@@ -15,15 +15,28 @@ class UUID(TypeDecorator):
         if value is None:
             return value
         elif isinstance(value, uuid.UUID):
+            if value.version != 4:
+                value = uuid.uuid4()
             return str(value)
         else:
-            return str(uuid.UUID(value))
+            try:
+                uuid_obj = uuid.UUID(value)
+                if uuid_obj.version != 4:
+                    uuid_obj = uuid.uuid4()
+                return str(uuid_obj)
+            except ValueError:
+                return str(uuid.uuid4())
 
     def process_result_value(self, value, dialect):
         if value is None:
             return value
-        else:
-            return uuid.UUID(value)
+        try:
+            uuid_obj = uuid.UUID(value)
+            if uuid_obj.version != 4:
+                uuid_obj = uuid.uuid4()
+            return uuid_obj
+        except ValueError:
+            return uuid.uuid4()
 
 class User(Base):
     __tablename__ = "users"

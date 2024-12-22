@@ -11,9 +11,12 @@ import uuid
 # Development flag to bypass authentication
 BYPASS_AUTH = True
 
+# Fixed UUID v4 for development user (generated with uuid.uuid4())
+DEV_USER_ID = uuid.UUID('a7a41c99-5555-4191-9b62-5e39b347b515')  # Valid UUID v4 format
+
 # Default admin user for development
 DEV_USER = models.User(
-    id=uuid.uuid4(),
+    id=DEV_USER_ID,  # Use fixed UUID v4 for consistency
     email="admin@example.com",
     username="admin",
     hashed_password="",
@@ -34,7 +37,8 @@ class OptionalOAuth2PasswordBearer(OAuth2PasswordBearer):
             return None
         return await super().__call__(request)
 
-oauth2_scheme = OptionalOAuth2PasswordBearer(tokenUrl="token")  # FastAPI will prepend the /api prefix
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")  # FastAPI will prepend the /api prefix
+oauth2_scheme_optional = OptionalOAuth2PasswordBearer(tokenUrl="token")
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
@@ -101,3 +105,27 @@ async def get_current_active_user(
     if not current_user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
+
+async def get_current_active_user_or_none(
+    token: Optional[str] = Depends(oauth2_scheme_optional),
+    db: Session = Depends(database.get_db)
+) -> Optional[models.User]:
+    if BYPASS_AUTH:
+        return DEV_USER
+
+    if not token:
+        return None
+
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            return None
+    except JWTError:
+        return None
+
+    user = db.query(models.User).filter(models.User.username == username).first()
+    if not user or not user.is_active:
+        return None
+
+    return user
