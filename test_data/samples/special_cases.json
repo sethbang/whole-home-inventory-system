@@ -1,0 +1,98 @@
+{
+  "items": [
+    {
+      "name": "Child's Toy™ - Special Edition!",
+      "category": "Kids & Baby Items",
+      "location": "Kids' Room",
+      "brand": "Fisher-Price®",
+      "model_number": "FP-123-α",
+      "serial_number": "FP/2023/β#123",
+      "barcode": "12345&67890",
+      "purchase_date": "2023-01-15",
+      "purchase_price": 1234567.89,
+      "current_value": 1000000.00,
+      "warranty_expiration": "2025-12-31",
+      "notes": "This is a very long description that includes special characters like ©®™&$€£¥§¶†‡... It also includes emojis 🎮🎲🎨 and multiple\nline\nbreaks to test text formatting. The description continues with more text to demonstrate handling of lengthy content in the system.",
+      "custom_fields": {
+        "color": "Multi-colored: Red, Blue & Green",
+        "size": "L (10\" × 12\" × 15\")",
+        "materials": ["Plastic", "Metal & Rubber", "100% Cotton"],
+        "age_range": "3+ years",
+        "safety_rating": "CE & ASTM F963"
+      }
+    },
+    {
+      "name": "",
+      "category": "Uncategorized",
+      "location": "Unknown",
+      "brand": null,
+      "model_number": null,
+      "serial_number": null,
+      "barcode": null,
+      "purchase_date": null,
+      "purchase_price": null,
+      "current_value": null,
+      "warranty_expiration": null,
+      "notes": null,
+      "custom_fields": {}
+    },
+    {
+      "name": "Résumé Portfolio & Documents",
+      "category": "Documents",
+      "location": "Home Office - Drawer #2",
+      "brand": "N/A",
+      "model_number": "",
+      "serial_number": "",
+      "barcode": "",
+      "purchase_date": "2023-02-28",
+      "purchase_price": 0.00,
+      "current_value": 0.00,
+      "warranty_expiration": "",
+      "notes": "Important documents with accented characters: é, è, à, ü, ñ, ç",
+      "custom_fields": {
+        "language": "English & Español",
+        "document_type": "Legal & Personal",
+        "last_updated": "2023-07-01",
+        "security_level": "Confidential"
+      }
+    },
+    {
+      "name": "<script>alert('test')</script>",
+      "category": "Testing & Validation",
+      "location": "Test Lab",
+      "brand": "Test & Debug Co.",
+      "model_number": "<test>123</test>",
+      "serial_number": "SELECT * FROM items;",
+      "barcode": "' OR '1'='1",
+      "purchase_date": "2023-03-15",
+      "purchase_price": 99.99,
+      "current_value": 89.99,
+      "warranty_expiration": "2024-03-15",
+      "notes": "This item tests SQL injection, XSS, and other security edge cases",
+      "custom_fields": {
+        "test_type": "Security & Validation",
+        "priority": "High",
+        "status": "In Progress & Ongoing"
+      }
+    },
+    {
+      "name": "     Whitespace    Test    Item     ",
+      "category": "   Testing   ",
+      "location": "  Storage  Room  ",
+      "brand": "  SpaceX  ",
+      "model_number": "  123  456  ",
+      "serial_number": "  ABC  123  ",
+      "barcode": "  123456789  ",
+      "purchase_date": "2023-04-01",
+      "purchase_price": 1.00,
+      "current_value": 1.00,
+      "warranty_expiration": "2024-04-01",
+      "notes": "   This item tests handling of excessive whitespace   ",
+      "custom_fields": {
+        "space_test": "  leading and trailing spaces  ",
+        "tab_test": "\tTabbed\tContent\t",
+        "mixed_spaces": "  Mixed   Spacing   Test  "
+      }
+    }
+  ]
+}

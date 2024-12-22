@@ -1,0 +1,118 @@
+{
+  "items": [
+    {
+      "name": "1964 Beatles Album",
+      "category": "Music Collectibles",
+      "location": "Display Room",
+      "brand": "Parlophone",
+      "model_number": "PMC 1240",
+      "serial_number": "",
+      "barcode": "",
+      "purchase_date": "2023-01-10",
+      "purchase_price": 1200.00,
+      "current_value": 1500.00,
+      "warranty_expiration": "",
+      "notes": "First UK pressing of 'A Hard Day's Night'",
+      "custom_fields": {
+        "condition": "VG+",
+        "pressing": "First UK Mono",
+        "authenticity": "Verified by Record Authentication Ltd",
+        "sleeve_condition": "VG",
+        "matrix_number": "XEX 481-1",
+        "previous_owner": "Private collector, London"
+      }
+    },
+    {
+      "name": "1955 Mickey Mantle Card",
+      "category": "Sports Memorabilia",
+      "location": "Safe",
+      "brand": "Topps",
+      "model_number": "#164",
+      "serial_number": "",
+      "barcode": "",
+      "purchase_date": "2022-12-15",
+      "purchase_price": 15000.00,
+      "current_value": 18000.00,
+      "warranty_expiration": "",
+      "notes": "Graded baseball card in protective case",
+      "custom_fields": {
+        "grade": "PSA 7",
+        "certification_number": "12345678",
+        "card_type": "Baseball",
+        "year": "1955",
+        "set": "Topps Baseball",
+        "population": "382 in PSA 7"
+      }
+    },
+    {
+      "name": "Vintage Rolex Submariner",
+      "category": "Watches",
+      "location": "Safe",
+      "brand": "Rolex",
+      "model_number": "5513",
+      "serial_number": "5789xxx",
+      "barcode": "",
+      "purchase_date": "2023-03-20",
+      "purchase_price": 22000.00,
+      "current_value": 25000.00,
+      "warranty_expiration": "",
+      "notes": "Matte dial Submariner with original box and papers",
+      "custom_fields": {
+        "year": "1978",
+        "case_size": "40mm",
+        "movement": "Caliber 1520",
+        "bracelet_code": "93150",
+        "box_papers": "yes",
+        "service_history": "Full service 2023-02",
+        "dial_type": "Matte black"
+      }
+    },
+    {
+      "name": "First Edition Book",
+      "category": "Books",
+      "location": "Library",
+      "brand": "Penguin Books",
+      "model_number": "",
+      "serial_number": "",
+      "barcode": "9780140283334",
+      "purchase_date": "2023-04-05",
+      "purchase_price": 3500.00,
+      "current_value": 4000.00,
+      "warranty_expiration": "",
+      "notes": "First edition of '1984' by George Orwell",
+      "custom_fields": {
+        "edition": "First Edition, First Printing",
+        "publisher": "Secker and Warburg",
+        "year": "1949",
+        "condition": "Near Fine",
+        "dust_jacket": "Present, Very Good",
+        "provenance": "Christie's Auction 2023",
+        "binding": "Original cloth"
+      }
+    },
+    {
+      "name": "Ancient Coin",
+      "category": "Numismatics",
+      "location": "Safe",
+      "brand": "",
+      "model_number": "",
+      "serial_number": "",
+      "barcode": "",
+      "purchase_date": "2023-05-15",
+      "purchase_price": 5000.00,
+      "current_value": 5500.00,
+      "warranty_expiration": "",
+      "notes": "Roman Denarius of Emperor Hadrian",
+      "custom_fields": {
+        "period": "Roman Empire",
+        "date": "117-138 CE",
+        "metal": "Silver",
+        "weight": "3.2g",
+        "diameter": "19mm",
+        "grade": "XF",
+        "certification": "NGC Ancients ID#4576-001",
+        "provenance": "Heritage Auctions 2023"
+      }
+    }
+  ]
+}

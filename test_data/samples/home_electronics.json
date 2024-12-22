@@ -1,0 +1,111 @@
+{
+  "items": [
+    {
+      "name": "Smart TV",
+      "category": "Electronics",
+      "location": "Media Room",
+      "brand": "LG",
+      "model_number": "OLED65C1PUB",
+      "serial_number": "LG2023OLED65C1",
+      "barcode": "719192633461",
+      "purchase_date": "2023-01-05",
+      "purchase_price": 2499.99,
+      "current_value": 2000.00,
+      "warranty_expiration": "2024-01-05",
+      "notes": "Primary TV with gaming features",
+      "custom_fields": {
+        "screen_size": "65 inches",
+        "resolution": "4K",
+        "hdr": "Dolby Vision",
+        "refresh_rate": "120Hz",
+        "smart_platform": "webOS",
+        "hdmi_2_1_ports": "4"
+      }
+    },
+    {
+      "name": "Home Theater Receiver",
+      "category": "Electronics",
+      "location": "Media Room",
+      "brand": "Denon",
+      "model_number": "AVR-X3700H",
+      "serial_number": "DEN3700H2023",
+      "barcode": "883795004931",
+      "purchase_date": "2023-02-15",
+      "purchase_price": 1199.99,
+      "current_value": 1000.00,
+      "warranty_expiration": "2024-02-15",
+      "notes": "9.2 channel AV receiver",
+      "custom_fields": {
+        "channels": "9.2",
+        "power_per_channel": "105W",
+        "hdmi_inputs": "7",
+        "dolby_atmos": "yes",
+        "zones": "3"
+      }
+    },
+    {
+      "name": "Gaming PC",
+      "category": "Electronics",
+      "location": "Home Office",
+      "brand": "Custom Built",
+      "model_number": "Custom-2023",
+      "serial_number": "",
+      "barcode": "",
+      "purchase_date": "2023-03-20",
+      "purchase_price": 2799.99,
+      "current_value": 2400.00,
+      "warranty_expiration": "",
+      "notes": "Custom built gaming/workstation PC",
+      "custom_fields": {
+        "cpu": "AMD Ryzen 9 5950X",
+        "gpu": "NVIDIA RTX 4080",
+        "ram": "64GB DDR4",
+        "storage": "2TB NVMe SSD",
+        "motherboard": "ASUS ROG X570",
+        "power_supply": "850W"
+      }
+    },
+    {
+      "name": "Network Router",
+      "category": "Electronics",
+      "location": "Network Closet",
+      "brand": "ASUS",
+      "model_number": "RT-AX86U",
+      "serial_number": "AS86U2023XYZ",
+      "barcode": "192876671955",
+      "purchase_date": "2023-04-10",
+      "purchase_price": 249.99,
+      "current_value": 200.00,
+      "warranty_expiration": "2025-04-10",
+      "notes": "Wi-Fi 6 gaming router",
+      "custom_fields": {
+        "wifi_standard": "Wi-Fi 6",
+        "frequency_bands": "dual-band",
+        "max_speed": "5700 Mbps",
+        "ports": "2.5G WAN, 4x Gigabit LAN",
+        "security": "WPA3"
+      }
+    },
+    {
+      "name": "Smart Thermostat",
+      "category": "Electronics",
+      "location": "Hallway",
+      "brand": "Ecobee",
+      "model_number": "SmartThermostat Premium",
+      "serial_number": "EB2023PREM123",
+      "barcode": "810008170326",
+      "purchase_date": "2023-05-01",
+      "purchase_price": 249.99,
+      "current_value": 220.00,
+      "warranty_expiration": "2025-05-01",
+      "notes": "Smart thermostat with voice control",
+      "custom_fields": {
+        "voice_assistant": "Alexa built-in",
+        "sensors": "1 main + 2 room sensors",
+        "wifi": "2.4/5GHz",
+        "smart_home": "HomeKit, Alexa, Google Home",
+        "display": "4 inch touchscreen"
+      }
+    }
+  ]
+}

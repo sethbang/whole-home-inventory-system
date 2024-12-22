@@ -1,0 +1,9 @@
+name,category,location,brand,model_number,serial_number,barcode,purchase_date,purchase_price,current_value,warranty_expiration,notes,custom_fields
+"Laptop","Electronics","Main Office","Dell","XPS 15 9520","DELL2023XPS15","884116455721","2023-01-10",1799.99,1500.00,"2024-01-10","Developer workstation","{""processor"": ""Intel i9"", ""ram"": ""32GB"", ""storage"": ""1TB SSD""}"
+"Office Chair","Furniture","Main Office","Herman Miller","Aeron","HM789456123","","2022-12-15",1095.00,900.00,"2029-12-15","Ergonomic chair size B","{""size"": ""B"", ""color"": ""graphite"", ""adjustable"": ""yes""}"
+"Printer","Electronics","Copy Room","HP","LaserJet Pro M404n","HPLJ123789","193905559833","2023-03-01",299.99,250.00,"2024-03-01","Network printer","{""type"": ""laser"", ""network"": ""ethernet"", ""duplex"": ""yes""}"
+"Filing Cabinet","Furniture","Storage Room","HON","H320","","","2023-02-15",199.99,180.00,"","4-drawer vertical file cabinet","{""material"": ""steel"", ""drawers"": ""4"", ""lock"": ""yes""}"
+"Conference Phone","Electronics","Meeting Room","Poly","Trio 8300","PT8300ABC","610807091233","2023-04-01",499.99,450.00,"2024-04-01","Conference room speakerphone","{""connectivity"": ""IP"", ""mics"": ""3"", ""bluetooth"": ""yes""}"
+"Whiteboard","Office Supplies","Meeting Room","Quartet","P557T","","678845673421","2023-01-20",129.99,100.00,"","Magnetic whiteboard 4x6","{""size"": ""4x6 feet"", ""surface"": ""magnetic"", ""mounting"": ""wall""}"
+"Paper Shredder","Electronics","Copy Room","Fellowes","225Ci","FS225CI456","043859728543","2023-05-15",399.99,350.00,"2025-05-15","Cross-cut shredder","{""type"": ""cross-cut"", ""capacity"": ""20 sheets"", ""bin"": ""14 gallons""}"
+"Standing Desk","Furniture","Main Office","Uplift","V2","UD456789","","2023-06-01",799.99,750.00,"2028-06-01","Electric adjustable desk","{""width"": ""72 inches"", ""height_range"": ""25-50.9 inches"", ""motors"": ""dual""}"

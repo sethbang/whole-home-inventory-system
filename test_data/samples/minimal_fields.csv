@@ -1,0 +1,9 @@
+name,category,location,brand,model_number,serial_number,barcode,purchase_date,purchase_price,current_value,warranty_expiration,notes,custom_fields
+"Kitchen Table","Furniture","Kitchen","","","","","","","","","Simple wooden table",""
+"Bookshelf","Furniture","Living Room","","","","","","","","","",""
+"Garden Hose","Outdoor","Backyard","","","","","","","","","Green 50ft hose",""
+"Desk Lamp","Lighting","Home Office","","","","","","","","","",""
+"Bath Towels","Linens","Bathroom","","","","","","","","","Set of 4 towels",""
+"Hand Tools","Tools","Garage","","","","","","","","","Basic tool set",""
+"Board Games","Entertainment","Living Room","","","","","","","","","Collection of family games",""
+"Cleaning Supplies","Household","Laundry Room","","","","","","","","","Various cleaning products",""

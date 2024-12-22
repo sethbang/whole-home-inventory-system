@@ -37,6 +37,4 @@ backend/backend/uploads/
 # Development
 dev-dist/
 
-# Test Data
-test_items.csv
-test_items.json
+# No longer excluding test data as it's now part of the repository

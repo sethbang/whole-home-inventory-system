@@ -1,0 +1,94 @@
+{
+  "items": [
+    {
+      "name": "55-inch 4K TV",
+      "category": "Electronics",
+      "location": "Living Room",
+      "brand": "Samsung",
+      "model_number": "UN55TU7000",
+      "serial_number": "XYZ123456789",
+      "barcode": "887276391885",
+      "purchase_date": "2023-01-15",
+      "purchase_price": 549.99,
+      "current_value": 450.00,
+      "warranty_expiration": "2024-01-15",
+      "notes": "Wall mounted TV with smart features",
+      "custom_fields": {
+        "color": "black",
+        "resolution": "4K"
+      }
+    },
+    {
+      "name": "Coffee Maker",
+      "category": "Appliances",
+      "location": "Kitchen",
+      "brand": "Breville",
+      "model_number": "BDC450",
+      "serial_number": "ABC987654321",
+      "barcode": "789012345678",
+      "purchase_date": "2023-03-20",
+      "purchase_price": 299.99,
+      "current_value": 250.00,
+      "warranty_expiration": "2025-03-20",
+      "notes": "12-cup precision brewer",
+      "custom_fields": {
+        "color": "silver",
+        "capacity": "12 cups"
+      }
+    },
+    {
+      "name": "Leather Sofa",
+      "category": "Furniture",
+      "location": "Living Room",
+      "brand": "Ashley Furniture",
+      "model_number": "AS-8675309",
+      "serial_number": "",
+      "barcode": "",
+      "purchase_date": "2022-11-30",
+      "purchase_price": 1299.99,
+      "current_value": 1000.00,
+      "warranty_expiration": "2024-11-30",
+      "notes": "3-seater brown leather sofa",
+      "custom_fields": {
+        "material": "leather",
+        "color": "brown"
+      }
+    },
+    {
+      "name": "Gaming Console",
+      "category": "Electronics",
+      "location": "Entertainment Room",
+      "brand": "Sony",
+      "model_number": "PlayStation 5",
+      "serial_number": "PS5123456",
+      "barcode": "711719541028",
+      "purchase_date": "2023-06-01",
+      "purchase_price": 499.99,
+      "current_value": 450.00,
+      "warranty_expiration": "2024-06-01",
+      "notes": "Digital Edition with extra controller",
+      "custom_fields": {
+        "edition": "digital",
+        "storage": "825GB"
+      }
+    },
+    {
+      "name": "Refrigerator",
+      "category": "Appliances",
+      "location": "Kitchen",
+      "brand": "LG",
+      "model_number": "LFXS26973S",
+      "serial_number": "LG2023ABC123",
+      "barcode": "048231024983",
+      "purchase_date": "2023-02-10",
+      "purchase_price": 2199.99,
+      "current_value": 2000.00,
+      "warranty_expiration": "2026-02-10",
+      "notes": "French door with ice maker",
+      "custom_fields": {
+        "color": "stainless steel",
+        "capacity": "26 cu ft"
+      }
+    }
+  ]
+}

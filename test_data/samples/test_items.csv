@@ -1,0 +1,6 @@
+name,category,location,brand,model_number,serial_number,barcode,purchase_date,purchase_price,current_value,warranty_expiration,notes,custom_fields
+"55-inch 4K TV","Electronics","Living Room","Samsung","UN55TU7000","XYZ123456789","887276391885","2023-01-15",549.99,450.00,"2024-01-15","Wall mounted TV with smart features","{""color"": ""black"", ""resolution"": ""4K""}"
+"Coffee Maker","Appliances","Kitchen","Breville","BDC450","ABC987654321","789012345678","2023-03-20",299.99,250.00,"2025-03-20","12-cup precision brewer","{""color"": ""silver"", ""capacity"": ""12 cups""}"
+"Leather Sofa","Furniture","Living Room","Ashley Furniture","AS-8675309","","","2022-11-30",1299.99,1000.00,"2024-11-30","3-seater brown leather sofa","{""material"": ""leather"", ""color"": ""brown""}"
+"Gaming Console","Electronics","Entertainment Room","Sony","PlayStation 5","PS5123456","711719541028","2023-06-01",499.99,450.00,"2024-06-01","Digital Edition with extra controller","{""edition"": ""digital"", ""storage"": ""825GB""}"
+"Refrigerator","Appliances","Kitchen","LG","LFXS26973S","LG2023ABC123","048231024983","2023-02-10",2199.99,2000.00,"2026-02-10","French door with ice maker","{""color"": ""stainless steel"", ""capacity"": ""26 cu ft""}"
