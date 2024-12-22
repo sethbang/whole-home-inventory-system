@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="images/whis_logo_thin.svg" alt="WHIS Logo" width="200" height="200">
+</div>
+
 # Whole-Home Inventory System (WHIS)
 
 WHIS is a self-hosted platform for managing household inventories. It centralizes item information—descriptions, photos, locations, purchase details, valuations, warranties—into a local database accessible from multiple devices via a web interface.

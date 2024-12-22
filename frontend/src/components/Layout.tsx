@@ -1,4 +1,5 @@
   import React, { Fragment } from 'react';
+  import whisLogo from '../assets/whis_logo.svg';
 import { Link, useLocation } from 'react-router-dom';
 import { Disclosure, Menu, Transition } from '@headlessui/react';
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
@@ -30,8 +31,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <div className="flex h-16 justify-between">
                 <div className="flex">
                   <div className="flex flex-shrink-0 items-center">
-                    <Link to="/" className="text-xl font-bold text-primary-600">
-                      WHIS
+                    <Link to="/" className="flex items-center">
+                      <img src={whisLogo} alt="WHIS Logo" className="h-16 w-16" />
                     </Link>
                   </div>
                   <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
