@@ -77,9 +77,24 @@ npm run dev
 ```
 
 The application will be available at:
-- Frontend: http://localhost:5173
-- Backend API: http://localhost:27182
-- API Documentation: http://localhost:27182/docs
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:8000
+- API Documentation: http://localhost:8000/docs
+
+### Development Mode
+
+The application includes a development mode that can be enabled to access additional features:
+- Test data generation
+- Quick user creation
+- Database verification tools
+- Sample data import/export testing
+
+### Test Data
+
+The `test_data/samples` directory contains various sample datasets for testing the import functionality:
+- CSV and JSON format examples
+- Different inventory scenarios (office, home electronics, garage tools, collectibles)
+- Edge cases and minimal field samples
 
 ## Production Deployment
 
