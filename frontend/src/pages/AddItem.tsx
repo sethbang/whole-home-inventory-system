@@ -59,6 +59,15 @@ export default function AddItem() {
     custom_fields: Record<string, unknown>;
   }
 
+  const uploadImageMutation = useMutation({
+    mutationFn: async ({ itemId, file }: { itemId: string; file: File }) => {
+      return await images.upload(itemId, file);
+    },
+    onError: (error: any) => {
+      setError(error.response?.data?.detail || 'Failed to upload image');
+    },
+  });
+
   const createItemMutation = useMutation({
     mutationFn: async (params: { values: FormValues } & { isDev?: boolean }) => {
       const { values, isDev } = params;
@@ -67,18 +76,28 @@ export default function AddItem() {
           ...values,
           purchase_price: values.purchase_price ? parseFloat(values.purchase_price) : undefined,
           current_value: values.current_value ? parseFloat(values.current_value) : undefined,
-          purchase_date: values.purchase_date || undefined,
-          warranty_expiration: values.warranty_expiration || undefined,
+          purchase_date: values.purchase_date ? new Date(values.purchase_date).toISOString() : undefined,
+          warranty_expiration: values.warranty_expiration ? new Date(values.warranty_expiration).toISOString() : undefined,
         },
         isDev
       );
+
+      // Upload images after item is created
       if (selectedFiles.length > 0) {
-        await Promise.all(selectedFiles.map((file) => images.upload(item.id, file)));
+        try {
+          await Promise.all(
+            selectedFiles.map(file => uploadImageMutation.mutateAsync({ itemId: item.id, file }))
+          );
+        } catch (error) {
+          console.error('Failed to upload some images:', error);
+          setError('Item was created but some images failed to upload. You can add them later.');
+        }
       }
+
       return item;
     },
-    onSuccess: () => {
-      navigate('/');
+    onSuccess: (item) => {
+      navigate(`/items/${item.id}`);
     },
     onError: (error: any) => {
       setError(error.response?.data?.detail || 'Failed to create item');

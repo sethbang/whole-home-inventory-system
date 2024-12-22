@@ -1,13 +1,17 @@
 import axios from 'axios';
 
-// Get the current hostname (e.g., localhost, 192.168.1.122, etc.)
-const hostname = window.location.hostname;
-// Use the API URL from environment variable, falling back to the current hostname
-const API_URL = import.meta.env.VITE_API_URL || `http://${hostname}:27182`;
+// In development, use relative URLs that will be handled by Vite's proxy
+const API_URL = '';
 
 export const apiClient = axios.create({
   baseURL: API_URL,
   withCredentials: true,
+  // Disable SSL certificate validation in development
+  ...(import.meta.env.DEV && {
+    httpsAgent: {
+      rejectUnauthorized: false
+    }
+  })
 });
 
 // Development flag to bypass authentication (must match AuthContext)

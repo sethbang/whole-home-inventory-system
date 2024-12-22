@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import CustomFields from '../components/CustomFields';
 import CameraCapture from '../components/CameraCapture';
+import ImageGallery from '../components/ImageGallery';
 import { CameraIcon } from '@heroicons/react/24/outline';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useFormik } from 'formik';
@@ -50,11 +51,7 @@ export default function ItemDetail() {
 
   const updateItemMutation = useMutation({
     mutationFn: async (values: Partial<Item>) => {
-      const updatedItem = await items.update(id!, values);
-      if (selectedFiles.length > 0) {
-        await Promise.all(selectedFiles.map((file) => images.upload(id!, file)));
-      }
-      return updatedItem;
+      return await items.update(id!, values);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['items', id] });
@@ -62,6 +59,19 @@ export default function ItemDetail() {
     },
     onError: (error: any) => {
       setError(error.response?.data?.detail || 'Failed to update item');
+    },
+  });
+
+  const uploadImageMutation = useMutation({
+    mutationFn: async (file: File) => {
+      return await images.upload(id!, file);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['items', id] });
+      setSelectedFiles([]);
+    },
+    onError: (error: any) => {
+      setError(error.response?.data?.detail || 'Failed to upload image');
     },
   });
 
@@ -107,8 +117,8 @@ export default function ItemDetail() {
         ...values,
         purchase_price: values.purchase_price ? parseFloat(values.purchase_price) : undefined,
         current_value: values.current_value ? parseFloat(values.current_value) : undefined,
-        purchase_date: values.purchase_date || undefined,
-        warranty_expiration: values.warranty_expiration || undefined,
+        purchase_date: values.purchase_date ? new Date(values.purchase_date).toISOString() : undefined,
+        warranty_expiration: values.warranty_expiration ? new Date(values.warranty_expiration).toISOString() : undefined,
       };
       updateItemMutation.mutate(itemData);
     },
@@ -116,7 +126,11 @@ export default function ItemDetail() {
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
-      setSelectedFiles(Array.from(event.target.files));
+      Array.from(event.target.files).forEach(file => {
+        uploadImageMutation.mutate(file);
+      });
+      // Clear the input
+      event.target.value = '';
     }
   };
 
@@ -171,25 +185,11 @@ export default function ItemDetail() {
           {item?.images && item.images.length > 0 && (
             <div className="pt-8">
               <h3 className="text-lg font-medium leading-6 text-gray-900">Current Images</h3>
-              <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-                {item.images.map((image) => (
-                  <div key={image.id} className="relative group">
-                    <div className="aspect-w-1 aspect-h-1 w-full overflow-hidden rounded-lg bg-gray-200">
-                      <img
-                        src={`http://localhost:8000/uploads/${image.filename}`}
-                        alt=""
-                        className="object-cover object-center"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteImage(image.id)}
-                        className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 opacity-0 group-hover:opacity-100"
-                      >
-                        <span className="text-white">Delete</span>
-                      </button>
-                    </div>
-                  </div>
-                ))}
+              <div className="mt-4">
+                <ImageGallery
+                  images={item.images}
+                  onDelete={handleDeleteImage}
+                />
               </div>
             </div>
           )}
@@ -399,7 +399,8 @@ export default function ItemDetail() {
               {showCamera && (
                 <CameraCapture
                   onCapture={(file) => {
-                    setSelectedFiles((prev) => [...prev, file]);
+                    uploadImageMutation.mutate(file);
+                    setShowCamera(false);
                   }}
                   onClose={() => setShowCamera(false)}
                 />

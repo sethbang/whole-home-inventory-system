@@ -1,13 +1,67 @@
-# React + TypeScript + Vite
+# WHIS Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This is the frontend application for the Whole Home Inventory System (WHIS), built with React, TypeScript, and Vite.
 
-Currently, two official plugins are available:
+## Docker Development Setup
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+1. Stop any running containers:
+```bash
+docker compose down
+```
 
-## Expanding the ESLint configuration
+2. Rebuild and start the containers:
+```bash
+docker compose up --build
+```
+
+The frontend will be available at `https://localhost:5173` or your local IP (e.g., `https://192.168.1.15:5173`).
+
+### HTTPS Certificate
+
+The development server uses HTTPS with a self-signed certificate. When you first access the site:
+
+1. You'll see a security warning in your browser - this is normal for self-signed certificates
+2. In Chrome/Edge: Click "Advanced" and then "Proceed to localhost (unsafe)"
+3. In Safari: Click "Show Details" and then "visit this website"
+4. In iOS Safari: Go to Settings > General > About > Certificate Trust Settings, and enable trust for the development certificate
+
+This HTTPS setup is required for:
+- Camera access on iOS devices
+- Testing PWA features
+- Secure cookie handling
+
+## Local Development Setup
+
+1. Install dependencies:
+```bash
+npm install
+```
+
+2. Start the development server:
+```bash
+npm run dev
+```
+
+The development server will:
+- Generate self-signed HTTPS certificates (required for camera access on iOS)
+- Start Vite in development mode with HTTPS enabled
+- Listen on all network interfaces (accessible via local IP)
+
+### HTTPS Certificate
+
+The development server uses HTTPS with a self-signed certificate. When you first access the site:
+
+1. You'll see a security warning in your browser - this is normal for self-signed certificates
+2. In Chrome/Edge: Click "Advanced" and then "Proceed to localhost (unsafe)"
+3. In Safari: Click "Show Details" and then "visit this website"
+4. In iOS Safari: Go to Settings > General > About > Certificate Trust Settings, and enable trust for the development certificate
+
+This HTTPS setup is required for:
+- Camera access on iOS devices
+- Testing PWA features
+- Secure cookie handling
+
+## ESLint Configuration
 
 If you are developing a production application, we recommend updating the configuration to enable type aware lint rules:
 
@@ -16,7 +70,6 @@ If you are developing a production application, we recommend updating the config
 ```js
 export default tseslint.config({
   languageOptions: {
-    // other options...
     parserOptions: {
       project: ['./tsconfig.node.json', './tsconfig.app.json'],
       tsconfigRootDir: import.meta.dirname,
@@ -41,10 +94,8 @@ export default tseslint.config({
     react,
   },
   rules: {
-    // other rules...
     // Enable its recommended rules
     ...react.configs.recommended.rules,
     ...react.configs['jsx-runtime'].rules,
   },
 })
-```

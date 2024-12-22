@@ -6,8 +6,21 @@ from . import models, database
 from .routers import auth, items, images, analytics, backups
 
 # Create the uploads directory if it doesn't exist
-UPLOAD_DIR = os.path.join("backend", "uploads")
+UPLOAD_DIR = os.path.join("/app", "backend", "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+print(f"Upload directory path: {UPLOAD_DIR}")
+print(f"Upload directory exists: {os.path.exists(UPLOAD_DIR)}")
+print(f"Directory permissions: {oct(os.stat(UPLOAD_DIR).st_mode)[-3:]}")
+
+# Ensure uploads directory is accessible
+try:
+    test_file = os.path.join(UPLOAD_DIR, "test.txt")
+    with open(test_file, "w") as f:
+        f.write("test")
+    os.remove(test_file)
+    print("Upload directory is writable")
+except Exception as e:
+    print(f"Error testing upload directory: {str(e)}")
 
 # Create database tables
 models.Base.metadata.create_all(bind=database.engine)
@@ -31,7 +44,7 @@ async def method_not_allowed_handler(request, exc):
     )
 
 # Get CORS settings from environment variables with defaults
-CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "https://localhost:5173,https://192.168.1.15:5173").split(",")
 CORS_ALLOW_METHODS = os.getenv("CORS_ALLOW_METHODS", "GET,POST,PUT,DELETE,OPTIONS,HEAD,PATCH").split(",")
 CORS_ALLOW_HEADERS = os.getenv("CORS_ALLOW_HEADERS", "Content-Type,Authorization,Accept,Origin,X-Requested-With").split(",")
 

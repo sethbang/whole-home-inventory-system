@@ -11,8 +11,11 @@ from datetime import datetime
 router = APIRouter(tags=["images"])
 
 # Create images directory if it doesn't exist
-UPLOAD_DIR = os.path.join("backend", "uploads")
+UPLOAD_DIR = os.path.join("/app", "backend", "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+print(f"Images upload directory: {UPLOAD_DIR}")
+print(f"Directory exists: {os.path.exists(UPLOAD_DIR)}")
+print(f"Directory permissions: {oct(os.stat(UPLOAD_DIR).st_mode)[-3:]}")
 
 def save_upload_file(upload_file: UploadFile, destination: str) -> None:
     try:
@@ -45,36 +48,49 @@ async def upload_item_image(
             detail="File must be an image (JPEG or PNG)"
         )
     
-    # Create user-specific upload directory
-    user_upload_dir = os.path.join(UPLOAD_DIR, str(current_user.id))
-    os.makedirs(user_upload_dir, exist_ok=True)
-    
     # Generate unique filename
     timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
     file_extension = os.path.splitext(file.filename)[1]
     filename = f"{timestamp}_{uuid.uuid4()}{file_extension}"
-    file_path = os.path.join(user_upload_dir, filename)
+    file_path = os.path.join(UPLOAD_DIR, filename)
+    
+    print(f"Generated filename: {filename}")
+    print(f"Full file path: {file_path}")
     
     # Save file
     try:
+        print(f"Saving file to: {file_path}")
         save_upload_file(file, file_path)
+        print(f"File saved successfully")
+        print(f"File exists: {os.path.exists(file_path)}")
+        print(f"File size: {os.path.getsize(file_path)} bytes")
     except Exception as e:
+        print(f"Error saving file: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"Could not upload file: {str(e)}"
         )
     
     # Create database record
-    db_image = models.ItemImage(
-        item_id=item_id,
-        filename=filename,
-        file_path=file_path
-    )
-    db.add(db_image)
-    db.commit()
-    db.refresh(db_image)
-    
-    return db_image
+    try:
+        db_image = models.ItemImage(
+            item_id=item_id,
+            filename=filename,
+            file_path=os.path.join('uploads', filename)  # Store relative path in database
+        )
+        db.add(db_image)
+        db.commit()
+        db.refresh(db_image)
+        print(f"Database record created: {db_image.id}")
+        return db_image
+    except Exception as e:
+        print(f"Error creating database record: {str(e)}")
+        if os.path.exists(file_path):
+            os.remove(file_path)  # Clean up file if database insert fails
+        raise HTTPException(
+            status_code=500,
+            detail=f"Could not create image record: {str(e)}"
+        )
 
 @router.get("/items/{item_id}/images", response_model=List[schemas.ItemImage])
 def list_item_images(
