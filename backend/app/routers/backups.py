@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import List
 import os
@@ -324,6 +324,84 @@ async def restore_backup(
             status_code=500,
             detail=f"Error restoring backup: {str(e)}"
         )
+
+@router.post("/backups/upload")
+async def upload_backup(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_active_user)
+):
+    if not file.filename.endswith('.zip'):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid file format. Only .zip files are allowed."
+        )
+
+    # Create a temporary directory for validation
+    temp_dir = os.path.join(BACKUP_DIR, f"upload_{current_user.id}")
+    os.makedirs(temp_dir, exist_ok=True)
+
+    try:
+        # Save the uploaded file
+        file_path = os.path.join(BACKUP_DIR, file.filename)
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        # Try to extract and validate the backup
+        with zipfile.ZipFile(file_path, 'r') as zip_ref:
+            zip_ref.extractall(temp_dir)
+
+        # Check for required backup structure
+        data_file = os.path.join(temp_dir, "data.json")
+        if not os.path.exists(data_file):
+            raise ValueError("Invalid backup file: missing data.json")
+
+        # Read and validate backup data
+        with open(data_file) as f:
+            backup_data = json.load(f)
+            if not isinstance(backup_data, dict) or 'items' not in backup_data:
+                raise ValueError("Invalid backup data structure")
+
+        # Count items and images
+        item_count = len(backup_data['items'])
+        image_count = sum(len(item.get('images', [])) for item in backup_data['items'])
+
+        # Create backup record
+        backup = models.Backup(
+            owner_id=current_user.id,
+            filename=file.filename,
+            file_path=file_path,
+            size_bytes=os.path.getsize(file_path),
+            item_count=item_count,
+            image_count=image_count,
+            status="completed"
+        )
+        db.add(backup)
+        db.commit()
+        db.refresh(backup)
+
+        return backup
+
+    except (zipfile.BadZipFile, ValueError) as e:
+        # Clean up the invalid file if it was saved
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        raise HTTPException(
+            status_code=400,
+            detail=str(e)
+        )
+    except Exception as e:
+        # Clean up on any other error
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error processing backup file: {str(e)}"
+        )
+    finally:
+        # Clean up temporary directory
+        if os.path.exists(temp_dir):
+            shutil.rmtree(temp_dir)
 
 @router.delete("/backups/{backup_id}")
 async def delete_backup(

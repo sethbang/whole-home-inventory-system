@@ -182,6 +182,13 @@ export const items = {
   delete: async (id: string): Promise<void> => {
     await apiClient.delete(`/api/items/${id}`);
   },
+  bulkDelete: async (itemIds: string[]): Promise<{ status: string; deleted_count: number }> => {
+    const response = await apiClient.post<{ status: string; deleted_count: number }>(
+      '/api/items/bulk-delete',
+      { item_ids: itemIds }
+    );
+    return response.data;
+  },
   getCategories: async (): Promise<string[]> => {
     const response = await apiClient.get<string[]>('/api/categories');
     return response.data;
@@ -352,5 +359,15 @@ export const backups = {
     link.click();
     link.remove();
     window.URL.revokeObjectURL(url);
+  },
+  upload: async (file: File): Promise<Backup> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await apiClient.post<Backup>('/api/backups/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
   },
 };

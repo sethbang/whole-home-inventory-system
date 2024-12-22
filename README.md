@@ -144,10 +144,12 @@ The Docker setup includes:
    - Add custom fields as needed
 
 4. **Data Management**
-   - Use the backup feature to create data backups
-   - Restore from backups when needed
-   - Import/export data using the migration tools
-   - Generate reports and analytics
+    - Create automatic backups of your data
+    - Download backups for safekeeping
+    - Upload backup files to restore data on another system
+    - Restore from any backup with a single click
+    - Import/export data using the migration tools
+    - Generate reports and analytics
 
 ## Future Features
 

@@ -104,13 +104,42 @@ const Backups: React.FC = () => {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Backups</h1>
-        <button
-          onClick={handleCreateBackup}
-          disabled={loading}
-          className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
-        >
-          Create New Backup
-        </button>
+        <div className="flex gap-4">
+          <label className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded cursor-pointer disabled:opacity-50">
+            <input
+              type="file"
+              accept=".zip"
+              className="hidden"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                
+                try {
+                  setLoading(true);
+                  await backups.upload(file);
+                  await loadBackups();
+                  setError(null);
+                } catch (err) {
+                  setError('Failed to upload backup file');
+                  console.error('Error uploading backup:', err);
+                } finally {
+                  setLoading(false);
+                  // Clear the input
+                  e.target.value = '';
+                }
+              }}
+              disabled={loading}
+            />
+            Upload Backup
+          </label>
+          <button
+            onClick={handleCreateBackup}
+            disabled={loading}
+            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
+          >
+            Create New Backup
+          </button>
+        </div>
       </div>
 
       {error && (
