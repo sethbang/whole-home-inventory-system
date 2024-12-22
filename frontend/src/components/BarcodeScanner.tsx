@@ -1,6 +1,6 @@
-import React, { useRef, useState, useCallback, useEffect } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 import { XMarkIcon, CameraIcon, QrCodeIcon } from '@heroicons/react/24/outline';
-import { BrowserMultiFormatReader, Result, BarcodeFormat } from '@zxing/library';
+import { BrowserMultiFormatReader, Result } from '@zxing/library';
 
 interface BarcodeScannerProps {
   onCapture: (file: File) => void;

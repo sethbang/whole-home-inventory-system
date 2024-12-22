@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { apiClient } from '../api/client';
-import axios from 'axios';
 
 interface ImportResult {
   success: boolean;
