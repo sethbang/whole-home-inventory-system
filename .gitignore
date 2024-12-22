@@ -39,3 +39,4 @@ backend/backend/backups/
 dev-dist/
 
 # No longer excluding test data as it's now part of the repository
+images/local

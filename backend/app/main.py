@@ -30,17 +30,19 @@ async def method_not_allowed_handler(request, exc):
         headers=get_cors_headers(request)
     )
 
-# Get CORS origins from environment variable, default to development server
+# Get CORS settings from environment variables with defaults
 CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
+CORS_ALLOW_METHODS = os.getenv("CORS_ALLOW_METHODS", "GET,POST,PUT,DELETE,OPTIONS,HEAD,PATCH").split(",")
+CORS_ALLOW_HEADERS = os.getenv("CORS_ALLOW_HEADERS", "Content-Type,Authorization,Accept,Origin,X-Requested-With").split(",")
 
 # Configure CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
-    expose_headers=["Content-Type", "Content-Disposition"],
+    allow_methods=CORS_ALLOW_METHODS,
+    allow_headers=CORS_ALLOW_HEADERS,
+    expose_headers=["Content-Type", "Content-Disposition", "Authorization"],
     max_age=3600,  # Cache preflight requests for 1 hour
 )
 
@@ -99,14 +101,14 @@ async def health_check():
 
 # Common CORS headers for error responses
 def get_cors_headers(request):
-    origin = request.headers.get("origin", CORS_ORIGINS[0])
+    origin = request.headers.get("origin")
     if origin in CORS_ORIGINS:
         return {
             "Access-Control-Allow-Origin": origin,
             "Access-Control-Allow-Credentials": "true",
-            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-            "Access-Control-Allow-Headers": "*",
-            "Access-Control-Expose-Headers": "Content-Type, Content-Disposition"
+            "Access-Control-Allow-Methods": ", ".join(CORS_ALLOW_METHODS),
+            "Access-Control-Allow-Headers": ", ".join(CORS_ALLOW_HEADERS),
+            "Access-Control-Expose-Headers": "Content-Type, Content-Disposition, Authorization"
         }
     return {}
 

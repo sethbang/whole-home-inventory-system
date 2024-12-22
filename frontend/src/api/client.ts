@@ -1,6 +1,8 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:27182';
+// Get the current hostname (e.g., localhost, 192.168.1.122, etc.)
+const hostname = window.location.hostname;
+const API_URL = `http://${hostname}:27182`;
 
 export const apiClient = axios.create({
   baseURL: API_URL,
