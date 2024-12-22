@@ -36,3 +36,7 @@ backend/backend/uploads/
 
 # Development
 dev-dist/
+
+# Test Data
+test_items.csv
+test_items.json
