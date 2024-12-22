@@ -35,6 +35,7 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     items = relationship("Item", back_populates="owner")
+    backups = relationship("Backup", back_populates="owner")
 
 class Item(Base):
     __tablename__ = "items"
@@ -69,3 +70,19 @@ class ItemImage(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     
     item = relationship("Item", back_populates="images")
+
+class Backup(Base):
+    __tablename__ = "backups"
+
+    id = Column(UUID, primary_key=True, default=uuid.uuid4)
+    owner_id = Column(UUID, ForeignKey("users.id"))
+    filename = Column(String)
+    file_path = Column(String)
+    size_bytes = Column(Integer)
+    item_count = Column(Integer)
+    image_count = Column(Integer)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    status = Column(String)  # 'completed', 'failed', 'in_progress'
+    error_message = Column(String, nullable=True)
+    
+    owner = relationship("User", back_populates="backups")

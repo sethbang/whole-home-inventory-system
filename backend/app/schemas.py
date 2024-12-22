@@ -1,8 +1,7 @@
-from pydantic import BaseModel, EmailStr, UUID4, Field, validator
-from typing import Optional, List, Dict, Union
+from pydantic import BaseModel, UUID4, EmailStr
+from typing import Optional, Dict, Any, List
 from datetime import datetime
 
-# User schemas
 class UserBase(BaseModel):
     email: EmailStr
     username: str
@@ -18,7 +17,6 @@ class User(UserBase):
     class Config:
         from_attributes = True
 
-# Token schemas
 class Token(BaseModel):
     access_token: str
     token_type: str
@@ -26,28 +24,7 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     username: Optional[str] = None
 
-# Image schemas
-class ItemImageBase(BaseModel):
-    filename: str
-    file_path: str
-
-class ItemImageCreate(ItemImageBase):
-    pass
-
-class ItemImage(ItemImageBase):
-    id: UUID4
-    item_id: UUID4
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-# Item schemas
 class ItemBase(BaseModel):
-    model_config = {
-        'protected_namespaces': ()
-    }
-    
     name: str
     category: str
     location: str
@@ -59,40 +36,57 @@ class ItemBase(BaseModel):
     current_value: Optional[float] = None
     warranty_expiration: Optional[datetime] = None
     notes: Optional[str] = None
-    custom_fields: Optional[Dict[str, Union[str, int, float, bool]]] = Field(default_factory=dict)
+    custom_fields: Optional[Dict[str, Any]] = None
 
 class ItemCreate(ItemBase):
     pass
-
-class ItemUpdate(ItemBase):
-    name: Optional[str] = None
-    category: Optional[str] = None
-    location: Optional[str] = None
 
 class Item(ItemBase):
     id: UUID4
     owner_id: UUID4
     created_at: datetime
     updated_at: datetime
-    images: List[ItemImage] = []
 
     class Config:
         from_attributes = True
 
-# Response schemas
-class ItemList(BaseModel):
-    items: List[Item]
-    total: int
-    page: int
-    page_size: int
+class ItemImage(BaseModel):
+    id: UUID4
+    item_id: UUID4
+    filename: str
+    file_path: str
+    created_at: datetime
 
-class SearchFilter(BaseModel):
-    query: Optional[str] = None
-    category: Optional[str] = None
-    location: Optional[str] = None
-    min_value: Optional[float] = None
-    max_value: Optional[float] = None
-    sort_by: Optional[str] = "created_at"
-    sort_desc: bool = True
-    page: int = 1
-    page_size: int = 20
+    class Config:
+        from_attributes = True
+
+class BackupBase(BaseModel):
+    pass
+
+class BackupCreate(BackupBase):
+    pass
+
+class Backup(BackupBase):
+    id: UUID4
+    owner_id: UUID4
+    filename: str
+    file_path: str
+    size_bytes: int
+    item_count: int
+    image_count: int
+    created_at: datetime
+    status: str
+    error_message: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+class BackupList(BaseModel):
+    backups: List[Backup]
+
+class RestoreResponse(BaseModel):
+    success: bool
+    message: str
+    items_restored: Optional[int] = None
+    images_restored: Optional[int] = None
+    errors: Optional[List[str]] = None

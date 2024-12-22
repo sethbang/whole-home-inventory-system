@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
 from . import models, database
-from .routers import auth, items, images, analytics
+from .routers import auth, items, images, analytics, backups
 
 # Create the uploads directory if it doesn't exist
 UPLOAD_DIR = os.path.join("backend", "uploads")
@@ -41,6 +41,7 @@ app.include_router(auth.router, prefix="/api")
 app.include_router(items.router, prefix="/api")
 app.include_router(images.router, prefix="/api")
 app.include_router(analytics.router, prefix="/api")
+app.include_router(backups.router, prefix="/api")
 
 @app.get("/api/health")
 async def health_check():

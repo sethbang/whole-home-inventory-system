@@ -9,6 +9,7 @@ import Dashboard from './pages/Dashboard';
 import AddItem from './pages/AddItem';
 import ItemDetail from './pages/ItemDetail';
 import Reports from './pages/Reports';
+import Backups from './pages/Backups';
 
 // Initialize React Query client
 const queryClient = new QueryClient({
@@ -67,6 +68,16 @@ function App() {
                 <RequireAuth>
                   <Layout>
                     <Reports />
+                  </Layout>
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/backups"
+              element={
+                <RequireAuth>
+                  <Layout>
+                    <Backups />
                   </Layout>
                 </RequireAuth>
               }

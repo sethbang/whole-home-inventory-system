@@ -287,3 +287,49 @@ export const images = {
     await apiClient.delete(`/images/${imageId}`);
   },
 };
+
+export interface Backup {
+  id: string;
+  owner_id: string;
+  filename: string;
+  file_path: string;
+  size_bytes: number;
+  item_count: number;
+  image_count: number;
+  created_at: string;
+  status: 'completed' | 'failed' | 'in_progress';
+  error_message?: string;
+}
+
+export interface BackupList {
+  backups: Backup[];
+}
+
+export interface RestoreResponse {
+  success: boolean;
+  message: string;
+  items_restored?: number;
+  images_restored?: number;
+  errors?: string[];
+}
+
+export const backups = {
+  create: async (): Promise<Backup> => {
+    const response = await apiClient.post<Backup>('/backups');
+    return response.data;
+  },
+  list: async (): Promise<BackupList> => {
+    const response = await apiClient.get<BackupList>('/backups');
+    return response.data;
+  },
+  restore: async (backupId: string): Promise<RestoreResponse> => {
+    const response = await apiClient.post<RestoreResponse>(`/backups/${backupId}/restore`);
+    return response.data;
+  },
+  delete: async (backupId: string): Promise<void> => {
+    await apiClient.delete(`/backups/${backupId}`);
+  },
+  download: async (backupId: string): Promise<void> => {
+    window.location.href = `${API_URL}/backups/${backupId}/download`;
+  },
+};
