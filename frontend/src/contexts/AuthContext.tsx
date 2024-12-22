@@ -1,13 +1,11 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, auth } from '../api/client';
 import { useNavigate } from 'react-router-dom';
-
-// Development flag to bypass authentication
-const BYPASS_AUTH = false;
+import { useDevMode } from './DevModeContext';
 
 // Default admin user for development
 const DEV_USER: User = {
-  id: 'admin',
+  id: 'a7a41c99-5555-4191-9b62-5e39b347b515',
   email: 'admin@example.com',
   username: 'admin',
   is_active: true,
@@ -28,10 +26,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
+  const { isDevMode } = useDevMode();
 
   useEffect(() => {
-    if (BYPASS_AUTH) {
+    if (isDevMode) {
       setUser(DEV_USER);
+      localStorage.setItem('whis_token', 'dev_token');
       setIsLoading(false);
       return;
     }
@@ -48,11 +48,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } else {
       setIsLoading(false);
     }
-  }, [navigate]);
+  }, [navigate, isDevMode]);
 
   const login = async (username: string, password: string) => {
-    if (BYPASS_AUTH) {
+    if (isDevMode) {
       setUser(DEV_USER);
+      localStorage.setItem('whis_token', 'dev_token');
       navigate('/');
       return;
     }
@@ -65,8 +66,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const register = async (email: string, username: string, password: string) => {
-    if (BYPASS_AUTH) {
+    if (isDevMode) {
       setUser(DEV_USER);
+      localStorage.setItem('whis_token', 'dev_token');
       navigate('/');
       return;
     }
@@ -76,7 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = () => {
-    if (BYPASS_AUTH) {
+    if (isDevMode) {
       setUser(DEV_USER);
       return;
     }
@@ -103,13 +105,14 @@ export function useAuth() {
 
 export function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
+  const { isDevMode } = useDevMode();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!isLoading && !user && !BYPASS_AUTH) {
+    if (!isLoading && !user && !isDevMode) {
       navigate('/login');
     }
-  }, [user, isLoading, navigate]);
+  }, [user, isLoading, navigate, isDevMode]);
 
   if (isLoading) {
     return (
@@ -119,5 +122,5 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return BYPASS_AUTH || user ? <>{children}</> : null;
+  return isDevMode || user ? <>{children}</> : null;
 }

@@ -8,24 +8,22 @@ export const apiClient = axios.create({
 });
 
 // Development flag to bypass authentication (must match AuthContext)
-const BYPASS_AUTH = false;
+const BYPASS_AUTH = true;
 
-// Add auth token to requests if available and not in bypass mode
+// Add auth token to requests if available
 apiClient.interceptors.request.use((config) => {
-  if (!BYPASS_AUTH) {
-    const token = localStorage.getItem('whis_token');
-    if (token && config.headers) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
+  const token = localStorage.getItem('whis_token');
+  if (token && config.headers) {
+    config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
 
-// Handle auth errors when not in bypass mode
+// Handle auth errors
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (!BYPASS_AUTH && error.response?.status === 401) {
+    if (error.response?.status === 401) {
       localStorage.removeItem('whis_token');
       window.location.href = '/login';
     }
@@ -341,6 +339,18 @@ export const backups = {
     await apiClient.delete(`/api/backups/${backupId}`);
   },
   download: async (backupId: string): Promise<void> => {
-    window.location.href = `${API_URL}/api/backups/${backupId}/download`;
+    const response = await apiClient.get<ArrayBuffer>(`/api/backups/${backupId}/download`, {
+      responseType: 'arraybuffer'
+    });
+    const blob = new Blob([response.data], { type: 'application/zip' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const filename = response.headers['content-disposition']?.split('filename=')[1]?.replace(/"/g, '') || `backup_${backupId}.zip`;
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
   },
 };

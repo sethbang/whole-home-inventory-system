@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 
 interface DevModeContextType {
   isDevMode: boolean;
@@ -8,10 +8,18 @@ interface DevModeContextType {
 const DevModeContext = createContext<DevModeContextType | undefined>(undefined);
 
 export function DevModeProvider({ children }: { children: React.ReactNode }) {
-  const [isDevMode, setIsDevMode] = useState(false);
+  const [isDevMode, setIsDevMode] = useState(() => {
+    const saved = localStorage.getItem('whis_dev_mode');
+    // Default to true in development environment
+    return saved ? JSON.parse(saved) : import.meta.env.DEV;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('whis_dev_mode', JSON.stringify(isDevMode));
+  }, [isDevMode]);
 
   const toggleDevMode = () => {
-    setIsDevMode((prev) => !prev);
+    setIsDevMode((prev: boolean) => !prev);
   };
 
   return (
