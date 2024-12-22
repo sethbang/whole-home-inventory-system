@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="images/whis_logo.svg" alt="WHIS Logo" width="200" height="200">
+  <img src="images/whis_logo.svg" alt="WHIS Logo" width="250" height="250">
 </div>
 
 # Whole-Home Inventory System (WHIS)
