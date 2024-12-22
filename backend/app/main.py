@@ -42,7 +42,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization", "Accept"],
-    expose_headers=["Content-Type"],
+    expose_headers=["Content-Type", "Content-Disposition"],
     max_age=3600,  # Cache preflight requests for 1 hour
 )
 
@@ -100,7 +100,8 @@ CORS_HEADERS = {
     "Access-Control-Allow-Origin": "http://localhost:5173",
     "Access-Control-Allow-Credentials": "true",
     "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization, Accept"
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, Accept",
+    "Access-Control-Expose-Headers": "Content-Type, Content-Disposition"
 }
 
 # Exception handlers
@@ -120,12 +121,36 @@ async def http_exception_handler(request, exc):
 async def general_exception_handler(request, exc):
     from fastapi.responses import JSONResponse
     import traceback
-    print(f"Internal Server Error: {str(exc)}")
+    import sys
+    
+    exc_type, exc_value, exc_traceback = sys.exc_info()
+    
+    # Print detailed error information
+    print("\n=== Error Details ===")
+    print(f"Request URL: {request.url}")
+    print(f"Request Method: {request.method}")
+    print(f"Exception Type: {exc_type.__name__}")
+    print(f"Exception Message: {str(exc)}")
+    print("\n=== Full Traceback ===")
     print(traceback.format_exc())
+    
+    # Get the full stack trace
+    stack_summary = traceback.extract_tb(exc_traceback)
+    formatted_stack = []
+    for frame in stack_summary:
+        formatted_stack.append({
+            'filename': frame.filename,
+            'line': frame.lineno,
+            'function': frame.name,
+            'code': frame.line
+        })
+    
     return JSONResponse(
         status_code=500,
         content={
-            "detail": "Internal server error",
+            "detail": str(exc),
+            "type": exc_type.__name__,
+            "stack_trace": formatted_stack,
             "status_code": 500
         },
         headers=CORS_HEADERS

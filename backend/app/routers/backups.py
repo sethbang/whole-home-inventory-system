@@ -7,34 +7,55 @@ import shutil
 from datetime import datetime
 import zipfile
 from .. import models, schemas, database
-from ..security import get_current_user
+from ..security import get_current_active_user
 from fastapi.responses import FileResponse
 
 router = APIRouter()
 
 # Create backups directory if it doesn't exist
-BACKUP_DIR = os.path.join("backend", "backups")
-os.makedirs(BACKUP_DIR, exist_ok=True)
+# Support both Docker and local development paths
+BACKUP_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "backend", "backups")
+print(f"Backup directory path: {BACKUP_DIR}")
+print(f"Backup directory exists: {os.path.exists(BACKUP_DIR)}")
+
+try:
+    os.makedirs(BACKUP_DIR, exist_ok=True)
+    print(f"Created/verified backup directory: {BACKUP_DIR}")
+    print(f"Directory permissions: {oct(os.stat(BACKUP_DIR).st_mode)[-3:]}")
+except Exception as e:
+    print(f"Error creating backup directory: {str(e)}")
 
 def get_db():
-    db = database.SessionLocal()
+    db = None
     try:
+        db = database.SessionLocal()
+        print("Database session created")
         yield db
+    except Exception as e:
+        print(f"Error creating database session: {str(e)}")
+        if db:
+            db.rollback()
+        raise
     finally:
-        db.close()
+        if db:
+            print("Closing database session")
+            db.close()
 
-def create_backup_file(
+async def create_backup_file(
     user_id: str,
     db: Session,
     backup_record: models.Backup
 ) -> None:
     try:
-        # Get all user's items with their images
+        print(f"Starting backup creation for user: {user_id}")
+        print("Querying items from database...")
         items = db.query(models.Item).filter(models.Item.owner_id == user_id).all()
+        print(f"Found {len(items)} items")
         
-        # Create a temporary directory for the backup
+        print("Creating temporary directory...")
         temp_dir = os.path.join(BACKUP_DIR, f"temp_{user_id}")
         os.makedirs(temp_dir, exist_ok=True)
+        print(f"Created temp directory: {temp_dir}")
         
         # Prepare the data structure
         backup_data = {
@@ -113,6 +134,9 @@ def create_backup_file(
         shutil.rmtree(temp_dir)
         
     except Exception as e:
+        print(f"Error during backup creation: {str(e)}")
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
         backup_record.status = "failed"
         backup_record.error_message = str(e)
         db.commit()
@@ -122,43 +146,93 @@ def create_backup_file(
 async def create_backup(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
+    current_user: models.User = Depends(get_current_active_user)
 ):
-    # Create a backup record
-    backup = models.Backup(
-        owner_id=current_user.id,
-        status="in_progress"
-    )
-    db.add(backup)
-    db.commit()
-    db.refresh(backup)
+    try:
+        print(f"Creating backup for user: {current_user.id}")
+        print(f"User ID type: {type(current_user.id)}")
+        
+        # Ensure owner_id is a string
+        owner_id = str(current_user.id) if not isinstance(current_user.id, str) else current_user.id
+        print(f"Converted owner_id: {owner_id}")
+        
+        # Create backup record in a transaction
+        print("Starting database transaction...")
+        backup = None
+        try:
+            backup = models.Backup(
+                owner_id=owner_id,
+                status="in_progress"
+            )
+            db.add(backup)
+            db.flush()  # Get the ID without committing
+            print(f"Generated backup ID: {backup.id}")
+            db.commit()
+            print("Transaction committed successfully")
+            db.refresh(backup)
+        except Exception as e:
+            print(f"Error in database transaction: {str(e)}")
+            db.rollback()
+            print("Transaction rolled back")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to create backup record: {str(e)}"
+            )
+    except Exception as e:
+        print(f"Error creating backup record: {str(e)}")
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
+        raise
     
-    # Start the backup process in the background
-    background_tasks.add_task(
-        create_backup_file,
-        str(current_user.id),
-        db,
-        backup
-    )
-    
-    return backup
+    try:
+        print("Starting backup creation...")
+        # Create backup directly instead of in background
+        await create_backup_file(str(current_user.id), db, backup)
+        print("Backup creation completed")
+        
+        # Refresh the backup record to get updated fields
+        db.refresh(backup)
+        return backup
+    except Exception as e:
+        print(f"Error creating backup: {str(e)}")
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
+        # Update backup record with error
+        backup.status = "failed"
+        backup.error_message = f"Failed to create backup: {str(e)}"
+        db.commit()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to create backup: {str(e)}"
+        )
 
 @router.get("/backups", response_model=schemas.BackupList)
 async def list_backups(
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
+    current_user: models.User = Depends(get_current_active_user)
 ):
     backups = db.query(models.Backup).filter(
-        models.Backup.owner_id == current_user.id
+        models.Backup.owner_id == current_user.id,
+        models.Backup.filename.isnot(None),  # Ensure required fields are not null
+        models.Backup.file_path.isnot(None),
+        models.Backup.size_bytes.isnot(None),
+        models.Backup.item_count.isnot(None),
+        models.Backup.image_count.isnot(None)
     ).order_by(models.Backup.created_at.desc()).all()
     
-    return {"backups": backups}
+    # Filter out any incomplete records
+    valid_backups = [b for b in backups if all([
+        b.filename, b.file_path, b.size_bytes is not None,
+        b.item_count is not None, b.image_count is not None
+    ])]
+    
+    return {"backups": valid_backups}
 
 @router.post("/backups/{backup_id}/restore", response_model=schemas.RestoreResponse)
 async def restore_backup(
     backup_id: str,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
+    current_user: models.User = Depends(get_current_active_user)
 ):
     backup = db.query(models.Backup).filter(
         models.Backup.id == backup_id,
@@ -255,7 +329,7 @@ async def restore_backup(
 async def delete_backup(
     backup_id: str,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
+    current_user: models.User = Depends(get_current_active_user)
 ):
     backup = db.query(models.Backup).filter(
         models.Backup.id == backup_id,
@@ -279,7 +353,7 @@ async def delete_backup(
 async def download_backup(
     backup_id: str,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
+    current_user: models.User = Depends(get_current_active_user)
 ):
     backup = db.query(models.Backup).filter(
         models.Backup.id == backup_id,
@@ -289,11 +363,34 @@ async def download_backup(
     if not backup:
         raise HTTPException(status_code=404, detail="Backup not found")
     
-    if not os.path.exists(backup.file_path):
-        raise HTTPException(status_code=404, detail="Backup file not found")
+    print(f"Attempting to download backup file: {backup.file_path}")
+    print(f"Current working directory: {os.getcwd()}")
+    print(f"File exists: {os.path.exists(backup.file_path)}")
+    print(f"File is readable: {os.access(backup.file_path, os.R_OK) if os.path.exists(backup.file_path) else False}")
     
-    return FileResponse(
-        backup.file_path,
-        media_type="application/zip",
-        filename=backup.filename
-    )
+    if not os.path.exists(backup.file_path):
+        raise HTTPException(
+            status_code=404,
+            detail=f"Backup file not found at path: {backup.file_path}"
+        )
+    
+    if not os.access(backup.file_path, os.R_OK):
+        raise HTTPException(
+            status_code=500,
+            detail=f"Backup file exists but is not readable: {backup.file_path}"
+        )
+    
+    try:
+        response = FileResponse(
+            backup.file_path,
+            media_type="application/zip",
+            filename=backup.filename
+        )
+        response.headers["Content-Disposition"] = f'attachment; filename="{backup.filename}"'
+        return response
+    except Exception as e:
+        print(f"Error serving file: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error serving backup file: {str(e)}"
+        )

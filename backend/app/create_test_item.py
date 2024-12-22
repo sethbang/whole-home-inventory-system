@@ -1,8 +1,13 @@
-from .database import SessionLocal, engine, SQLALCHEMY_DATABASE_URL
-from . import models, security
-from datetime import datetime
-import uuid
 import os
+import sys
+import uuid
+from datetime import datetime
+
+# Add the parent directory to the Python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from app.database import SessionLocal, engine, SQLALCHEMY_DATABASE_URL
+from app import models, security
 
 def create_test_item():
     print(f"Database URL: {SQLALCHEMY_DATABASE_URL}")

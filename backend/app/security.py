@@ -9,7 +9,7 @@ from . import models, database
 import uuid
 
 # Development flag to bypass authentication
-BYPASS_AUTH = False
+BYPASS_AUTH = True
 
 # Fixed UUID v4 for development user (generated with uuid.uuid4())
 DEV_USER_ID = uuid.UUID('a7a41c99-5555-4191-9b62-5e39b347b515')  # Valid UUID v4 format
@@ -34,8 +34,13 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 class OptionalOAuth2PasswordBearer(OAuth2PasswordBearer):
     async def __call__(self, request: Request = None) -> Optional[str]:
         if BYPASS_AUTH:
-            return None
-        return await super().__call__(request)
+            return "dev_token"  # Return a dummy token in dev mode
+        try:
+            return await super().__call__(request)
+        except HTTPException:
+            if BYPASS_AUTH:
+                return "dev_token"
+            raise
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")  # FastAPI will prepend the /api prefix
 oauth2_scheme_optional = OptionalOAuth2PasswordBearer(tokenUrl="token")
