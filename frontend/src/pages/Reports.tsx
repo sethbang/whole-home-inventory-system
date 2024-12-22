@@ -1,4 +1,3 @@
-import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { analytics } from '../api/client';
 import type { ValueByCategory, ValueByLocation, WarrantyItem } from '../api/client';
