@@ -84,12 +84,15 @@ def get_warranty_status(
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(security.get_current_active_user)
 ) -> Dict[str, Any]:
+    from dateutil.relativedelta import relativedelta
+    
     now = datetime.utcnow()
+    three_months_later = now + relativedelta(months=3)
     
     expiring_soon = db.query(models.Item).filter(
         models.Item.owner_id == current_user.id,
         models.Item.warranty_expiration > now,
-        models.Item.warranty_expiration <= now.replace(month=now.month + 3)
+        models.Item.warranty_expiration <= three_months_later
     ).all()
     
     expired = db.query(models.Item).filter(
@@ -100,7 +103,7 @@ def get_warranty_status(
     
     active = db.query(models.Item).filter(
         models.Item.owner_id == current_user.id,
-        models.Item.warranty_expiration > now.replace(month=now.month + 3)
+        models.Item.warranty_expiration > three_months_later
     ).all()
     
     return {

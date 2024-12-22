@@ -39,7 +39,7 @@ app.add_middleware(
     allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization", "Accept"],
+    allow_headers=["*"],
     expose_headers=["Content-Type", "Content-Disposition"],
     max_age=3600,  # Cache preflight requests for 1 hour
 )
@@ -76,8 +76,12 @@ async def add_cors_and_trailing_slash(request, call_next):
 
 # Add OPTIONS handler for preflight requests
 @app.options("/{rest_of_path:path}")
-async def preflight_handler():
-    return {"status": "ok"}
+async def preflight_handler(request):
+    from fastapi.responses import JSONResponse
+    return JSONResponse(
+        content={"status": "ok"},
+        headers=get_cors_headers(request)
+    )
 
 # Mount static file directory for uploaded images
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
@@ -101,7 +105,7 @@ def get_cors_headers(request):
             "Access-Control-Allow-Origin": origin,
             "Access-Control-Allow-Credentials": "true",
             "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type, Authorization, Accept",
+            "Access-Control-Allow-Headers": "*",
             "Access-Control-Expose-Headers": "Content-Type, Content-Disposition"
         }
     return {}

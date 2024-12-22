@@ -181,14 +181,21 @@ export default function Reports() {
             <div>
               <h3 className="text-sm font-medium text-yellow-600 mb-2">Expiring Soon</h3>
               <div className="bg-yellow-50 rounded-lg p-4">
-                {warrantyData?.expiring_soon.map((item: WarrantyItem) => (
-                  <div key={item.id} className="mb-2 last:mb-0">
-                    <p className="text-sm font-medium text-gray-900">{item.name}</p>
-                    <p className="text-xs text-gray-500">Expires: {formatDate(item.expiration_date)}</p>
-                  </div>
-                ))}
-                {warrantyData?.expiring_soon.length === 0 && (
-                  <p className="text-sm text-gray-500">No warranties expiring soon</p>
+                {warrantyData ? (
+                  <>
+                    {warrantyData.expiring_soon.length > 0 ? (
+                      warrantyData.expiring_soon.map((item: WarrantyItem) => (
+                        <div key={item.id} className="mb-2 last:mb-0">
+                          <p className="text-sm font-medium text-gray-900">{item.name}</p>
+                          <p className="text-xs text-gray-500">Expires: {formatDate(item.expiration_date)}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-sm text-gray-500">No warranties expiring soon</p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-sm text-gray-500">Loading warranty information...</p>
                 )}
               </div>
             </div>
@@ -197,14 +204,21 @@ export default function Reports() {
             <div>
               <h3 className="text-sm font-medium text-red-600 mb-2">Expired</h3>
               <div className="bg-red-50 rounded-lg p-4">
-                {warrantyData?.expired.map((item: WarrantyItem) => (
-                  <div key={item.id} className="mb-2 last:mb-0">
-                    <p className="text-sm font-medium text-gray-900">{item.name}</p>
-                    <p className="text-xs text-gray-500">Expired: {formatDate(item.expiration_date)}</p>
-                  </div>
-                ))}
-                {warrantyData?.expired.length === 0 && (
-                  <p className="text-sm text-gray-500">No expired warranties</p>
+                {warrantyData ? (
+                  <>
+                    {warrantyData.expired.length > 0 ? (
+                      warrantyData.expired.map((item: WarrantyItem) => (
+                        <div key={item.id} className="mb-2 last:mb-0">
+                          <p className="text-sm font-medium text-gray-900">{item.name}</p>
+                          <p className="text-xs text-gray-500">Expired: {formatDate(item.expiration_date)}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-sm text-gray-500">No expired warranties</p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-sm text-gray-500">Loading warranty information...</p>
                 )}
               </div>
             </div>
@@ -213,14 +227,21 @@ export default function Reports() {
             <div>
               <h3 className="text-sm font-medium text-green-600 mb-2">Active</h3>
               <div className="bg-green-50 rounded-lg p-4">
-                {warrantyData?.active.map((item: WarrantyItem) => (
-                  <div key={item.id} className="mb-2 last:mb-0">
-                    <p className="text-sm font-medium text-gray-900">{item.name}</p>
-                    <p className="text-xs text-gray-500">Valid until: {formatDate(item.expiration_date)}</p>
-                  </div>
-                ))}
-                {warrantyData?.active.length === 0 && (
-                  <p className="text-sm text-gray-500">No active warranties</p>
+                {warrantyData ? (
+                  <>
+                    {warrantyData.active.length > 0 ? (
+                      warrantyData.active.map((item: WarrantyItem) => (
+                        <div key={item.id} className="mb-2 last:mb-0">
+                          <p className="text-sm font-medium text-gray-900">{item.name}</p>
+                          <p className="text-xs text-gray-500">Valid until: {formatDate(item.expiration_date)}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-sm text-gray-500">No active warranties</p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-sm text-gray-500">Loading warranty information...</p>
                 )}
               </div>
             </div>
