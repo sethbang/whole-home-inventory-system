@@ -26,6 +26,7 @@ yarn-error.log*
 backend/database/
 backend/backend/database/
 backend/backend/uploads/
+backend/backend/backups/
 
 # System
 .DS_Store
