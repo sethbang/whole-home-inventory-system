@@ -8,6 +8,7 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import AddItem from './pages/AddItem';
 import ItemDetail from './pages/ItemDetail';
+import Reports from './pages/Reports';
 
 // Initialize React Query client
 const queryClient = new QueryClient({
@@ -56,6 +57,16 @@ function App() {
                 <RequireAuth>
                   <Layout>
                     <ItemDetail />
+                  </Layout>
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/reports"
+              element={
+                <RequireAuth>
+                  <Layout>
+                    <Reports />
                   </Layout>
                 </RequireAuth>
               }

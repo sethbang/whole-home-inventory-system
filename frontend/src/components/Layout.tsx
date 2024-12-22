@@ -7,6 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 const navigation = [
   { name: 'Dashboard', href: '/' },
   { name: 'Add Item', href: '/items/new' },
+  { name: 'Reports', href: '/reports' },
 ];
 
 function classNames(...classes: string[]) {

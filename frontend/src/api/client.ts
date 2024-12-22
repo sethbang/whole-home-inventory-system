@@ -194,6 +194,80 @@ export const items = {
   },
 };
 
+export interface ValueByCategory {
+  category: string;
+  item_count: number;
+  total_value: number;
+}
+
+export interface ValueByLocation {
+  location: string;
+  item_count: number;
+  total_value: number;
+}
+
+export interface ValueTrends {
+  total_purchase_value: number;
+  total_current_value: number;
+  value_change: number;
+  value_change_percentage: number;
+}
+
+export interface WarrantyItem {
+  id: string;
+  name: string;
+  expiration_date: string;
+}
+
+export interface WarrantyStatus {
+  expiring_soon: WarrantyItem[];
+  expired: WarrantyItem[];
+  active: WarrantyItem[];
+}
+
+export interface AgeAnalysisItem {
+  id: string;
+  name: string;
+  purchase_date: string;
+  current_value: number;
+}
+
+export interface AgeRange {
+  count: number;
+  total_value: number;
+  items: AgeAnalysisItem[];
+}
+
+export interface AgeAnalysis {
+  "0-1 year": AgeRange;
+  "1-3 years": AgeRange;
+  "3-5 years": AgeRange;
+  "5+ years": AgeRange;
+}
+
+export const analytics = {
+  getValueByCategory: async (): Promise<ValueByCategory[]> => {
+    const response = await apiClient.get<ValueByCategory[]>('/analytics/value-by-category');
+    return response.data;
+  },
+  getValueByLocation: async (): Promise<ValueByLocation[]> => {
+    const response = await apiClient.get<ValueByLocation[]>('/analytics/value-by-location');
+    return response.data;
+  },
+  getValueTrends: async (): Promise<ValueTrends> => {
+    const response = await apiClient.get<ValueTrends>('/analytics/value-trends');
+    return response.data;
+  },
+  getWarrantyStatus: async (): Promise<WarrantyStatus> => {
+    const response = await apiClient.get<WarrantyStatus>('/analytics/warranty-status');
+    return response.data;
+  },
+  getAgeAnalysis: async (): Promise<AgeAnalysis> => {
+    const response = await apiClient.get<AgeAnalysis>('/analytics/age-analysis');
+    return response.data;
+  },
+};
+
 export const images = {
   upload: async (itemId: string, file: File) => {
     const formData = new FormData();
