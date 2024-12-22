@@ -121,6 +121,15 @@ class Backup(BackupBase):
 class BackupList(BaseModel):
     backups: List[Backup]
 
+class ImportResult(BaseModel):
+    success: bool
+    message: str
+    items_imported: int
+    errors: Optional[List[str]] = None
+
+class ExportFormat(BaseModel):
+    format: str  # "csv" or "json"
+
 class Error(BaseModel):
     detail: str
 

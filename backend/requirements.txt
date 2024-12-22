@@ -7,3 +7,4 @@ passlib[bcrypt]==1.7.4
 python-dotenv==1.0.0
 pillow==10.1.0
 pydantic[email]==2.5.2
+pandas==2.1.3

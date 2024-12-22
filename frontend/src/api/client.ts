@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:8000/api';
+const API_URL = 'http://localhost:8000';
 
 export const apiClient = axios.create({
   baseURL: API_URL,
@@ -165,36 +165,36 @@ const generateDummyItem = (): Partial<Item> => {
 
 export const items = {
   list: async (filters: SearchFilters = {}): Promise<ItemListResponse> => {
-    const response = await apiClient.get<ItemListResponse>('/items', { params: filters });
+    const response = await apiClient.get<ItemListResponse>('/api/items', { params: filters });
     return response.data;
   },
   get: async (id: string): Promise<Item> => {
-    const response = await apiClient.get<Item>(`/items/${id}`);
+    const response = await apiClient.get<Item>(`/api/items/${id}`);
     return response.data;
   },
   create: async (data: Partial<Item>, isDev: boolean = false): Promise<Item> => {
     let itemData = isDev ? generateDummyItem() : data;
-    const response = await apiClient.post<Item>('/items', itemData);
+    const response = await apiClient.post<Item>('/api/items', itemData);
     return response.data;
   },
   update: async (id: string, data: Partial<Item>): Promise<Item> => {
-    const response = await apiClient.put<Item>(`/items/${id}`, data);
+    const response = await apiClient.put<Item>(`/api/items/${id}`, data);
     return response.data;
   },
   delete: async (id: string): Promise<void> => {
-    await apiClient.delete(`/items/${id}`);
+    await apiClient.delete(`/api/items/${id}`);
   },
   getCategories: async (): Promise<string[]> => {
-    const response = await apiClient.get<string[]>('/categories');
+    const response = await apiClient.get<string[]>('/api/categories');
     return response.data;
   },
   getLocations: async (): Promise<string[]> => {
-    const response = await apiClient.get<string[]>('/locations');
+    const response = await apiClient.get<string[]>('/api/locations');
     return response.data;
   },
   lookupBarcode: async (barcode: string): Promise<Item | null> => {
     try {
-      const response = await apiClient.get<Item>(`/items/barcode/${barcode}`);
+      const response = await apiClient.get<Item>(`/api/items/barcode/${barcode}`);
       return response.data;
     } catch (error) {
       if ((error as any)?.response?.status === 404) {
@@ -258,23 +258,23 @@ export interface AgeAnalysis {
 
 export const analytics = {
   getValueByCategory: async (): Promise<ValueByCategory[]> => {
-    const response = await apiClient.get<ValueByCategory[]>('/analytics/value-by-category');
+    const response = await apiClient.get<ValueByCategory[]>('/api/analytics/value-by-category');
     return response.data;
   },
   getValueByLocation: async (): Promise<ValueByLocation[]> => {
-    const response = await apiClient.get<ValueByLocation[]>('/analytics/value-by-location');
+    const response = await apiClient.get<ValueByLocation[]>('/api/analytics/value-by-location');
     return response.data;
   },
   getValueTrends: async (): Promise<ValueTrends> => {
-    const response = await apiClient.get<ValueTrends>('/analytics/value-trends');
+    const response = await apiClient.get<ValueTrends>('/api/analytics/value-trends');
     return response.data;
   },
   getWarrantyStatus: async (): Promise<WarrantyStatus> => {
-    const response = await apiClient.get<WarrantyStatus>('/analytics/warranty-status');
+    const response = await apiClient.get<WarrantyStatus>('/api/analytics/warranty-status');
     return response.data;
   },
   getAgeAnalysis: async (): Promise<AgeAnalysis> => {
-    const response = await apiClient.get<AgeAnalysis>('/analytics/age-analysis');
+    const response = await apiClient.get<AgeAnalysis>('/api/analytics/age-analysis');
     return response.data;
   },
 };
@@ -283,7 +283,7 @@ export const images = {
   upload: async (itemId: string, file: File) => {
     const formData = new FormData();
     formData.append('file', file);
-    const response = await apiClient.post(`/items/${itemId}/images`, formData, {
+    const response = await apiClient.post(`/api/items/${itemId}/images`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -291,11 +291,11 @@ export const images = {
     return response.data;
   },
   list: async (itemId: string) => {
-    const response = await apiClient.get(`/items/${itemId}/images`);
+    const response = await apiClient.get(`/api/items/${itemId}/images`);
     return response.data;
   },
   delete: async (imageId: string) => {
-    await apiClient.delete(`/images/${imageId}`);
+    await apiClient.delete(`/api/images/${imageId}`);
   },
 };
 
@@ -326,21 +326,21 @@ export interface RestoreResponse {
 
 export const backups = {
   create: async (): Promise<Backup> => {
-    const response = await apiClient.post<Backup>('/backups');
+    const response = await apiClient.post<Backup>('/api/backups');
     return response.data;
   },
   list: async (): Promise<BackupList> => {
-    const response = await apiClient.get<BackupList>('/backups');
+    const response = await apiClient.get<BackupList>('/api/backups');
     return response.data;
   },
   restore: async (backupId: string): Promise<RestoreResponse> => {
-    const response = await apiClient.post<RestoreResponse>(`/backups/${backupId}/restore`);
+    const response = await apiClient.post<RestoreResponse>(`/api/backups/${backupId}/restore`);
     return response.data;
   },
   delete: async (backupId: string): Promise<void> => {
-    await apiClient.delete(`/backups/${backupId}`);
+    await apiClient.delete(`/api/backups/${backupId}`);
   },
   download: async (backupId: string): Promise<void> => {
-    window.location.href = `${API_URL}/backups/${backupId}/download`;
+    window.location.href = `${API_URL}/api/backups/${backupId}/download`;
   },
 };

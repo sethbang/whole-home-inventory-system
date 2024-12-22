@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { PlusIcon } from '@heroicons/react/24/outline';
 import { items } from '../api/client';
 import type { Item, ItemListResponse } from '../api/client';
+import DataMigration from '../components/DataMigration';
 
 export default function Dashboard() {
   const [viewMode, setViewMode] = React.useState<'list' | 'grid'>('list');
@@ -222,6 +223,11 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Data Migration Tools */}
+      <div className="mt-8">
+        <DataMigration />
       </div>
 
       {/* Items View */}
