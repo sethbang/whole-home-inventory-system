@@ -96,14 +96,6 @@ class ItemList(BaseModel):
 
     class Config:
         from_attributes = True
-    id: UUID4
-    item_id: UUID4
-    filename: str
-    file_path: str
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 class BackupBase(BaseModel):
     pass
@@ -128,6 +120,9 @@ class Backup(BackupBase):
 
 class BackupList(BaseModel):
     backups: List[Backup]
+
+class Error(BaseModel):
+    detail: str
 
 class RestoreResponse(BaseModel):
     success: bool
