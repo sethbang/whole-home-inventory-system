@@ -27,18 +27,16 @@ async def method_not_allowed_handler(request, exc):
     return JSONResponse(
         status_code=405,
         content={"detail": "Method not allowed"},
-        headers={
-            "Access-Control-Allow-Origin": "http://localhost:5173",
-            "Access-Control-Allow-Credentials": "true",
-            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type, Authorization, Accept"
-        }
+        headers=get_cors_headers(request)
     )
 
-# Configure CORS for development and preview
+# Get CORS origins from environment variable, default to development server
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
+
+# Configure CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Vite development server
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization", "Accept"],
@@ -53,13 +51,13 @@ async def add_cors_and_trailing_slash(request, call_next):
         response = await call_next(request)
         
         # Add CORS headers to all responses
-        response.headers.update(CORS_HEADERS)
+        response.headers.update(get_cors_headers(request))
         
         # Handle trailing slashes
         if response.status_code == 405 and not request.url.path.endswith('/'):
             request.scope['path'] = request.url.path + '/'
             response = await call_next(request)
-            response.headers.update(CORS_HEADERS)
+            response.headers.update(get_cors_headers(request))
         
         return response
     except Exception as e:
@@ -73,7 +71,7 @@ async def add_cors_and_trailing_slash(request, call_next):
                 "detail": "Internal server error",
                 "status_code": 500
             },
-            headers=CORS_HEADERS
+            headers=get_cors_headers(request)
         )
 
 # Add OPTIONS handler for preflight requests
@@ -96,13 +94,17 @@ async def health_check():
     return {"status": "healthy", "version": "1.0.0"}
 
 # Common CORS headers for error responses
-CORS_HEADERS = {
-    "Access-Control-Allow-Origin": "http://localhost:5173",
-    "Access-Control-Allow-Credentials": "true",
-    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization, Accept",
-    "Access-Control-Expose-Headers": "Content-Type, Content-Disposition"
-}
+def get_cors_headers(request):
+    origin = request.headers.get("origin", CORS_ORIGINS[0])
+    if origin in CORS_ORIGINS:
+        return {
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization, Accept",
+            "Access-Control-Expose-Headers": "Content-Type, Content-Disposition"
+        }
+    return {}
 
 # Exception handlers
 @app.exception_handler(HTTPException)
@@ -114,7 +116,7 @@ async def http_exception_handler(request, exc):
             "detail": exc.detail,
             "status_code": exc.status_code
         },
-        headers=CORS_HEADERS
+        headers=get_cors_headers(request)
     )
 
 @app.exception_handler(Exception)
@@ -153,7 +155,7 @@ async def general_exception_handler(request, exc):
             "stack_trace": formatted_stack,
             "status_code": 500
         },
-        headers=CORS_HEADERS
+        headers=get_cors_headers(request)
     )
 
 if __name__ == "__main__":

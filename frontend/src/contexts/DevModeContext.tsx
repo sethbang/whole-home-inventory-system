@@ -10,8 +10,8 @@ const DevModeContext = createContext<DevModeContextType | undefined>(undefined);
 export function DevModeProvider({ children }: { children: React.ReactNode }) {
   const [isDevMode, setIsDevMode] = useState(() => {
     const saved = localStorage.getItem('whis_dev_mode');
-    // Default to true in development environment
-    return saved ? JSON.parse(saved) : import.meta.env.DEV;
+    // Default to false in production, only true in development if explicitly enabled
+    return saved ? JSON.parse(saved) : false;
   });
 
   useEffect(() => {

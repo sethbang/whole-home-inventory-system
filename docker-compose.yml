@@ -7,6 +7,7 @@ services:
       - "27182:27182"
     environment:
       - DATABASE_URL=sqlite:///./app.db
+      - CORS_ORIGINS=http://localhost:5173
     volumes:
       - ./backend/database:/app/database
       - ./backend/backend/uploads:/app/backend/uploads
