@@ -4,12 +4,16 @@ WHIS is a self-hosted platform for managing household inventories. It centralize
 
 ## Features
 
-- 📱 **Responsive Web Interface**: Access your inventory from any device
+- 📱 **Progressive Web App (PWA)**: Offline access and mobile app-like experience
 - 📸 **Photo Management**: Multiple images per item with camera integration
 - 🔍 **Advanced Search**: Filter and sort by any field
 - 🏷️ **Custom Fields**: Define your own data fields and categories
 - 🔒 **Privacy-Focused**: Self-hosted with local data storage
 - 📱 **Mobile-Optimized**: Camera integration and quick-add functionality
+- 📊 **Analytics & Reports**: Generate detailed reports about your inventory
+- 🔄 **Backup & Restore**: Automated backup system with restore capabilities
+- 📷 **Barcode/QR Scanning**: Quick item lookup and entry using barcodes
+- 🔄 **Data Migration**: Import/export functionality for various formats
 
 ## Tech Stack
 
@@ -18,12 +22,14 @@ WHIS is a self-hosted platform for managing household inventories. It centralize
 - FastAPI
 - SQLite
 - Uvicorn
+- Alembic (Database migrations)
 
 ### Frontend
 - React 18
 - TypeScript
 - Tailwind CSS
 - Vite
+- PWA Support
 
 ## Prerequisites
 
@@ -46,6 +52,7 @@ cd backend
 python -m venv venv
 source venv/bin/activate  # On Windows use: venv\Scripts\activate
 pip install -r requirements.txt
+alembic upgrade head  # Initialize the database
 ```
 
 3. Set up the frontend:
@@ -93,6 +100,7 @@ Detailed deployment instructions coming soon.
    - Click the "Add Item" button
    - Fill in the item details
    - Add photos using upload or camera capture
+   - Use barcode scanner for quick entry
    - Save the item
 
 3. **Managing Items**
@@ -101,22 +109,23 @@ Detailed deployment instructions coming soon.
    - Click on items to view/edit details
    - Add custom fields as needed
 
+4. **Data Management**
+   - Use the backup feature to create data backups
+   - Restore from backups when needed
+   - Import/export data using the migration tools
+   - Generate reports and analytics
+
 ## Future Features
 
 🚀 The following features are planned for future releases:
 
-- 📱 **Progressive Web App (PWA)**: Offline access and mobile app-like experience
-- 📊 **Advanced Reporting**: Generate detailed reports and analytics about your inventory
-- 🔄 **Backup & Restore**: Automated backup system with restore capabilities
-- 📷 **Barcode/QR Scanning**: Quick item lookup and entry using barcodes
-- 🔌 **Plugin System**: Extensible architecture for community contributions
-- 🔄 **Data Migration Tools**: Import/export functionality for various formats
 - 📱 **Mobile Apps**: Native mobile applications for iOS and Android
 - 🤖 **AI Integration**: Automated item categorization and description generation
 - 🏷️ **Smart Tags**: Automated tagging system based on item characteristics
 - 📅 **Maintenance Reminders**: Schedule and track item maintenance
 - 📈 **Value Tracking**: Track item depreciation and current market values
 - 🔗 **API Integration**: Connect with home automation and insurance systems
+- 🔌 **Plugin System**: Extensible architecture for community contributions
 
 ## Contributing
 
