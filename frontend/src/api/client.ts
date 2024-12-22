@@ -2,7 +2,8 @@ import axios from 'axios';
 
 // Get the current hostname (e.g., localhost, 192.168.1.122, etc.)
 const hostname = window.location.hostname;
-const API_URL = `http://${hostname}:27182`;
+// Use the API URL from environment variable, falling back to the current hostname
+const API_URL = import.meta.env.VITE_API_URL || `http://${hostname}:27182`;
 
 export const apiClient = axios.create({
   baseURL: API_URL,

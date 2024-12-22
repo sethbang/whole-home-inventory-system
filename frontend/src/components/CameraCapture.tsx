@@ -12,17 +12,84 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const isIOSPWA = () => {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+                        (window.navigator as any).standalone ||
+                        document.referrer.includes('ios-app://');
+    return isIOS && isStandalone;
+  };
+
   const startCamera = async () => {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setError('Camera access is not supported in this browser.');
+      return;
+    }
+
     try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' },
-      });
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const isChrome = /CriOS/.test(navigator.userAgent);
+      const isPWA = isIOSPWA();
+
+      // For iOS PWA, we need to ensure we're using the right constraints
+      const constraints = {
+        video: {
+          facingMode: 'environment',
+          width: isIOS ? { ideal: 1920, max: 1920 } : undefined,
+          height: isIOS ? { ideal: 1080, max: 1080 } : undefined,
+        }
+      };
+
+      // Try to get camera access
+      const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
       setStream(mediaStream);
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-      }
+      // Wait for video element to be ready
+      const waitForVideo = async () => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = mediaStream;
+          // Ensure video plays on iOS
+          try {
+            await videoRef.current.play();
+          } catch (playError) {
+            console.error('Error playing video:', playError);
+            // If play fails, try again after a short delay
+            setTimeout(waitForVideo, 100);
+          }
+        } else {
+          // If video element isn't ready, try again after a short delay
+          setTimeout(waitForVideo, 100);
+        }
+      };
+      await waitForVideo();
     } catch (err) {
-      setError('Unable to access camera. Please make sure you have granted camera permissions.');
+      const error = err as Error;
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const isChrome = /CriOS/.test(navigator.userAgent);
+      const isPWA = isIOSPWA();
+      
+      if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+        if (isIOS) {
+          if (isPWA) {
+            setError(
+              'Camera access was denied. Please close this app completely, go to iOS Settings > WHIS > Camera, enable access, then reopen the app.'
+            );
+          } else if (isChrome) {
+            setError(
+              'Camera access was denied. To enable: Go to iOS Settings > Chrome > Camera, then allow access for this site.'
+            );
+          } else {
+            setError(
+              'Camera access was denied. For local development, make sure to use https:// or enable camera access in iOS Settings > Safari > Camera, then allow access for this site.'
+            );
+          }
+        } else {
+          setError(
+            'Camera access was denied. Please allow camera access when prompted.'
+          );
+        }
+      } else {
+        setError('Unable to access camera. Please make sure your device has a working camera.');
+      }
     }
   };
 
@@ -62,8 +129,34 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
     }
   };
 
+  const requestCameraPermission = async () => {
+    // For iOS PWA, we need to request permissions differently
+    if (isIOSPWA()) {
+      try {
+        // Try to get a temporary stream just to trigger the permission prompt
+        const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        tempStream.getTracks().forEach(track => track.stop());
+        // If we get here, permission was granted, so start the real camera
+        await startCamera();
+      } catch (err) {
+        // If permission was denied, show PWA-specific instructions
+        const error = err as Error;
+        if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+          setError(
+            'Camera access was denied. Please close this app completely, go to iOS Settings > WHIS > Camera, enable access, then reopen the app.'
+          );
+        } else {
+          await startCamera(); // Try regular camera start for other errors
+        }
+      }
+    } else {
+      // For non-PWA, start camera normally
+      await startCamera();
+    }
+  };
+
   React.useEffect(() => {
-    startCamera();
+    requestCameraPermission();
     return () => {
       stopCamera();
     };
@@ -88,14 +181,52 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
         <div className="relative aspect-[4/3] bg-black">
           {error ? (
             <div className="absolute inset-0 flex items-center justify-center text-white text-center p-4">
-              {error}
+              <div className="max-w-sm">
+                <p className="mb-4">{error}</p>
+                {error.includes('Camera access was denied') && (
+                  <div className="text-sm opacity-80">
+                    <p className="mb-2">Steps to enable:</p>
+                    {error.includes('WHIS > Camera') ? (
+                      <ol className="list-decimal list-inside text-left">
+                        <li>Close this app completely (swipe up to remove)</li>
+                        <li>Open iOS Settings</li>
+                        <li>Scroll down to WHIS</li>
+                        <li>Tap Camera</li>
+                        <li>Enable camera access</li>
+                        <li>Reopen the app</li>
+                      </ol>
+                    ) : error.includes('Chrome') ? (
+                      <ol className="list-decimal list-inside text-left">
+                        <li>Open iOS Settings</li>
+                        <li>Scroll down to Chrome</li>
+                        <li>Tap Camera</li>
+                        <li>Find this website and select "Allow"</li>
+                        <li>Return here and refresh the page</li>
+                      </ol>
+                    ) : error.includes('Safari') ? (
+                      <ol className="list-decimal list-inside text-left">
+                        <li>Open iOS Settings</li>
+                        <li>Scroll down to Safari</li>
+                        <li>Tap Camera</li>
+                        <li>Find this website and select "Allow"</li>
+                        <li>Return here and refresh the page</li>
+                      </ol>
+                    ) : (
+                      <p>When prompted, click "Allow" to give this site access to your camera.</p>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           ) : (
             <video
               ref={videoRef}
               autoPlay
               playsInline
+              muted // Required for iOS autoplay
+              controls={false}
               className="absolute inset-0 w-full h-full object-cover"
+              style={{ transform: 'scaleX(-1)' }} // Mirror the camera view
             />
           )}
         </div>
