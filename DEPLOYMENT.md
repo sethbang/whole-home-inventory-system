@@ -21,8 +21,8 @@ This guide explains how to deploy the Whole Home Inventory System (WHIS) on a Sy
 
 2. Clone the repository to your NAS:
 ```bash
-git clone https://github.com/yourusername/whis.git
-cd whis
+git clone https://github.com/sethbang/whole-home-inventory-system.git
+cd /volume1/docker/whole-home-inventory-system
 ```
 
 2. Create the following directory structure on your NAS for persistent storage:
