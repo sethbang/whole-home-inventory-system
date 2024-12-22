@@ -3,7 +3,7 @@ import { User, auth } from '../api/client';
 import { useNavigate } from 'react-router-dom';
 
 // Development flag to bypass authentication
-const BYPASS_AUTH = true;
+const BYPASS_AUTH = false;
 
 // Default admin user for development
 const DEV_USER: User = {

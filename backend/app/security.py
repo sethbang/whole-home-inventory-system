@@ -9,7 +9,7 @@ from . import models, database
 import uuid
 
 # Development flag to bypass authentication
-BYPASS_AUTH = True
+BYPASS_AUTH = False
 
 # Fixed UUID v4 for development user (generated with uuid.uuid4())
 DEV_USER_ID = uuid.UUID('a7a41c99-5555-4191-9b62-5e39b347b515')  # Valid UUID v4 format

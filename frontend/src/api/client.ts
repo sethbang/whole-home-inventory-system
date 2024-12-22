@@ -8,7 +8,7 @@ export const apiClient = axios.create({
 });
 
 // Development flag to bypass authentication (must match AuthContext)
-const BYPASS_AUTH = true;
+const BYPASS_AUTH = false;
 
 // Add auth token to requests if available and not in bypass mode
 apiClient.interceptors.request.use((config) => {
@@ -67,7 +67,7 @@ export const auth = {
       params.append('username', credentials.username);
       params.append('password', credentials.password);
       
-      const response = await apiClient.post<AuthResponse>('/token', params, {
+      const response = await apiClient.post<AuthResponse>('/api/token', params, {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
@@ -81,11 +81,11 @@ export const auth = {
     }
   },
   register: async (data: RegisterData): Promise<User> => {
-    const response = await apiClient.post<User>('/register', data);
+    const response = await apiClient.post<User>('/api/register', data);
     return response.data;
   },
   getCurrentUser: async (): Promise<User> => {
-    const response = await apiClient.get<User>('/users/me');
+    const response = await apiClient.get<User>('/api/users/me');
     return response.data;
   },
 };

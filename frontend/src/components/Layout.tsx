@@ -1,8 +1,9 @@
-import React, { Fragment } from 'react';
+  import React, { Fragment } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Disclosure, Menu, Transition } from '@headlessui/react';
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '../contexts/AuthContext';
+import { useDevMode } from '../contexts/DevModeContext';
 
 const navigation = [
   { name: 'Dashboard', href: '/' },
@@ -17,6 +18,7 @@ function classNames(...classes: string[]) {
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
+  const { isDevMode, toggleDevMode } = useDevMode();
   const location = useLocation();
 
   return (
@@ -71,6 +73,19 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                       leaveTo="transform opacity-0 scale-95"
                     >
                       <Menu.Items className="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                        <Menu.Item>
+                          {({ active }) => (
+                            <button
+                              onClick={toggleDevMode}
+                              className={classNames(
+                                active ? 'bg-gray-100' : '',
+                                'block w-full px-4 py-2 text-left text-sm text-gray-700'
+                              )}
+                            >
+                              {isDevMode ? 'Disable Dev Mode' : 'Enable Dev Mode'}
+                            </button>
+                          )}
+                        </Menu.Item>
                         <Menu.Item>
                           {({ active }) => (
                             <button
@@ -138,6 +153,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </div>
                 <div className="mt-3 space-y-1">
                   <button
+                    onClick={toggleDevMode}
+                    className="block w-full px-4 py-2 text-left text-base font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+                  >
+                    {isDevMode ? 'Disable Dev Mode' : 'Enable Dev Mode'}
+                  </button>
+                  <button
                     onClick={logout}
                     className="block w-full px-4 py-2 text-left text-base font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-800"
                   >
@@ -155,27 +176,29 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* Mobile Quick Add FAB */}
-      <div className="sm:hidden">
-        <Link
-          to="/items/new"
-          className="fixed bottom-6 right-6 h-14 w-14 rounded-full bg-primary-600 flex items-center justify-center text-white shadow-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-          aria-label="Add new item"
-        >
-          <svg
-            className="h-6 w-6"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
+      {isDevMode && (
+        <div className="sm:hidden">
+          <Link
+            to="/items/new"
+            className="fixed bottom-6 right-6 h-14 w-14 rounded-full bg-primary-600 flex items-center justify-center text-white shadow-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+            aria-label="Add new item"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 4v16m8-8H4"
-            />
-          </svg>
-        </Link>
-      </div>
+            <svg
+              className="h-6 w-6"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 4v16m8-8H4"
+              />
+            </svg>
+          </Link>
+        </div>
+      )}
     </div>
   );
 }

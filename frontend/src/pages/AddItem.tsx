@@ -3,6 +3,7 @@ import CustomFields from '../components/CustomFields';
 import BarcodeScanner from '../components/BarcodeScanner';
 import { CameraIcon, QrCodeIcon } from '@heroicons/react/24/outline';
 import { useNavigate } from 'react-router-dom';
+import { useDevMode } from '../contexts/DevModeContext';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
 import { useMutation, useQuery } from '@tanstack/react-query';
@@ -25,6 +26,7 @@ const validationSchema = Yup.object({
 
 export default function AddItem() {
   const navigate = useNavigate();
+  const { isDevMode } = useDevMode();
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [showScanner, setShowScanner] = useState(false);
@@ -120,18 +122,20 @@ export default function AddItem() {
           </h2>
         </div>
         <div className="mt-4 flex md:ml-4 md:mt-0">
-          <button
-            type="button"
-            onClick={() => {
-              createItemMutation.mutate({ 
-                values: {} as FormValues,
-                isDev: true 
-              });
-            }}
-            className="ml-3 inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-          >
-            Quick Add (Dev)
-          </button>
+          {isDevMode && (
+            <button
+              type="button"
+              onClick={() => {
+                createItemMutation.mutate({
+                  values: {} as FormValues,
+                  isDev: true
+                });
+              }}
+              className="ml-3 inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+            >
+              Quick Add (Dev)
+            </button>
+          )}
         </div>
       </div>
 
