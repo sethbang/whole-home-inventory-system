@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Generate PWA Icons</title>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: white;
+        }
+        .icon-container {
+            display: flex;
+            gap: 20px;
+        }
+        .icon {
+            background: #00D8FF;
+            border-radius: 20%;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        #icon-192 {
+            width: 192px;
+            height: 192px;
+        }
+        #icon-512 {
+            width: 512px;
+            height: 512px;
+        }
+    </style>
+</head>
+<body>
+    <div class="icon-container">
+        <div id="icon-192" class="icon">
+            <img src="masked-icon.svg" width="152" height="152" alt="PWA Icon 192x192">
+        </div>
+        <div id="icon-512" class="icon">
+            <img src="masked-icon.svg" width="472" height="472" alt="PWA Icon 512x512">
+        </div>
+    </div>
+</body>
+</html>
