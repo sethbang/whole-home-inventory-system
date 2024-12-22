@@ -144,6 +144,38 @@ def get_categories(
     ).distinct().all()
     return [cat[0] for cat in categories if cat[0]]
 
+@router.get("/items/barcode/{barcode}", response_model=schemas.Item)
+def lookup_by_barcode(
+    barcode: str,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(security.get_current_active_user)
+) -> Any:
+    item = db.query(models.Item).filter(
+        and_(
+            models.Item.barcode == barcode,
+            models.Item.owner_id == current_user.id
+        )
+    ).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="No item found with this barcode")
+    return item
+
+@router.get("/items/barcode/{barcode}", response_model=schemas.Item)
+def lookup_by_barcode(
+    barcode: str,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(security.get_current_active_user)
+) -> Any:
+    item = db.query(models.Item).filter(
+        and_(
+            models.Item.barcode == barcode,
+            models.Item.owner_id == current_user.id
+        )
+    ).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="No item found with this barcode")
+    return item
+
 @router.get("/locations", response_model=List[str])
 def get_locations(
     db: Session = Depends(database.get_db),

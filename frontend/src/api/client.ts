@@ -192,6 +192,17 @@ export const items = {
     const response = await apiClient.get<string[]>('/locations');
     return response.data;
   },
+  lookupBarcode: async (barcode: string): Promise<Item | null> => {
+    try {
+      const response = await apiClient.get<Item>(`/items/barcode/${barcode}`);
+      return response.data;
+    } catch (error) {
+      if ((error as any)?.response?.status === 404) {
+        return null;
+      }
+      throw error;
+    }
+  },
 };
 
 export interface ValueByCategory {

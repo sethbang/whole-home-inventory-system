@@ -2,7 +2,7 @@ from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, DateTime, F
 from sqlalchemy.orm import relationship
 import uuid
 from datetime import datetime
-from .database import Base
+from app.database import Base
 
 class UUID(TypeDecorator):
     """Platform-independent UUID type.
@@ -47,6 +47,7 @@ class Item(Base):
     brand = Column(String)
     model_number = Column(String)
     serial_number = Column(String)
+    barcode = Column(String, index=True)
     purchase_date = Column(DateTime)
     purchase_price = Column(Float)
     current_value = Column(Float)
