@@ -83,12 +83,31 @@ The application will be available at:
 
 ## Production Deployment
 
-### Recommended Setup
+### Docker Deployment
+The easiest way to deploy WHIS is using Docker:
+
+1. Make sure you have Docker and Docker Compose installed on your system.
+
+2. Build and start the containers:
+```bash
+docker compose up --build
+```
+
+3. Access the application:
+- Frontend: http://localhost:5173
+- Backend API: http://localhost:27182
+- API Documentation: http://localhost:27182/docs
+
+The Docker setup includes:
+- Automatic container orchestration
+- Volume mounts for persistent data (database, uploads, backups)
+- Network configuration for service communication
+- Production-ready Nginx configuration for the frontend
+
+### Alternative Setup (Manual Installation)
 - Hardware: Raspberry Pi 4 (2GB+ RAM) or equivalent
 - OS: Raspberry Pi OS Lite or Ubuntu Server
 - Network: Local network with optional VPN for remote access
-
-Detailed deployment instructions coming soon.
 
 ## Usage
 

@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "27182:27182"
+    environment:
+      - DATABASE_URL=sqlite:///./app.db
+    volumes:
+      - ./backend/database:/app/database
+      - ./backend/backend/uploads:/app/backend/uploads
+      - ./backend/backend/backups:/app/backend/backups
+    networks:
+      - whis-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    networks:
+      - whis-network
+
+networks:
+  whis-network:
+    driver: bridge
