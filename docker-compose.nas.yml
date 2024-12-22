@@ -9,9 +9,9 @@ services:
       - DATABASE_URL=sqlite:///./app.db
       - CORS_ORIGINS=http://192.168.1.122:5173
     volumes:
-      - /volume1/docker/whis/database:/app/database
-      - /volume1/docker/whis/uploads:/app/backend/uploads
-      - /volume1/docker/whis/backups:/app/backend/backups
+      - /volume1/docker/whole-home-inventory-system/database:/app/database
+      - /volume1/docker/whole-home-inventory-system/uploads:/app/backend/uploads
+      - /volume1/docker/whole-home-inventory-system/backups:/app/backend/backups
     networks:
       - whis-network
     restart: unless-stopped

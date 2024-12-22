@@ -27,9 +27,9 @@ cd whis
 
 2. Create the following directory structure on your NAS for persistent storage:
 ```bash
-mkdir -p /volume1/docker/whis/database
-mkdir -p /volume1/docker/whis/uploads
-mkdir -p /volume1/docker/whis/backups
+mkdir -p /volume1/docker/whole-home-inventory-system/database
+mkdir -p /volume1/docker/whole-home-inventory-system/uploads
+mkdir -p /volume1/docker/whole-home-inventory-system/backups
 ```
 
 3. Create a `docker-compose.nas.yml` file with the following content:
@@ -45,9 +45,9 @@ services:
       - DATABASE_URL=sqlite:///./app.db
       - CORS_ORIGINS=http://192.168.1.122:5173
     volumes:
-      - /volume1/docker/whis/database:/app/database
-      - /volume1/docker/whis/uploads:/app/backend/uploads
-      - /volume1/docker/whis/backups:/app/backend/backups
+      - /volume1/docker/whole-home-inventory-system/database:/app/database
+      - /volume1/docker/whole-home-inventory-system/uploads:/app/backend/uploads
+      - /volume1/docker/whole-home-inventory-system/backups:/app/backend/backups
     networks:
       - whis-network
     restart: unless-stopped
@@ -101,7 +101,7 @@ There are two ways to deploy the application:
 
 2. Navigate to the project directory:
 ```bash
-cd /volume1/docker/whis
+cd /volume1/docker/whole-home-inventory-system
 ```
 
 3. Build and start the containers (choose one of these methods):
@@ -176,9 +176,9 @@ docker-compose -f docker-compose.nas.yml down --volumes
 
 ### Backup Data
 The following directories contain persistent data:
-- `/volume1/docker/whis/database`: SQLite database
-- `/volume1/docker/whis/uploads`: Uploaded files
-- `/volume1/docker/whis/backups`: System backups
+- `/volume1/docker/whole-home-inventory-system/database`: SQLite database
+- `/volume1/docker/whole-home-inventory-system/uploads`: Uploaded files
+- `/volume1/docker/whole-home-inventory-system/backups`: System backups
 
 Regular backups of these directories are recommended using Synology's built-in backup tools.
 
@@ -202,12 +202,12 @@ Regular backups of these directories are recommended using Synology's built-in b
 3. If volumes are not accessible:
    - Verify the directories exist on the NAS:
      ```bash
-     ls -la /volume1/docker/whis/
+     ls -la /volume1/docker/whole-home-inventory-system/
      ```
    - Fix permissions if needed:
      ```bash
-     sudo chown -R $(whoami):docker /volume1/docker/whis/
-     sudo chmod -R 755 /volume1/docker/whis/
+     sudo chown -R $(whoami):docker /volume1/docker/whole-home-inventory-system/
+     sudo chmod -R 755 /volume1/docker/whole-home-inventory-system/
      ```
    - Ensure the Docker user has access to these directories
 
