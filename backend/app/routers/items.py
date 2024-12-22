@@ -1,14 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Body
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_
 from typing import Any, List, Optional, Dict
+from pydantic import BaseModel
 from .. import models, schemas, security, database
 import uuid
 import pandas as pd
 import json
 import io
 from datetime import datetime
+
+class BulkDeleteRequest(BaseModel):
+    item_ids: List[uuid.UUID]
 
 router = APIRouter(tags=["items"])
 
@@ -280,6 +284,33 @@ def delete_item(
     db.delete(db_item)
     db.commit()
     return {"status": "success"}
+
+@router.post("/items/bulk-delete")
+def bulk_delete_items(
+    request: BulkDeleteRequest,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(security.get_current_active_user_or_none)
+) -> Any:
+    if not current_user:
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required"
+        )
+    
+    # Delete all items that belong to the user
+    deleted_count = db.query(models.Item).filter(
+        and_(
+            models.Item.id.in_(request.item_ids),
+            models.Item.owner_id == current_user.id
+        )
+    ).delete(synchronize_session=False)
+    
+    db.commit()
+    
+    return {
+        "status": "success",
+        "deleted_count": deleted_count
+    }
 
 @router.get("/categories", response_model=List[str])
 def get_categories(

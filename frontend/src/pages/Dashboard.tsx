@@ -1,13 +1,18 @@
 import React from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { PlusIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { items } from '../api/client';
 import type { Item, ItemListResponse } from '../api/client';
 import DataMigration from '../components/DataMigration';
 
 export default function Dashboard() {
+  const queryClient = useQueryClient();
   const [viewMode, setViewMode] = React.useState<'list' | 'grid'>('list');
+  const [selectedItems, setSelectedItems] = React.useState<Set<string>>(new Set());
+  const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false);
+  const [showDeleteAllConfirm, setShowDeleteAllConfirm] = React.useState(false);
+  const [deleteAllConfirmCount, setDeleteAllConfirmCount] = React.useState(0);
   const [searchFilters, setSearchFilters] = React.useState({
     query: '',
     category: '',
@@ -19,6 +24,41 @@ export default function Dashboard() {
     page: 1,
     page_size: 20,
   });
+
+  const handleDeleteSelected = async () => {
+    try {
+      await items.bulkDelete(Array.from(selectedItems));
+      setSelectedItems(new Set());
+      setShowDeleteConfirm(false);
+      queryClient.invalidateQueries({ queryKey: ['items'] });
+    } catch (error) {
+      console.error('Error deleting items:', error);
+      alert('Failed to delete items. Please try again.');
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    if (!data?.items) return;
+    try {
+      await items.bulkDelete(data.items.map(item => item.id));
+      setShowDeleteAllConfirm(false);
+      setDeleteAllConfirmCount(0);
+      queryClient.invalidateQueries({ queryKey: ['items'] });
+    } catch (error) {
+      console.error('Error deleting all items:', error);
+      alert('Failed to delete all items. Please try again.');
+    }
+  };
+
+  const toggleItemSelection = (itemId: string) => {
+    const newSelected = new Set(selectedItems);
+    if (newSelected.has(itemId)) {
+      newSelected.delete(itemId);
+    } else {
+      newSelected.add(itemId);
+    }
+    setSelectedItems(newSelected);
+  };
 
   const { data, isLoading } = useQuery<ItemListResponse>({
     queryKey: ['items', searchFilters],
@@ -52,7 +92,26 @@ export default function Dashboard() {
             A list of all your inventory items including their name, category, location, and value.
           </p>
         </div>
-        <div className="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
+        <div className="mt-4 sm:ml-16 sm:mt-0 flex space-x-4">
+          {selectedItems.size > 0 && (
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="inline-flex items-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500"
+            >
+              <TrashIcon className="h-5 w-5 mr-1" />
+              Delete Selected ({selectedItems.size})
+            </button>
+          )}
+          <button
+            onClick={() => {
+              setShowDeleteAllConfirm(true);
+              setDeleteAllConfirmCount(0);
+            }}
+            className="inline-flex items-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500"
+          >
+            <TrashIcon className="h-5 w-5 mr-1" />
+            Delete All
+          </button>
           <Link
             to="/items/new"
             className="block rounded-md bg-primary-600 px-3 py-2 text-center text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600"
@@ -240,7 +299,21 @@ export default function Dashboard() {
                 <table className="min-w-full divide-y divide-gray-300">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">
+                      <th scope="col" className="relative px-4 sm:px-6 py-3.5">
+                        <input
+                          type="checkbox"
+                          className="absolute left-4 top-1/2 -mt-2 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-600"
+                          checked={data?.items && data.items.length > 0 && data.items.length === selectedItems.size}
+                          onChange={(e) => {
+                            if (e.target.checked && data?.items) {
+                              setSelectedItems(new Set(data.items.map(item => item.id)));
+                            } else {
+                              setSelectedItems(new Set());
+                            }
+                          }}
+                        />
+                      </th>
+                      <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900">
                         Name
                       </th>
                       <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
@@ -260,7 +333,15 @@ export default function Dashboard() {
                   <tbody className="divide-y divide-gray-200 bg-white">
                     {data?.items.map((item: Item) => (
                       <tr key={item.id}>
-                        <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
+                        <td className="relative whitespace-nowrap py-4 pl-4 pr-3 sm:pl-6">
+                          <input
+                            type="checkbox"
+                            className="absolute left-4 top-1/2 -mt-2 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-600"
+                            checked={selectedItems.has(item.id)}
+                            onChange={() => toggleItemSelection(item.id)}
+                          />
+                        </td>
+                        <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900">
                           <Link to={`/items/${item.id}`} className="hover:text-primary-600">
                             {item.name}
                           </Link>
@@ -288,6 +369,14 @@ export default function Dashboard() {
         <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {data?.items.map((item: Item) => (
             <div key={item.id} className="relative flex flex-col overflow-hidden rounded-lg border border-gray-200">
+              <div className="absolute top-4 left-4">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-600"
+                  checked={selectedItems.has(item.id)}
+                  onChange={() => toggleItemSelection(item.id)}
+                />
+              </div>
               {item.images && item.images[0] && (
                 <div className="aspect-h-1 aspect-w-1 bg-gray-200">
                   <img
@@ -375,6 +464,99 @@ export default function Dashboard() {
                   Next
                 </button>
               </nav>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Selected Confirmation Dialog */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity">
+          <div className="fixed inset-0 z-10 overflow-y-auto">
+            <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+              <div className="relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6">
+                <div className="sm:flex sm:items-start">
+                  <div className="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
+                    <TrashIcon className="h-6 w-6 text-red-600" aria-hidden="true" />
+                  </div>
+                  <div className="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left">
+                    <h3 className="text-base font-semibold leading-6 text-gray-900">Delete Selected Items</h3>
+                    <div className="mt-2">
+                      <p className="text-sm text-gray-500">
+                        Are you sure you want to delete {selectedItems.size} selected items? This action cannot be undone.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
+                  <button
+                    type="button"
+                    className="inline-flex w-full justify-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 sm:ml-3 sm:w-auto"
+                    onClick={handleDeleteSelected}
+                  >
+                    Delete
+                  </button>
+                  <button
+                    type="button"
+                    className="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto"
+                    onClick={() => setShowDeleteConfirm(false)}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete All Confirmation Dialog */}
+      {showDeleteAllConfirm && (
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity">
+          <div className="fixed inset-0 z-10 overflow-y-auto">
+            <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+              <div className="relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6">
+                <div className="sm:flex sm:items-start">
+                  <div className="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
+                    <TrashIcon className="h-6 w-6 text-red-600" aria-hidden="true" />
+                  </div>
+                  <div className="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left">
+                    <h3 className="text-base font-semibold leading-6 text-gray-900">Delete All Items</h3>
+                    <div className="mt-2">
+                      <p className="text-sm text-gray-500">
+                        {deleteAllConfirmCount === 0 && "Are you sure you want to delete ALL items? This action cannot be undone."}
+                        {deleteAllConfirmCount === 1 && "Please confirm again that you want to delete ALL items."}
+                        {deleteAllConfirmCount === 2 && "Final confirmation: Delete ALL items permanently?"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
+                  <button
+                    type="button"
+                    className="inline-flex w-full justify-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 sm:ml-3 sm:w-auto"
+                    onClick={() => {
+                      if (deleteAllConfirmCount < 2) {
+                        setDeleteAllConfirmCount(prev => prev + 1);
+                      } else {
+                        handleDeleteAll();
+                      }
+                    }}
+                  >
+                    {deleteAllConfirmCount < 2 ? 'Confirm Delete All' : 'Delete All Permanently'}
+                  </button>
+                  <button
+                    type="button"
+                    className="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto"
+                    onClick={() => {
+                      setShowDeleteAllConfirm(false);
+                      setDeleteAllConfirmCount(0);
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
