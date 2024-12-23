@@ -1,0 +1,1 @@
+inventory-management home-organization fastapi react typescript pwa docker python database-migrations authentication barcode-scanning image-gallery data-migration tailwindcss vite alembic mobile-friendly home-inventory asset-tracking inventory-system fullstack-application web-application rest-api file-upload secure-storage

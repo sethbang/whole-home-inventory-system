@@ -19,6 +19,22 @@ WHIS is a self-hosted platform for managing household inventories. It centralize
 - 📷 **Barcode/QR Scanning**: Quick item lookup and entry using barcodes
 - 🔄 **Data Migration**: Import/export functionality for various formats
 
+## Screenshots
+
+<div align="center">
+  <img src="images/screenshots/WHIS - Whole-Home Inventory System.jpeg" alt="WHIS Dashboard" width="800">
+  <p><em>Main Dashboard - Overview of your inventory items</em></p>
+  
+  <img src="images/screenshots/WHIS - Whole-Home Inventory System · 5.08pm · 12-22.jpeg" alt="WHIS Item Details" width="800">
+  <p><em>Item Details View - Comprehensive information about each item</em></p>
+  
+  <img src="images/screenshots/WHIS - Whole-Home Inventory System · 5.08pm · 12-22 (1).jpeg" alt="WHIS Add Item" width="800">
+  <p><em>Add Item Form - Easy item entry with custom fields</em></p>
+  
+  <img src="images/screenshots/WHIS - Whole-Home Inventory System · 5.08pm · 12-22 (2).jpeg" alt="WHIS Reports" width="800">
+  <p><em>Analytics Dashboard - Detailed insights about your inventory</em></p>
+</div>
+
 ## Tech Stack
 
 ### Backend
