@@ -24,4 +24,5 @@ dist-ssr
 *.sw?
 
 # SSL Certificates
-certs/*.pem
+*.pem
+frontend/certs

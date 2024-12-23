@@ -41,3 +41,5 @@ dev-dist/
 # No longer excluding test data as it's now part of the repository
 images/local
 /ToDo.md
+frontend/certs/key.pem
+frontend/certs/cert.pem
