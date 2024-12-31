@@ -1,0 +1,21 @@
+[req]
+default_bits = 4096
+prompt = no
+default_md = sha384
+x509_extensions = v3_ca
+distinguished_name = dn
+
+[dn]
+C = US
+ST = State
+L = City
+O = Your Organization CA
+OU = Development
+CN = Local Development Root CA
+emailAddress = dev@example.local
+
+[v3_ca]
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid:always,issuer
+basicConstraints = critical, CA:true
+keyUsage = critical, digitalSignature, cRLSign, keyCertSign

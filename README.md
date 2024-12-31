@@ -83,23 +83,80 @@ npm install
 
 ## Development Setup
 
-1. Start the backend server:
+### Certificate Setup (Required)
+
+> ⚠️ **Important**: WHIS uses HTTPS for secure communication. You must set up the development certificates before running the application.
+
+1. Generate the development certificates:
+```bash
+cd frontend
+node scripts/generate-certs.js
+```
+This will create:
+- A root Certificate Authority (CA) certificate
+- Server certificates for local development
+- All certificates are stored in the `certs` directory
+
+2. Install the CA certificate on your development machine:
+
+#### macOS:
+```bash
+cd ../certs
+sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain whis-dev-ca.crt
+```
+
+#### Linux:
+```bash
+cd ../certs
+sudo cp whis-dev-ca.crt /usr/local/share/ca-certificates/
+sudo update-ca-certificates
+```
+
+#### Windows:
+1. Navigate to the `certs` directory
+2. Double-click `whis-dev-ca.crt`
+3. Click "Install Certificate"
+4. Select "Local Machine"
+5. Choose "Trusted Root Certification Authorities"
+6. Complete the installation wizard
+
+For detailed instructions including mobile devices and NAS setup, see `certs/CERTIFICATE-SETUP.md`.
+
+> 📝 **Note**: The certificate needs to be installed on each device that will access WHIS.
+
+3. Start the backend server:
 ```bash
 cd backend
 source venv/bin/activate  # On Windows use: venv\Scripts\activate
 uvicorn app.main:app --reload
 ```
 
-2. Start the frontend development server:
+4. Start the frontend development server:
 ```bash
 cd frontend
 npm run dev
 ```
 
 The application will be available at:
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:8000
-- API Documentation: http://localhost:8000/docs
+- Local development: https://localhost:5173
+- Network access: https://[your-ip]:5173 or https://[your-nas]:5173
+
+### Network Deployment Notes
+
+When running WHIS on a network server (like a Synology NAS):
+1. Install the CA certificate on the NAS itself (see `CERTIFICATE-SETUP.md`)
+2. Distribute and install the CA certificate on all devices that need access
+3. The server certificate automatically includes:
+   - All local network IP addresses
+   - Common NAS hostnames
+   - Standard development hostnames (localhost)
+
+This ensures secure access from any device on your network without certificate warnings.
+
+The application will be available at:
+- Frontend: https://localhost:5173
+- Backend API: https://localhost:27182
+- API Documentation: https://localhost:27182/docs
 
 ### Development Mode
 
@@ -129,9 +186,11 @@ docker compose up --build
 ```
 
 3. Access the application:
-- Frontend: http://localhost:5173
-- Backend API: http://localhost:27182
-- API Documentation: http://localhost:27182/docs
+- Frontend: https://localhost:5173
+- Backend API: https://localhost:27182
+- API Documentation: https://localhost:27182/docs
+
+> ⚠️ **Important**: Before accessing the application, make sure to install the development CA certificate. See the "Development Certificate Setup" section above for instructions.
 
 The Docker setup includes:
 - Automatic container orchestration

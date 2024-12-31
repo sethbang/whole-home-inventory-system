@@ -27,9 +27,11 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
+      - ./certs:/root/certs:rw
     environment:
       - NODE_ENV=development
       - VITE_API_URL=
+      - CERT_OUTPUT_DIR=/root/certs
     depends_on:
       - backend
     networks:
