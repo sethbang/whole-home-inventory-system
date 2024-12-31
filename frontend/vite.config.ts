@@ -5,27 +5,29 @@ import fs from 'fs'
 import path from 'path'
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   server: {
     host: true,
     port: 5173,
     strictPort: true,
-    https: {
-      key: fs.readFileSync(path.resolve(__dirname, 'certs/key.pem')),
-      cert: fs.readFileSync(path.resolve(__dirname, 'certs/cert.pem')),
-    },
-    proxy: {
-      '/api': {
-        target: 'https://backend:27182',
-        secure: false,
-        changeOrigin: true
+    ...(mode === 'development' && {
+      https: {
+        key: fs.readFileSync(path.resolve(__dirname, 'certs/key.pem')),
+        cert: fs.readFileSync(path.resolve(__dirname, 'certs/cert.pem')),
       },
-      '/uploads': {
-        target: 'https://backend:27182',
-        secure: false,
-        changeOrigin: true
+      proxy: {
+        '/api': {
+          target: 'https://backend:27182',
+          secure: false,
+          changeOrigin: true
+        },
+        '/uploads': {
+          target: 'https://backend:27182',
+          secure: false,
+          changeOrigin: true
+        }
       }
-    }
+    })
   },
   plugins: [
     react(),
@@ -96,4 +98,4 @@ export default defineConfig({
       }
     })
   ]
-})
+}))
