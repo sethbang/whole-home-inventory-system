@@ -44,7 +44,8 @@ async def method_not_allowed_handler(request, exc):
     )
 
 # Get CORS settings from environment variables with defaults
-CORS_ORIGINS = os.getenv("CORS_ORIGINS", "https://localhost:5173,https://192.168.1.15:5173").split(",")
+# Default CORS origins support both HTTP and HTTPS
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:5173,https://localhost:5173,http://192.168.1.122:5173,https://192.168.1.122:5173").split(",")
 CORS_ALLOW_METHODS = os.getenv("CORS_ALLOW_METHODS", "GET,POST,PUT,DELETE,OPTIONS,HEAD,PATCH").split(",")
 CORS_ALLOW_HEADERS = os.getenv("CORS_ALLOW_HEADERS", "Content-Type,Authorization,Accept,Origin,X-Requested-With").split(",")
 
