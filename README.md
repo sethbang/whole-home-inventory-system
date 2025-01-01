@@ -95,8 +95,8 @@ WHIS provides comprehensive documentation to help you understand, use, and contr
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/whis.git
-cd whis
+git clone https://github.com/yourusername/whole-home-inventory-system.git
+cd whole-home-inventory-system
 ```
 
 2. Set up the backend:
@@ -211,8 +211,8 @@ We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.
 ## Support
 
 - 📖 [Documentation](#documentation-suite)
-- 🐛 [Issue Tracker](https://github.com/yourusername/whis/issues)
-- 💬 [Discussions](https://github.com/yourusername/whis/discussions)
+- 🐛 [Issue Tracker](https://github.com/yourusername/whole-home-inventory-system/issues)
+- 💬 [Discussions](https://github.com/yourusername/whole-home-inventory-system/discussions)
 
 ## License
 

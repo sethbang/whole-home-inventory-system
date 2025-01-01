@@ -40,8 +40,8 @@ Recommended extensions for development:
 1. **Clone and Setup**
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/whis.git
-cd whis
+git clone https://github.com/yourusername/whole-home-inventory-system
+cd whole-home-inventory-system
 
 # Create Python virtual environment
 cd backend

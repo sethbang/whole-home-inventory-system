@@ -29,8 +29,8 @@ We are committed to providing a welcoming and inclusive experience for everyone.
 1. Fork the repository
 2. Clone your fork:
    ```bash
-   git clone https://github.com/yourusername/whis.git
-   cd whis
+   git clone https://github.com/yourusername/whole-home-inventory-system
+   cd whole-home-inventory-system
    ```
 3. Set up your development environment (see below)
 4. Create a new branch for your feature/fix:

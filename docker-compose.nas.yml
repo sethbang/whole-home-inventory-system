@@ -13,7 +13,7 @@ services:
       - /volume1/docker/whole-home-inventory-system/uploads:/app/backend/uploads
       - /volume1/docker/whole-home-inventory-system/backups:/app/backend/backups
     networks:
-      - whis-network
+      - whole-home-inventory-system-network
     restart: unless-stopped
 
   frontend:
@@ -25,9 +25,9 @@ services:
     depends_on:
       - backend
     networks:
-      - whis-network
+      - whole-home-inventory-system-network
     restart: unless-stopped
 
 networks:
-  whis-network:
+  whole-home-inventory-system-network:
     driver: bridge

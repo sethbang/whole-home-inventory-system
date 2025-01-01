@@ -16,7 +16,7 @@ services:
       - ./backend/backend/uploads:/app/backend/uploads
       - ./backend/backend/backups:/app/backend/backups
     networks:
-      - whis-network
+      - whole-home-inventory-system-network
 
   frontend:
     build:
@@ -35,8 +35,8 @@ services:
     depends_on:
       - backend
     networks:
-      - whis-network
+      - whole-home-inventory-system-network
 
 networks:
-  whis-network:
+  whole-home-inventory-system-network:
     driver: bridge
