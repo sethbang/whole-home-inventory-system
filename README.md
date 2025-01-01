@@ -6,6 +6,19 @@
 
 WHIS is a self-hosted platform for managing household inventories. It centralizes item information—descriptions, photos, locations, purchase details, valuations, warranties—into a local database accessible from multiple devices via a web interface.
 
+## Documentation
+
+📚 **[View Full Documentation](#documentation-suite)**
+
+- 📖 [Architecture Overview](ARCHITECTURE.md)
+- 🔧 [Development Guide](DEVELOPMENT.md)
+- 🧪 [Testing Guide](TESTING.md)
+- 🤝 [Contributing Guidelines](CONTRIBUTING.md)
+- 📜 [API Documentation](API.md)
+- 🔒 [Security Policy](SECURITY.md)
+- 📋 [Changelog](CHANGELOG.md)
+- 📦 [Deployment Guide](DEPLOYMENT.md)
+
 ## Features
 
 - 📱 **Progressive Web App (PWA)**: Offline access and mobile app-like experience
@@ -34,6 +47,26 @@ WHIS is a self-hosted platform for managing household inventories. It centralize
   <img src="images/screenshots/WHIS - Whole-Home Inventory System · 5.08pm · 12-22 (2).jpeg" alt="WHIS Reports" width="800">
   <p><em>Analytics Dashboard - Detailed insights about your inventory</em></p>
 </div>
+
+## Documentation Suite
+
+WHIS provides comprehensive documentation to help you understand, use, and contribute to the project:
+
+### For Users
+
+- **[User Guide](docs/USER_GUIDE.md)**: Complete guide to using WHIS
+- **[Installation Guide](#installation)**: Step-by-step installation instructions
+- **[Deployment Guide](DEPLOYMENT.md)**: Production deployment instructions
+- **[Security Policy](SECURITY.md)**: Security information and best practices
+- **[Changelog](CHANGELOG.md)**: Version history and updates
+
+### For Developers
+
+- **[Architecture Overview](ARCHITECTURE.md)**: System design and technical decisions
+- **[Development Guide](DEVELOPMENT.md)**: Setting up development environment
+- **[Contributing Guidelines](CONTRIBUTING.md)**: How to contribute to WHIS
+- **[Testing Guide](TESTING.md)**: Testing procedures and guidelines
+- **[API Documentation](API.md)**: Complete API reference
 
 ## Tech Stack
 
@@ -141,69 +174,7 @@ The application will be available at:
 - Local development: https://localhost:5173
 - Network access: https://[your-ip]:5173 or https://[your-nas]:5173
 
-### Network Deployment Notes
-
-When running WHIS on a network server (like a Synology NAS):
-1. Install the CA certificate on the NAS itself (see `CERTIFICATE-SETUP.md`)
-2. Distribute and install the CA certificate on all devices that need access
-3. The server certificate automatically includes:
-   - All local network IP addresses
-   - Common NAS hostnames
-   - Standard development hostnames (localhost)
-
-This ensures secure access from any device on your network without certificate warnings.
-
-The application will be available at:
-- Frontend: https://localhost:5173
-- Backend API: https://localhost:27182
-- API Documentation: https://localhost:27182/docs
-
-### Development Mode
-
-The application includes a development mode that can be enabled to access additional features:
-- Test data generation
-- Quick user creation
-- Database verification tools
-- Sample data import/export testing
-
-### Test Data
-
-The `test_data/samples` directory contains various sample datasets for testing the import functionality:
-- CSV and JSON format examples
-- Different inventory scenarios (office, home electronics, garage tools, collectibles)
-- Edge cases and minimal field samples
-
-## Production Deployment
-
-### Docker Deployment
-The easiest way to deploy WHIS is using Docker:
-
-1. Make sure you have Docker and Docker Compose installed on your system.
-
-2. Build and start the containers:
-```bash
-docker compose up --build
-```
-
-3. Access the application:
-- Frontend: https://localhost:5173
-- Backend API: https://localhost:27182
-- API Documentation: https://localhost:27182/docs
-
-> ⚠️ **Important**: Before accessing the application, make sure to install the development CA certificate. See the "Development Certificate Setup" section above for instructions.
-
-The Docker setup includes:
-- Automatic container orchestration
-- Volume mounts for persistent data (database, uploads, backups)
-- Network configuration for service communication
-- Production-ready Nginx configuration for the frontend
-
-### Alternative Setup (Manual Installation)
-- Hardware: Raspberry Pi 4 (2GB+ RAM) or equivalent
-- OS: Raspberry Pi OS Lite or Ubuntu Server
-- Network: Local network with optional VPN for remote access
-
-## Usage
+## Quick Start Guide
 
 1. **First Time Setup**
    - Create an admin account using the registration page
@@ -225,34 +196,27 @@ The Docker setup includes:
 4. **Data Management**
     - Create automatic backups of your data
     - Download backups for safekeeping
-    - Upload backup files to restore data on another system
-    - Restore from any backup with a single click
-    - Import/export data using the migration tools
+    - Upload backup files to restore data
+    - Import/export data using migration tools
     - Generate reports and analytics
-
-## Future Features
-
-🚀 The following features are planned for future releases:
-
-- 📱 **Mobile Apps**: Native mobile applications for iOS and Android
-- 🤖 **AI Integration**: Automated item categorization and description generation
-- 🏷️ **Smart Tags**: Automated tagging system based on item characteristics
-- 📅 **Maintenance Reminders**: Schedule and track item maintenance
-- 📈 **Value Tracking**: Track item depreciation and current market values
-- 🔗 **API Integration**: Connect with home automation and insurance systems
-- 🔌 **Plugin System**: Extensible architecture for community contributions
 
 ## Contributing
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details on:
+- Code of Conduct
+- Development process
+- Pull request procedure
+- Coding standards
+
+## Support
+
+- 📖 [Documentation](#documentation-suite)
+- 🐛 [Issue Tracker](https://github.com/yourusername/whis/issues)
+- 💬 [Discussions](https://github.com/yourusername/whis/discussions)
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
 
