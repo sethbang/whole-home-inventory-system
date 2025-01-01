@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- eBay integration feature (Phase 1)
+  - eBay Seller Hub CSV export
+  - eBay category mapping
+  - eBay-specific custom fields
+  - Multi-image support for listings
 - Barcode/QR code scanning functionality (in progress)
 - Unit and integration tests (in progress)
 - Enhanced documentation suite
@@ -16,11 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Development workflow
   - Testing procedures
   - Architecture overview
+  - eBay integration guide
 
 ### Changed
 - Improved error handling in API endpoints
 - Enhanced input validation
 - Updated development environment setup process
+- Extended custom fields system for eBay integration
 
 ### Fixed
 - Image upload error handling
@@ -203,6 +210,11 @@ Each change links to relevant GitHub issues where applicable:
 - Mobile applications
 - Cloud integration options
 - Plugin system
+- eBay integration Phase 2
+  - Direct API integration
+  - Real-time sync
+  - Order management
+  - Automated listing
 
 ### Version 1.5.0 (Planned)
 - Value tracking

@@ -2,13 +2,14 @@ import React, { useState } from 'react';
 import CustomFields from '../components/CustomFields';
 import CameraCapture from '../components/CameraCapture';
 import ImageGallery from '../components/ImageGallery';
+import EbayFields, { EbayFieldsData } from '../components/EbayFields';
 import { CameraIcon } from '@heroicons/react/24/outline';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { items, images } from '../api/client';
-import type { Item } from '../api/client';
+import { items, images, ebay } from '../api/client';
+import type { Item, EbayCategoryResponse } from '../api/client';
 import { format } from 'date-fns';
 
 const validationSchema = Yup.object({
@@ -39,12 +40,12 @@ export default function ItemDetail() {
     queryFn: () => items.get(id!),
   });
 
-  const { data: categories } = useQuery({
+  const { data: categories = [] } = useQuery({
     queryKey: ['categories'],
     queryFn: items.getCategories,
   });
 
-  const { data: locations } = useQuery({
+  const { data: locations = [] } = useQuery({
     queryKey: ['locations'],
     queryFn: items.getLocations,
   });
@@ -92,6 +93,39 @@ export default function ItemDetail() {
     },
     onError: (error: any) => {
       setError(error.response?.data?.detail || 'Failed to delete item');
+    },
+  });
+
+  const updateEbayFieldsMutation = useMutation({
+    mutationFn: async (fields: EbayFieldsData) => {
+      return await ebay.updateFields(id!, fields);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['items', id] });
+    },
+    onError: (error: any) => {
+      setError(error.response?.data?.detail || 'Failed to update eBay fields');
+    },
+  });
+
+  const lookupEbayCategoryMutation = useMutation({
+    mutationFn: async () => {
+      return await ebay.getCategories(id);
+    },
+    onSuccess: (data: EbayCategoryResponse) => {
+      if (data.suggested_category) {
+        const ebayFields = formik.values.custom_fields?.ebay || {};
+        formik.setFieldValue('custom_fields', {
+          ...formik.values.custom_fields,
+          ebay: {
+            ...ebayFields,
+            category_id: data.suggested_category.id,
+          },
+        });
+      }
+    },
+    onError: (error: any) => {
+      setError(error.response?.data?.detail || 'Failed to lookup eBay category');
     },
   });
 
@@ -144,6 +178,14 @@ export default function ItemDetail() {
     if (window.confirm('Are you sure you want to delete this item? This action cannot be undone.')) {
       deleteItemMutation.mutate();
     }
+  };
+
+  const handleEbayFieldsChange = (fields: EbayFieldsData) => {
+    formik.setFieldValue('custom_fields', {
+      ...formik.values.custom_fields,
+      ebay: fields,
+    });
+    updateEbayFieldsMutation.mutate(fields);
   };
 
   if (isLoading) {
@@ -220,7 +262,7 @@ export default function ItemDetail() {
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
               >
                 <option value="">Select a category</option>
-                {categories?.map((category) => (
+                {categories.map((category: string) => (
                   <option key={category} value={category}>
                     {category}
                   </option>
@@ -241,7 +283,7 @@ export default function ItemDetail() {
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
               >
                 <option value="">Select a location</option>
-                {locations?.map((location) => (
+                {locations.map((location: string) => (
                   <option key={location} value={location}>
                     {location}
                   </option>
@@ -405,6 +447,16 @@ export default function ItemDetail() {
                   onClose={() => setShowCamera(false)}
                 />
               )}
+            </div>
+
+            {/* eBay Fields */}
+            <div className="sm:col-span-6 pt-8">
+              <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">eBay Listing Details</h3>
+              <EbayFields
+                fields={formik.values.custom_fields?.ebay || {}}
+                onChange={handleEbayFieldsChange}
+                onCategoryLookup={() => lookupEbayCategoryMutation.mutate()}
+              />
             </div>
           </div>
         </div>

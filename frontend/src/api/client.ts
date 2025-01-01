@@ -1,4 +1,5 @@
 import axios from 'axios';
+import type { EbayFieldsData } from '../components/EbayFields';
 
 // In development, use relative URLs that will be handled by Vite's proxy
 const API_URL = '';
@@ -217,80 +218,6 @@ export const items = {
   },
 };
 
-export interface ValueByCategory {
-  category: string;
-  item_count: number;
-  total_value: number;
-}
-
-export interface ValueByLocation {
-  location: string;
-  item_count: number;
-  total_value: number;
-}
-
-export interface ValueTrends {
-  total_purchase_value: number;
-  total_current_value: number;
-  value_change: number;
-  value_change_percentage: number;
-}
-
-export interface WarrantyItem {
-  id: string;
-  name: string;
-  expiration_date: string;
-}
-
-export interface WarrantyStatus {
-  expiring_soon: WarrantyItem[];
-  expired: WarrantyItem[];
-  active: WarrantyItem[];
-}
-
-export interface AgeAnalysisItem {
-  id: string;
-  name: string;
-  purchase_date: string;
-  current_value: number;
-}
-
-export interface AgeRange {
-  count: number;
-  total_value: number;
-  items: AgeAnalysisItem[];
-}
-
-export interface AgeAnalysis {
-  "0-1 year": AgeRange;
-  "1-3 years": AgeRange;
-  "3-5 years": AgeRange;
-  "5+ years": AgeRange;
-}
-
-export const analytics = {
-  getValueByCategory: async (): Promise<ValueByCategory[]> => {
-    const response = await apiClient.get<ValueByCategory[]>('/api/analytics/value-by-category');
-    return response.data;
-  },
-  getValueByLocation: async (): Promise<ValueByLocation[]> => {
-    const response = await apiClient.get<ValueByLocation[]>('/api/analytics/value-by-location');
-    return response.data;
-  },
-  getValueTrends: async (): Promise<ValueTrends> => {
-    const response = await apiClient.get<ValueTrends>('/api/analytics/value-trends');
-    return response.data;
-  },
-  getWarrantyStatus: async (): Promise<WarrantyStatus> => {
-    const response = await apiClient.get<WarrantyStatus>('/api/analytics/warranty-status');
-    return response.data;
-  },
-  getAgeAnalysis: async (): Promise<AgeAnalysis> => {
-    const response = await apiClient.get<AgeAnalysis>('/api/analytics/age-analysis');
-    return response.data;
-  },
-};
-
 export const images = {
   upload: async (itemId: string, file: File) => {
     const formData = new FormData();
@@ -311,69 +238,45 @@ export const images = {
   },
 };
 
-export interface Backup {
-  id: string;
-  owner_id: string;
-  filename: string;
-  file_path: string;
-  size_bytes: number;
-  item_count: number;
-  image_count: number;
-  created_at: string;
-  status: 'completed' | 'failed' | 'in_progress';
-  error_message?: string;
+export interface EbayCategoryResponse {
+  categories: Array<{
+    id: string;
+    name: string;
+    subcategories?: Array<{
+      id: string;
+      name: string;
+    }>;
+  }>;
+  suggested_category?: {
+    id: string;
+    name: string;
+  };
 }
 
-export interface BackupList {
-  backups: Backup[];
-}
-
-export interface RestoreResponse {
+export interface EbayExportResponse {
   success: boolean;
+  file_url?: string;
   message: string;
-  items_restored?: number;
-  images_restored?: number;
   errors?: string[];
+  items_processed: number;
 }
 
-export const backups = {
-  create: async (): Promise<Backup> => {
-    const response = await apiClient.post<Backup>('/api/backups');
-    return response.data;
-  },
-  list: async (): Promise<BackupList> => {
-    const response = await apiClient.get<BackupList>('/api/backups');
-    return response.data;
-  },
-  restore: async (backupId: string): Promise<RestoreResponse> => {
-    const response = await apiClient.post<RestoreResponse>(`/api/backups/${backupId}/restore`);
-    return response.data;
-  },
-  delete: async (backupId: string): Promise<void> => {
-    await apiClient.delete(`/api/backups/${backupId}`);
-  },
-  download: async (backupId: string): Promise<void> => {
-    const response = await apiClient.get<ArrayBuffer>(`/api/backups/${backupId}/download`, {
-      responseType: 'arraybuffer'
+// eBay integration
+export const ebay = {
+  getCategories: async (itemId?: string): Promise<EbayCategoryResponse> => {
+    const response = await apiClient.get<EbayCategoryResponse>('/api/ebay/categories', {
+      params: itemId ? { item_id: itemId } : undefined
     });
-    const blob = new Blob([response.data], { type: 'application/zip' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    const filename = response.headers['content-disposition']?.split('filename=')[1]?.replace(/"/g, '') || `backup_${backupId}.zip`;
-    link.href = url;
-    link.setAttribute('download', filename);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
+    return response.data;
   },
-  upload: async (file: File): Promise<Backup> => {
-    const formData = new FormData();
-    formData.append('file', file);
-    const response = await apiClient.post<Backup>('/api/backups/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+  updateFields: async (itemId: string, fields: EbayFieldsData): Promise<EbayFieldsData> => {
+    const response = await apiClient.post<EbayFieldsData>(`/api/ebay/items/${itemId}/ebay-fields`, fields);
+    return response.data;
+  },
+  exportItems: async (itemIds: string[], defaultFields?: EbayFieldsData): Promise<EbayExportResponse> => {
+    const response = await apiClient.post<EbayExportResponse>('/api/ebay/export', {
+      item_ids: itemIds,
+      default_fields: defaultFields
     });
     return response.data;
   },

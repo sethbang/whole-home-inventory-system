@@ -321,6 +321,31 @@ Storage Write
 Cleanup
 ```
 
+3. **eBay Integration**
+```
+Phase 1: Seller Hub Export
+     ↓
+Item Selection
+     ↓
+Category Mapping
+     ↓
+CSV Generation
+     ↓
+Image URL Processing
+     ↓
+Export File
+
+Phase 2: API Integration (Future)
+     ↓
+OAuth Authentication
+     ↓
+Direct API Calls
+     ↓
+Real-time Sync
+     ↓
+Order Management
+```
+
 ### API Integration
 
 1. **REST API**
@@ -334,6 +359,30 @@ Cleanup
    - Bi-directional
    - Event-based
    - Connection management
+
+3. **eBay Integration API (Future)**
+   - OAuth 2.0 authentication
+   - Trading API integration
+   - Inventory API integration
+   - Order management
+   - Bulk operations
+
+### Data Transformations
+
+1. **eBay Export Flow**
+```
+Item Data
+     ↓
+Field Mapping
+     ↓
+Category Translation
+     ↓
+Image Processing
+     ↓
+CSV/Feed Generation
+     ↓
+Export File
+```
 
 ## Deployment Architecture
 
@@ -443,12 +492,14 @@ SSL/TLS
    - Offline support
    - Real-time updates
    - AI integration
+   - Enhanced eBay integration
 
 3. **Integration**
    - External APIs
    - Authentication providers
    - Cloud storage
    - Analytics
+   - Additional marketplace integrations
 
 ## Architecture Decision Records
 
