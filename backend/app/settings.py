@@ -74,6 +74,13 @@ class Settings(BaseSettings):
     LOG_FORMAT: str = ""
     DEBUG: bool = False
 
+    # OpenTelemetry — tracer provider is always installed, but the exporter
+    # only spins up when OTEL_ENABLED=true. Unconfigured deployments pay
+    # essentially nothing for the import cost.
+    OTEL_ENABLED: bool = False
+    OTEL_SERVICE_NAME: str = "whis-backend"
+    OTEL_EXPORTER_OTLP_ENDPOINT: str = "http://localhost:4317"
+
     @field_validator(
         "CORS_ORIGINS", "CORS_ALLOW_METHODS", "CORS_ALLOW_HEADERS", mode="before"
     )

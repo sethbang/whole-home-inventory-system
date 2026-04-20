@@ -11,6 +11,7 @@ from .logging_config import setup_logging
 from .middleware.request_id import RequestIdMiddleware
 from .routers import analytics, auth, backups, ebay, images, items
 from .settings import settings
+from .telemetry import setup_telemetry
 
 # Configure structlog + stdlib logging before the rest of the app boots so
 # every module's logger picks up the shared renderer on first use.
@@ -27,6 +28,12 @@ app = FastAPI(
     version="2.0.0",
     redirect_slashes=False,
 )
+
+# OpenTelemetry setup is a no-op unless OTEL_ENABLED=true. When enabled
+# it installs a tracer provider, an OTLP gRPC exporter, and instrumentors
+# for FastAPI + SQLAlchemy. Runs after FastAPI() but before routes are
+# included so the instrumentation wraps everything.
+setup_telemetry(app)
 
 
 @app.exception_handler(405)
