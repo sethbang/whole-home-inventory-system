@@ -135,6 +135,4 @@ def test_full_roundtrip_preserves_core_tables(fresh_db):
         tables = set(inspect(engine).get_table_names())
     finally:
         engine.dispose()
-    assert {"users", "items", "item_images", "backups", "price_cache"}.issubset(
-        tables
-    )
+    assert {"users", "items", "item_images", "backups", "price_cache"}.issubset(tables)

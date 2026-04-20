@@ -338,6 +338,14 @@ def test_import_records_partial_failure_does_not_abort(db_session, user):
 
 
 def test_import_records_decodes_custom_fields_json_string(db_session, user):
+    """Legacy CSV imports with unstructured custom_fields land under user_defined.
+
+    v2.3 made the HTTP API strict at the top level of ``custom_fields`` —
+    only ``ebay`` / ``facebook`` / ``user_defined`` are accepted. The
+    import path is deliberately lenient: unknown top-level keys get
+    folded into ``user_defined`` via ``CustomFieldsSchema.coerce_from_raw``
+    so legacy exports stay importable without losing data.
+    """
     records = [
         {
             "name": "A",
@@ -348,4 +356,4 @@ def test_import_records_decodes_custom_fields_json_string(db_session, user):
     ]
     ItemService(db_session, user).import_records(records)
     [item] = db_session.query(models.Item).filter(models.Item.owner_id == user.id).all()
-    assert item.custom_fields == {"color": "blue", "rating": 4}
+    assert item.custom_fields == {"user_defined": {"color": "blue", "rating": 4}}

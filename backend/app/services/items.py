@@ -255,6 +255,21 @@ class ItemService:
                     except json.JSONDecodeError:
                         safe["custom_fields"] = None
 
+                # Coerce legacy custom_fields shapes into the v2.3 strict
+                # schema — unknown top-level keys land under user_defined
+                # rather than failing the whole row. Stored as a plain
+                # dict so SQLAlchemy can hand it straight to the JSON
+                # column.
+                if safe.get("custom_fields"):
+                    coerced = schemas.CustomFieldsSchema.coerce_from_raw(
+                        safe["custom_fields"]
+                    )
+                    safe["custom_fields"] = (
+                        coerced.model_dump(exclude_none=True)
+                        if coerced is not None
+                        else None
+                    )
+
                 db_item = models.Item(**safe, owner_id=self.user.id)
                 self.db.add(db_item)
                 items_imported += 1

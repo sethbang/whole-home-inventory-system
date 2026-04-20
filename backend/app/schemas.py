@@ -1,7 +1,60 @@
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from pydantic import UUID4, BaseModel, ConfigDict, EmailStr
+from pydantic import UUID4, BaseModel, ConfigDict, EmailStr, Field
+
+from .ebay.schemas import EbayFields
+from .facebook.schemas import FbFields
+
+
+class CustomFieldsSchema(BaseModel):
+    """Structured shape of ``Item.custom_fields``.
+
+    Top-level is strict: only ``ebay``, ``facebook``, and ``user_defined``
+    are accepted. Unknown keys at this level produce a 422 at request
+    time — this is the v2.3 plug for the "JSON column accepts anything"
+    gap flagged in the post-2.0 audit. The ``user_defined`` catchall
+    preserves the operator-level flexibility that people actually use
+    (hand-added tags, photography rating, loaner tracking, etc.) without
+    giving up the schema discipline around the integrations.
+    """
+
+    ebay: Optional[EbayFields] = None
+    facebook: Optional[FbFields] = None
+    user_defined: Dict[str, Any] = Field(default_factory=dict)
+
+    model_config = ConfigDict(extra="forbid")
+
+    @classmethod
+    def coerce_from_raw(
+        cls, raw: Optional[Dict[str, Any]]
+    ) -> Optional["CustomFieldsSchema"]:
+        """Lenient entrypoint for operator-controlled inputs (CSV import, etc.).
+
+        Recognized keys (``ebay`` / ``facebook`` / ``user_defined``) pass
+        through with type validation. Any other top-level keys are folded
+        into ``user_defined`` rather than rejected — this keeps legacy
+        hand-edited custom_fields shapes importable while the strict
+        schema still guards the HTTP API at the POST/PUT boundary.
+        """
+        if raw is None:
+            return None
+        if not isinstance(raw, dict):
+            raise ValueError("custom_fields must be a JSON object")
+
+        known: Dict[str, Any] = {}
+        unknown: Dict[str, Any] = {}
+        for key, value in raw.items():
+            if key in {"ebay", "facebook"}:
+                known[key] = value
+            elif key == "user_defined" and isinstance(value, dict):
+                # Merge any pre-existing user_defined into the catchall.
+                unknown.update(value)
+            else:
+                unknown[key] = value
+        if unknown:
+            known["user_defined"] = unknown
+        return cls.model_validate(known)
 
 
 class UserBase(BaseModel):
@@ -47,7 +100,10 @@ class ItemBase(BaseModel):
 
 
 class ItemCreate(ItemBase):
-    pass
+    # Override with strict schema for HTTP-bound writes. ItemBase keeps the
+    # permissive Dict[str, Any] shape so response parsing tolerates any
+    # legacy JSON-column content that predates v2.3.
+    custom_fields: Optional[CustomFieldsSchema] = None
 
 
 class ItemUpdate(BaseModel):
@@ -63,7 +119,7 @@ class ItemUpdate(BaseModel):
     current_value: Optional[float] = None
     warranty_expiration: Optional[datetime] = None
     notes: Optional[str] = None
-    custom_fields: Optional[Dict[str, Any]] = None
+    custom_fields: Optional[CustomFieldsSchema] = None
 
 
 class ItemImage(BaseModel):
