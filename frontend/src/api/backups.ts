@@ -57,15 +57,6 @@ export const backups = {
     // lives on the server.
     window.open(`/api/backups/${backupId}/download`, '_blank');
   },
-  /**
-   * @deprecated v2.1 changed restore to a two-phase contract
-   * (``previewRestore`` + ``commitRestore``). This alias forwards to
-   * ``previewRestore`` so Backups.tsx keeps compiling until the v2.3
-   * UI rewrite wires the two-phase flow. Do not use in new code.
-   */
-  restore: async (backupId: string): Promise<RestoreResult> => {
-    return backups.previewRestore(backupId);
-  },
 };
 
 export type { Backup, BackupList, RestoreResult };
