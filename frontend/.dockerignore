@@ -1,0 +1,40 @@
+# Exclude host-side state and build artifacts from the frontend image context.
+
+# Dependencies (installed inside the image)
+node_modules/
+
+# Build outputs
+dist/
+build/
+dev-dist/
+
+# Test & coverage
+coverage/
+.nyc_output/
+
+# Editor / OS junk
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Secrets / env
+.env
+.env.*
+!.env.example
+
+# Certificates (generated at runtime / mounted volume)
+certs/
+*.pem
+*.key
+*.crt
+*.srl
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Docs don't belong in the image.
+*.md

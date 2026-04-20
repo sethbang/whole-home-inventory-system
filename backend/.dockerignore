@@ -1,0 +1,56 @@
+# Exclude everything that has no place in the backend image build context.
+# Keeps the context small (faster pushes, less cache invalidation) and
+# prevents accidental secret/host-state leaks from reaching the image.
+
+# Python build artifacts and caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# Virtualenvs
+venv/
+.venv/
+env/
+
+# Editor / OS junk
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Secrets / env
+.env
+.env.*
+!.env.example
+
+# Local databases and uploaded artifacts (these come from volume mounts in
+# compose, not from the image).
+database/
+uploads/
+backups/
+*.db
+*.sqlite3
+
+# Certificates (generated at runtime / via volume, not baked into the image)
+certs/
+*.pem
+*.key
+*.crt
+*.srl
+
+# Tests are not needed in the production image.
+tests/
+
+# Docs shouldn't go into the image either.
+*.md

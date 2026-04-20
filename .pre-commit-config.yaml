@@ -1,0 +1,67 @@
+# Pre-commit config — runs on staged files before each commit.
+# Install once:
+#     pip install pre-commit
+#     pre-commit install
+#
+# Run against the whole repo manually:
+#     pre-commit run --all-files
+#
+# Rationale: CI lint is currently advisory (continue-on-error) because the
+# frontend has 47 pre-existing ESLint issues. Pre-commit catches *new* issues
+# at author time without lowering the bar for existing code, so we can ratchet
+# quality up without a flag day.
+
+repos:
+  # --- Generic hygiene -------------------------------------------------------
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+      - id: check-json
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+      - id: check-merge-conflict
+      - id: detect-private-key
+      - id: mixed-line-ending
+        args: [--fix=lf]
+
+  # --- Python: ruff replaces black + isort + flake8 --------------------------
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.4
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+        files: ^backend/
+      - id: ruff-format
+        files: ^backend/
+
+  # --- Secrets scan ----------------------------------------------------------
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: [--baseline, .secrets.baseline]
+        exclude: |
+          (?x)^(
+            frontend/package-lock\.yaml|
+            frontend/package-lock\.json|
+            backend/tests/.*|
+            .*\.snap
+          )$
+
+  # --- Frontend lint + format (runs only if node_modules is installed) -------
+  - repo: local
+    hooks:
+      - id: eslint
+        name: eslint (frontend, changed files)
+        language: system
+        types_or: [javascript, jsx, ts, tsx]
+        files: ^frontend/src/
+        # Use the project's installed eslint via npx; fail the commit only on
+        # errors, not warnings (the 47 pre-existing warnings still apply).
+        entry: bash -c 'cd frontend && npx --no-install eslint --max-warnings=999 "$@"' --
+        pass_filenames: true
+        require_serial: false

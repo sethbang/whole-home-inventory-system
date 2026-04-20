@@ -7,6 +7,88 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-04-20
+
+Security and correctness patch driven by the 2026-04-20 post-2.0 audit. Focuses
+on the sharp bugs that shouldn't ship past 2.0 and lays the groundwork
+(pre-commit, dependabot, `.dockerignore`) for the larger v2.2+ refactors.
+
+### Security & correctness
+
+- `GET /api/items/barcode/{barcode}` now requires an authenticated user. It
+  previously accepted anonymous callers (via `get_current_active_user_or_none`)
+  and only filtered by owner when a user was present, which allowed unauth'd
+  barcode probing.
+- `POST /api/backups/upload` now validates uploaded zips on magic bytes via
+  `zipfile.is_zipfile()`, runs `testzip()` for CRC integrity, and enforces a
+  decompression-bomb cap (total uncompressed size ≤ `MAX_UPLOAD_BYTES × 20`,
+  returned as 413). Previously a renamed `.zip` of any content would pass.
+- **Breaking API change for safety:** `POST /api/backups/{id}/restore` is now
+  two-phase. Without query params it returns a non-destructive preview
+  (`dry_run=true`) describing the item counts. To commit a restore the caller
+  must pass `?dry_run=false` *and* a body `{"confirm_item_count": N}` that
+  matches the current server-side count; a mismatch is rejected with 409.
+  This guards against accidental clicks and stale-UI races that previously
+  would wipe the entire item list.
+- Backup create now eager-loads `Item.images` via `selectinload`, eliminating
+  an O(items + images) N+1 pattern. Large inventories saw 100s of extra
+  queries per backup; now it's two.
+- Backup router no longer leaks `str(exc)` into HTTP response bodies. All
+  unexpected errors are logged server-side and return a generic 500 with
+  detail `"Restore failed; check server logs"` / equivalent.
+- `models.UUID` TypeDecorator no longer silently replaces non-v4 UUIDs with a
+  fresh v4 on every read and write. It now logs a warning and preserves the
+  caller's value. Malformed strings raise `ValueError` (previously were
+  silently replaced). Integrations passing v1/v5 UUIDs round-trip correctly.
+- Frontend `src/lib/logger.ts` replaces direct `console.log` / `console.error`
+  in `src/api/client.ts`. The login handler previously emitted credentials-
+  adjacent output to the browser console in production builds.
+- Frontend dev-mode auth bypass (`AuthContext`) now refuses to trust the
+  `isDevMode` localStorage flag unless the app is being accessed from a
+  loopback or RFC-1918 private hostname, even in a dev build. A dev build
+  tunneled to the public internet cannot impersonate the admin account.
+
+### Added
+
+- `backend/tests/test_barcode.py`, `test_backups.py`, `test_uuid_decorator.py`
+  add 23 new tests covering every behavior above (including an N+1 regression
+  test via a SQLAlchemy event listener and a positive decompression-bomb
+  rejection test). Backend suite: 10 → 33 tests.
+- `frontend/src/lib/__tests__/logger.test.ts` and `devBypass.test.ts` add 10
+  new tests (3 logger + 7 hostname guard). Frontend suite: 19 → 28 tests.
+- `.github/dependabot.yml` — weekly grouped minor/patch PRs for pip, npm, and
+  github-actions; security updates bypass the grouping.
+- `.pre-commit-config.yaml` + `backend/ruff.toml` — ruff (backend) and eslint
+  (frontend) gates at author time. Catches *new* issues without flagging the
+  pre-existing debt.
+- `backend/.dockerignore` and `frontend/.dockerignore` — exclude venvs,
+  node_modules, caches, secrets, certs, and tests from the Docker build
+  context.
+
+### Changed
+
+- `schemas.RestoreResponse` extended with `dry_run: bool`,
+  `current_item_count`, `backup_item_count`, `backup_image_count`, all
+  optional. A new `schemas.RestoreRequest` body carries `confirm_item_count`.
+
+### Fixed
+
+- Pre-existing `tsc --noEmit` failure (TS6305 on `vite.config.ts` via the
+  composite project reference). Narrowed root `tsconfig.json` `include` to
+  `["src"]` so `vite.config.ts` is handled exclusively by `tsconfig.node.json`
+  (the canonical Vite-React-TS template pattern). `npm run build` now passes.
+
+### Operator notes
+
+- Frontend `Backups.tsx` restore button will need to be updated to the
+  two-phase dry-run/confirm flow. Existing calls from the UI without a body
+  will now return a preview and do nothing destructive — the restore action
+  effectively becomes a no-op until the UI is updated. That change lands in
+  v2.3's frontend refit. If you need to restore a backup before then, call
+  the API directly: preview first, then
+  `POST /api/backups/{id}/restore?dry_run=false` with JSON body
+  `{"confirm_item_count": N}`.
+
 ## [2.0.0] - 2026-04-20
 
 Major remediation and modernization release. Addresses the findings of the

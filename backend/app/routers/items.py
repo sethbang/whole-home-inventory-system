@@ -205,12 +205,14 @@ async def export_items(
 async def lookup_by_barcode(
     barcode: str,
     db: Session = Depends(database.get_db),
-    current_user: Optional[models.User] = Depends(security.get_current_active_user_or_none)
+    current_user: models.User = Depends(security.get_current_active_user),
 ) -> Any:
-    query = db.query(models.Item).filter(models.Item.barcode == barcode)
-    if current_user:
-        query = query.filter(models.Item.owner_id == current_user.id)
-    item = query.first()
+    item = db.query(models.Item).filter(
+        and_(
+            models.Item.barcode == barcode,
+            models.Item.owner_id == current_user.id,
+        )
+    ).first()
     if not item:
         raise HTTPException(
             status_code=404,

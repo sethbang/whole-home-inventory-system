@@ -2,6 +2,8 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, auth } from '../api/client';
 import { useNavigate } from 'react-router-dom';
 import { useDevMode } from './DevModeContext';
+import { isDevBypassAllowed } from '../lib/devBypass';
+import { logger } from '../lib/logger';
 
 const DEV_BUILD = import.meta.env.DEV;
 
@@ -13,6 +15,28 @@ const DEV_USER: User = {
   is_active: true,
   created_at: new Date().toISOString(),
 };
+
+/**
+ * Compute whether dev bypass is active for this render.
+ *
+ * Even in a dev build, we refuse to trust localStorage state to impersonate
+ * the admin account if the app is being served from a host that isn't
+ * loopback or private-LAN — this guards against a dev build leaking onto the
+ * public internet via a tunnel / misconfigured reverse proxy.
+ */
+function resolveBypass(isDevMode: boolean): boolean {
+  if (!DEV_BUILD || !isDevMode) return false;
+  if (typeof window === 'undefined') return false;
+  const hostname = window.location?.hostname ?? '';
+  const allowed = isDevBypassAllowed(DEV_BUILD, hostname);
+  if (!allowed) {
+    logger.warn(
+      'dev bypass requested but hostname is not loopback/private; refusing.',
+      { hostname },
+    );
+  }
+  return allowed;
+}
 
 interface AuthContextType {
   user: User | null;
@@ -29,7 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
   const { isDevMode } = useDevMode();
-  const bypass = DEV_BUILD && isDevMode;
+  const bypass = resolveBypass(isDevMode);
 
   useEffect(() => {
     if (bypass) {
@@ -105,7 +129,7 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
   const { isDevMode } = useDevMode();
   const navigate = useNavigate();
-  const bypass = DEV_BUILD && isDevMode;
+  const bypass = resolveBypass(isDevMode);
 
   useEffect(() => {
     if (!isLoading && !user && !bypass) {

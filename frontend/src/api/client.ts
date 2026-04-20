@@ -1,5 +1,6 @@
 import axios from 'axios';
 import type { EbayFieldsData } from '../components/EbayFields';
+import { logger } from '../lib/logger';
 
 // In development, use relative URLs that will be handled by Vite's proxy
 const API_URL = '';
@@ -63,23 +64,24 @@ export interface AuthResponse {
 export const auth = {
   login: async (credentials: LoginCredentials): Promise<AuthResponse> => {
     try {
-      console.log('Attempting login with:', credentials.username);
-      
+      logger.debug('auth.login attempt', { username: credentials.username });
+
       const params = new URLSearchParams();
       params.append('grant_type', 'password');
       params.append('username', credentials.username);
       params.append('password', credentials.password);
-      
+
       const response = await apiClient.post<AuthResponse>('/api/token', params, {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
       });
-      
-      console.log('Login response:', response.data);
+
+      logger.debug('auth.login succeeded', { username: credentials.username });
       return response.data;
-    } catch (error: any) {
-      console.error('Login error:', error.response?.data || error.message);
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: unknown }; message?: string };
+      logger.error('auth.login failed', err.response?.data ?? err.message);
       throw error;
     }
   },

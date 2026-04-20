@@ -149,9 +149,28 @@ class Error(BaseModel):
     detail: str
 
 
+class RestoreRequest(BaseModel):
+    """Body schema for POST /backups/{id}/restore when committing a restore.
+
+    When ``dry_run=true`` is set on the query string the body is ignored and a
+    preview is returned instead. When ``dry_run=false`` (or omitted) the caller
+    MUST provide ``confirm_item_count`` that matches the current server-side
+    count of their items; a mismatch is rejected with 409 to guard against
+    accidental data loss from a stale UI.
+    """
+
+    confirm_item_count: Optional[int] = None
+
+
 class RestoreResponse(BaseModel):
     success: bool
     message: str
+    # Populated on a committed restore.
     items_restored: Optional[int] = None
     images_restored: Optional[int] = None
     errors: Optional[List[str]] = None
+    # Populated on a dry-run preview.
+    dry_run: bool = False
+    current_item_count: Optional[int] = None
+    backup_item_count: Optional[int] = None
+    backup_image_count: Optional[int] = None

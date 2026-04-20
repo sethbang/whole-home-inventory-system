@@ -1,42 +1,60 @@
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, DateTime, Float, JSON, TypeDecorator
-from sqlalchemy.orm import relationship
+import logging
 import uuid
 from datetime import datetime
+
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    TypeDecorator,
+)
+from sqlalchemy.orm import relationship
+
 from app.database import Base
+
+logger = logging.getLogger(__name__)
+
 
 class UUID(TypeDecorator):
     """Platform-independent UUID type.
-    Uses SQLite's string type, storing as stringified hex values.
+
+    Stored as a 36-character string in SQLite. Any valid RFC-4122 UUID is
+    accepted and round-tripped faithfully. Non-v4 UUIDs used to be silently
+    replaced with a fresh v4 — that masked bugs when UUIDs from other sources
+    landed in the DB. Now we log a warning and keep the caller's value.
+    Malformed strings raise ``ValueError`` as the caller expects from ``uuid``.
     """
+
     impl = String(36)
     cache_ok = True
 
     def process_bind_param(self, value, dialect):
         if value is None:
             return value
-        elif isinstance(value, uuid.UUID):
+        if isinstance(value, uuid.UUID):
             if value.version != 4:
-                value = uuid.uuid4()
+                logger.warning("storing non-v4 UUID (version=%s): %s", value.version, value)
             return str(value)
-        else:
-            try:
-                uuid_obj = uuid.UUID(value)
-                if uuid_obj.version != 4:
-                    uuid_obj = uuid.uuid4()
-                return str(uuid_obj)
-            except ValueError:
-                return str(uuid.uuid4())
+        # String (or bytes) form. Let uuid.UUID do the parsing; it raises
+        # ValueError on malformed input, which SQLAlchemy will surface to the
+        # caller.
+        uuid_obj = uuid.UUID(value)
+        if uuid_obj.version != 4:
+            logger.warning("storing non-v4 UUID (version=%s): %s", uuid_obj.version, uuid_obj)
+        return str(uuid_obj)
 
     def process_result_value(self, value, dialect):
         if value is None:
             return value
-        try:
-            uuid_obj = uuid.UUID(value)
-            if uuid_obj.version != 4:
-                uuid_obj = uuid.uuid4()
-            return uuid_obj
-        except ValueError:
-            return uuid.uuid4()
+        uuid_obj = uuid.UUID(value)
+        if uuid_obj.version != 4:
+            logger.warning("reading non-v4 UUID (version=%s) from storage: %s", uuid_obj.version, uuid_obj)
+        return uuid_obj
 
 class User(Base):
     __tablename__ = "users"
@@ -69,7 +87,7 @@ class Item(Base):
     custom_fields = Column(JSON)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
+
     owner_id = Column(UUID, ForeignKey("users.id"))
     owner = relationship("User", back_populates="items")
     images = relationship("ItemImage", back_populates="item", cascade="all, delete-orphan")
@@ -82,7 +100,7 @@ class ItemImage(Base):
     filename = Column(String)
     file_path = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
-    
+
     item = relationship("Item", back_populates="images")
 
 class Backup(Base):
@@ -98,5 +116,5 @@ class Backup(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     status = Column(String)  # 'completed', 'failed', 'in_progress'
     error_message = Column(String, nullable=True)
-    
+
     owner = relationship("User", back_populates="backups")
