@@ -53,13 +53,23 @@ def testing_session_local(engine):
 
 
 @pytest.fixture
-def db_session(testing_session_local):
+def db_session(testing_session_local, engine):
+    """Per-test DB session.
+
+    The ``rollback()`` at teardown only covers in-flight transactions; tests
+    that ``commit()`` (e.g. via a fixture like ``user``) leave data behind in
+    the shared in-memory DB. We also wipe all tables after every test so
+    fixtures start clean — same contract as the ``client`` fixture.
+    """
     session = testing_session_local()
     try:
         yield session
     finally:
         session.rollback()
         session.close()
+        with engine.begin() as conn:
+            for table in reversed(models.Base.metadata.sorted_tables):
+                conn.execute(table.delete())
 
 
 @pytest.fixture
