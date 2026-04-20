@@ -96,7 +96,7 @@ def test_upload_rejects_corrupted_zip(client, auth_headers):
 
 def test_upload_rejects_decompression_bomb(client, auth_headers, monkeypatch):
     """A zip whose uncompressed size exceeds the cap must be refused with 413."""
-    from app.routers import backups as backups_module
+    from app.services import backups as backups_module
 
     monkeypatch.setattr(backups_module, "MAX_BACKUP_DECOMPRESSED_BYTES", 1024)
     # Build a zip with data.json containing >1KB of deflated-small content.
@@ -162,12 +162,12 @@ def test_restore_does_not_leak_exception_details(
     record = _persist_backup_record(db_session, user, zip_bytes, backup_dir)
 
     # Force an unexpected crash inside the restore path.
-    from app.routers import backups as backups_module
+    from app.services import backups as backups_module
 
     def _blow_up(*args, **kwargs):
         raise RuntimeError("INTERNAL-SECRET-DO-NOT-LEAK-12345")
 
-    monkeypatch.setattr(backups_module, "_inspect_backup_zip", _blow_up)
+    monkeypatch.setattr(backups_module, "inspect_backup_zip", _blow_up)
 
     resp = client.post(
         f"/api/backups/{record.id}/restore?dry_run=true",
@@ -181,12 +181,12 @@ def test_restore_does_not_leak_exception_details(
 
 
 def test_upload_does_not_leak_exception_details(client, auth_headers, monkeypatch):
-    from app.routers import backups as backups_module
+    from app.services import backups as backups_module
 
     def _blow_up(*args, **kwargs):
         raise RuntimeError("SENSITIVE-UPLOAD-DETAIL-98765")
 
-    monkeypatch.setattr(backups_module, "_inspect_backup_zip", _blow_up)
+    monkeypatch.setattr(backups_module, "inspect_backup_zip", _blow_up)
 
     resp = _upload_backup(client, auth_headers, _build_backup_zip(), filename="ok.zip")
     assert resp.status_code == 500

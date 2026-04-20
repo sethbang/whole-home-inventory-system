@@ -161,9 +161,7 @@ class ImageService:
                     logger.warning(
                         "could not clean up orphan upload at %s", on_disk_path
                     )
-            raise HTTPException(
-                status_code=500, detail="Could not create image record"
-            )
+            raise HTTPException(status_code=500, detail="Could not create image record")
 
     def list_for_item(self, item_id: uuid.UUID) -> List[models.ItemImage]:
         item = self._owned_item(item_id)

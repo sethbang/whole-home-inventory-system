@@ -1,16 +1,16 @@
-import os
 import sys
 from logging.config import fileConfig
 from pathlib import Path
 
-from alembic import context
 from sqlalchemy import engine_from_config, pool
+
+from alembic import context
 
 backend_dir = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(backend_dir))
 
-from app.database import Base, SQLALCHEMY_DATABASE_URL  # noqa: E402
 from app import models  # noqa: F401,E402  (ensure models are imported for autogenerate)
+from app.database import SQLALCHEMY_DATABASE_URL, Base  # noqa: E402
 
 config = context.config
 config.set_main_option("sqlalchemy.url", SQLALCHEMY_DATABASE_URL)

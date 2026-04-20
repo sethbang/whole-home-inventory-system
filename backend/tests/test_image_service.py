@@ -81,7 +81,7 @@ def test_validate_allowed_set_matches_extension_map():
     """Every format we accept must also have a file extension mapping."""
     from app.services.images import EXT_BY_FORMAT
 
-    assert ALLOWED_PIL_FORMATS == set(EXT_BY_FORMAT.keys())
+    assert set(EXT_BY_FORMAT.keys()) == ALLOWED_PIL_FORMATS
 
 
 def test_validate_rejects_empty_bytes():
