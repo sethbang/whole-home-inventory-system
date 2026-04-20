@@ -1,9 +1,9 @@
 import type {
   EbayCategoryResponse,
   EbayExportRequest,
-  EbayExportResponse,
   EbayFields,
 } from '../types/ebay';
+import { downloadPost } from './download';
 import { apiClient } from './http';
 
 export const ebay = {
@@ -24,14 +24,16 @@ export const ebay = {
     );
     return response.data;
   },
-  exportItems: async (
-    request: EbayExportRequest,
-  ): Promise<EbayExportResponse> => {
-    const response = await apiClient.post<EbayExportResponse>(
-      '/api/ebay/export',
-      request,
-    );
-    return response.data;
+  /**
+   * v2.3: server now streams the CSV directly instead of returning
+   * ``file_url=null`` with a TODO. The client triggers a browser
+   * download via a Blob URL — no return value since the bytes never
+   * hit JavaScript state.
+   */
+  exportItems: async (request: EbayExportRequest): Promise<void> => {
+    await downloadPost('/api/ebay/export', request, {
+      fallback: 'whis-ebay-export.csv',
+    });
   },
 };
 

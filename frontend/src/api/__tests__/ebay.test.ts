@@ -1,6 +1,6 @@
 import { ebay } from '../ebay';
 import { apiClient } from '../http';
-import type { EbayFields, EbayCategoryResponse, EbayExportResponse } from '../ebay';
+import type { EbayFields, EbayCategoryResponse } from '../ebay';
 
 jest.mock('../http', () => ({
   apiClient: {
@@ -8,6 +8,12 @@ jest.mock('../http', () => ({
     post: jest.fn(),
   },
 }));
+
+// Stub URL + anchor APIs so the download helper can run in jsdom.
+beforeAll(() => {
+  (global.URL.createObjectURL as unknown) = jest.fn(() => 'blob:stub');
+  (global.URL.revokeObjectURL as unknown) = jest.fn();
+});
 
 describe('ebay API', () => {
   beforeEach(() => {
@@ -77,7 +83,7 @@ describe('ebay API', () => {
     });
   });
 
-  describe('exportItems', () => {
+  describe('exportItems (streams CSV via blob download)', () => {
     const mockRequest = {
       item_ids: ['1', '2'],
       default_fields: {
@@ -86,36 +92,24 @@ describe('ebay API', () => {
       },
     };
 
-    const mockResponse: EbayExportResponse = {
-      success: true,
-      message: 'Export successful',
-      items_processed: 2,
-      file_url: 'http://example.com/export.csv',
-    };
+    it('POSTs with blob responseType and triggers a download', async () => {
+      const blob = new Blob(['id,title\n1,Drill'], { type: 'text/csv' });
+      (apiClient.post as jest.Mock).mockResolvedValue({
+        data: blob,
+        headers: {
+          'content-disposition': 'attachment; filename="whis-ebay-export.csv"',
+        },
+      });
 
-    it('calls the correct endpoint with request data', async () => {
-      (apiClient.post as jest.Mock).mockResolvedValue({ data: mockResponse });
+      await ebay.exportItems(mockRequest);
 
-      const result = await ebay.exportItems(mockRequest);
-
-      expect(apiClient.post).toHaveBeenCalledWith('/api/ebay/export', mockRequest);
-      expect(result).toEqual(mockResponse);
-    });
-
-    it('handles export errors correctly', async () => {
-      const errorResponse: EbayExportResponse = {
-        success: false,
-        message: 'Export failed',
-        items_processed: 0,
-        errors: ['Invalid item data'],
-      };
-
-      (apiClient.post as jest.Mock).mockResolvedValue({ data: errorResponse });
-
-      const result = await ebay.exportItems(mockRequest);
-
-      expect(result.success).toBe(false);
-      expect(result.errors).toContain('Invalid item data');
+      expect(apiClient.post).toHaveBeenCalledWith(
+        '/api/ebay/export',
+        mockRequest,
+        expect.objectContaining({ responseType: 'blob' }),
+      );
+      // URL.createObjectURL is called on the blob to build the download link.
+      expect(global.URL.createObjectURL).toHaveBeenCalled();
     });
   });
 });
