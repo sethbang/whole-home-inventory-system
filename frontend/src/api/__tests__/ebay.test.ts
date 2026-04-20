@@ -1,8 +1,8 @@
 import { ebay } from '../ebay';
-import { apiClient } from '../client';
+import { apiClient } from '../http';
 import type { EbayFields, EbayCategoryResponse, EbayExportResponse } from '../ebay';
 
-jest.mock('../client', () => ({
+jest.mock('../http', () => ({
   apiClient: {
     get: jest.fn(),
     post: jest.fn(),
