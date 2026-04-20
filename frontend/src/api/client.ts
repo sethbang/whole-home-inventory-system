@@ -15,9 +15,6 @@ export const apiClient = axios.create({
   })
 });
 
-// Development flag to bypass authentication (must match AuthContext)
-const BYPASS_AUTH = true;
-
 // Add auth token to requests if available
 apiClient.interceptors.request.use((config) => {
   const token = localStorage.getItem('whis_token');
@@ -278,6 +275,128 @@ export const ebay = {
       item_ids: itemIds,
       default_fields: defaultFields
     });
+    return response.data;
+  },
+};
+
+// --- Backups ------------------------------------------------------------
+
+export interface Backup {
+  id: string;
+  owner_id: string;
+  filename: string;
+  file_path: string;
+  size_bytes: number;
+  item_count: number;
+  image_count: number;
+  created_at: string;
+  status: 'completed' | 'failed' | 'in_progress' | string;
+  error_message?: string;
+}
+
+export interface BackupList {
+  backups: Backup[];
+}
+
+export interface RestoreResult {
+  success: boolean;
+  message: string;
+  items_restored?: number;
+  images_restored?: number;
+  errors?: string[] | null;
+}
+
+export const backups = {
+  list: async (): Promise<BackupList> => {
+    const response = await apiClient.get<BackupList>('/api/backups');
+    return response.data;
+  },
+  create: async (): Promise<Backup> => {
+    const response = await apiClient.post<Backup>('/api/backups');
+    return response.data;
+  },
+  restore: async (backupId: string): Promise<RestoreResult> => {
+    const response = await apiClient.post<RestoreResult>(`/api/backups/${backupId}/restore`);
+    return response.data;
+  },
+  upload: async (file: File): Promise<Backup> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await apiClient.post<Backup>('/api/backups/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+  delete: async (backupId: string): Promise<void> => {
+    await apiClient.delete(`/api/backups/${backupId}`);
+  },
+  download: (backupId: string): void => {
+    // Trigger a browser download via a new tab. The endpoint sets the
+    // Content-Disposition header server-side.
+    window.open(`/api/backups/${backupId}/download`, '_blank');
+  },
+};
+
+// --- Analytics ----------------------------------------------------------
+
+export interface ValueByCategory {
+  category: string;
+  item_count: number;
+  total_value: number;
+}
+
+export interface ValueByLocation {
+  location: string;
+  item_count: number;
+  total_value: number;
+}
+
+export interface ValueTrends {
+  total_purchase_value: number;
+  total_current_value: number;
+  value_change: number;
+  value_change_percentage: number;
+}
+
+export interface WarrantyItem {
+  id: string;
+  name: string;
+  expiration_date: string;
+}
+
+export interface WarrantyStatus {
+  expiring_soon: WarrantyItem[];
+  expired: WarrantyItem[];
+  active: WarrantyItem[];
+}
+
+export interface AgeBucket {
+  count: number;
+  total_value: number;
+  items: Array<{ id: string; name: string; purchase_date: string; current_value: number }>;
+}
+
+export type AgeAnalysis = Record<string, AgeBucket>;
+
+export const analytics = {
+  getValueByCategory: async (): Promise<ValueByCategory[]> => {
+    const response = await apiClient.get<ValueByCategory[]>('/api/analytics/value-by-category');
+    return response.data;
+  },
+  getValueByLocation: async (): Promise<ValueByLocation[]> => {
+    const response = await apiClient.get<ValueByLocation[]>('/api/analytics/value-by-location');
+    return response.data;
+  },
+  getValueTrends: async (): Promise<ValueTrends> => {
+    const response = await apiClient.get<ValueTrends>('/api/analytics/value-trends');
+    return response.data;
+  },
+  getWarrantyStatus: async (): Promise<WarrantyStatus> => {
+    const response = await apiClient.get<WarrantyStatus>('/api/analytics/warranty-status');
+    return response.data;
+  },
+  getAgeAnalysis: async (): Promise<AgeAnalysis> => {
+    const response = await apiClient.get<AgeAnalysis>('/api/analytics/age-analysis');
     return response.data;
   },
 };

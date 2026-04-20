@@ -3,13 +3,15 @@ import { User, auth } from '../api/client';
 import { useNavigate } from 'react-router-dom';
 import { useDevMode } from './DevModeContext';
 
-// Default admin user for development
+const DEV_BUILD = import.meta.env.DEV;
+
+// Fallback user used only in development when dev mode is toggled on.
 const DEV_USER: User = {
   id: 'a7a41c99-5555-4191-9b62-5e39b347b515',
   email: 'admin@example.com',
   username: 'admin',
   is_active: true,
-  created_at: new Date().toISOString()
+  created_at: new Date().toISOString(),
 };
 
 interface AuthContextType {
@@ -27,9 +29,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
   const { isDevMode } = useDevMode();
+  const bypass = DEV_BUILD && isDevMode;
 
   useEffect(() => {
-    if (isDevMode) {
+    if (bypass) {
       setUser(DEV_USER);
       localStorage.setItem('whis_token', 'dev_token');
       setIsLoading(false);
@@ -39,7 +42,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const token = localStorage.getItem('whis_token');
     if (token) {
       auth.getCurrentUser()
-        .then(user => setUser(user))
+        .then((u) => setUser(u))
         .catch(() => {
           localStorage.removeItem('whis_token');
           navigate('/login');
@@ -48,10 +51,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } else {
       setIsLoading(false);
     }
-  }, [navigate, isDevMode]);
+  }, [navigate, bypass]);
 
   const login = async (username: string, password: string) => {
-    if (isDevMode) {
+    if (bypass) {
       setUser(DEV_USER);
       localStorage.setItem('whis_token', 'dev_token');
       navigate('/');
@@ -60,13 +63,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const response = await auth.login({ username, password });
     localStorage.setItem('whis_token', response.access_token);
-    const user = await auth.getCurrentUser();
-    setUser(user);
+    const u = await auth.getCurrentUser();
+    setUser(u);
     navigate('/');
   };
 
   const register = async (email: string, username: string, password: string) => {
-    if (isDevMode) {
+    if (bypass) {
       setUser(DEV_USER);
       localStorage.setItem('whis_token', 'dev_token');
       navigate('/');
@@ -78,11 +81,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = () => {
-    if (isDevMode) {
-      setUser(DEV_USER);
-      return;
-    }
-
     localStorage.removeItem('whis_token');
     setUser(null);
     navigate('/login');
@@ -107,12 +105,13 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
   const { isDevMode } = useDevMode();
   const navigate = useNavigate();
+  const bypass = DEV_BUILD && isDevMode;
 
   useEffect(() => {
-    if (!isLoading && !user && !isDevMode) {
+    if (!isLoading && !user && !bypass) {
       navigate('/login');
     }
-  }, [user, isLoading, navigate, isDevMode]);
+  }, [user, isLoading, navigate, bypass]);
 
   if (isLoading) {
     return (
@@ -122,5 +121,5 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return isDevMode || user ? <>{children}</> : null;
+  return bypass || user ? <>{children}</> : null;
 }

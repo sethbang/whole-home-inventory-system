@@ -1,28 +1,34 @@
-from pydantic import BaseModel, UUID4, EmailStr
-from typing import Optional, Dict, Any, List
 from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel, ConfigDict, EmailStr, UUID4
+
 
 class UserBase(BaseModel):
     email: EmailStr
     username: str
 
+
 class UserCreate(UserBase):
     password: str
+
 
 class User(UserBase):
     id: UUID4
     is_active: bool
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+
 
 class Token(BaseModel):
     access_token: str
     token_type: str
 
+
 class TokenData(BaseModel):
     username: Optional[str] = None
+
 
 class ItemBase(BaseModel):
     name: str
@@ -39,8 +45,10 @@ class ItemBase(BaseModel):
     notes: Optional[str] = None
     custom_fields: Optional[Dict[str, Any]] = None
 
+
 class ItemCreate(ItemBase):
     pass
+
 
 class ItemUpdate(BaseModel):
     name: Optional[str] = None
@@ -57,6 +65,7 @@ class ItemUpdate(BaseModel):
     notes: Optional[str] = None
     custom_fields: Optional[Dict[str, Any]] = None
 
+
 class ItemImage(BaseModel):
     id: UUID4
     item_id: UUID4
@@ -64,8 +73,8 @@ class ItemImage(BaseModel):
     file_path: str
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+
 
 class Item(ItemBase):
     id: UUID4
@@ -74,8 +83,8 @@ class Item(ItemBase):
     updated_at: datetime
     images: List[ItemImage] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+
 
 class SearchFilter(BaseModel):
     query: Optional[str] = None
@@ -88,20 +97,23 @@ class SearchFilter(BaseModel):
     page: int = 1
     page_size: int = 10
 
+
 class ItemList(BaseModel):
     items: List[Item]
     total: int
     page: int
     page_size: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+
 
 class BackupBase(BaseModel):
     pass
 
+
 class BackupCreate(BackupBase):
     pass
+
 
 class Backup(BackupBase):
     id: UUID4
@@ -115,11 +127,12 @@ class Backup(BackupBase):
     status: str
     error_message: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+
 
 class BackupList(BaseModel):
     backups: List[Backup]
+
 
 class ImportResult(BaseModel):
     success: bool
@@ -127,11 +140,14 @@ class ImportResult(BaseModel):
     items_imported: int
     errors: Optional[List[str]] = None
 
+
 class ExportFormat(BaseModel):
     format: str  # "csv" or "json"
 
+
 class Error(BaseModel):
     detail: str
+
 
 class RestoreResponse(BaseModel):
     success: bool

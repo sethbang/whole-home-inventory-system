@@ -1,6 +1,9 @@
-import React, { useState } from 'react';
+import React, { lazy, Suspense, useState } from 'react';
 import CustomFields from '../components/CustomFields';
-import BarcodeScanner from '../components/BarcodeScanner';
+
+// Lazy-loaded: @zxing/* bundles are ~400KB gzipped and only needed when the
+// user opens the scanner.
+const BarcodeScanner = lazy(() => import('../components/BarcodeScanner'));
 import { CameraIcon, QrCodeIcon } from '@heroicons/react/24/outline';
 import { useNavigate } from 'react-router-dom';
 import { useDevMode } from '../contexts/DevModeContext';
@@ -388,39 +391,41 @@ export default function AddItem() {
               )}
 
               {showScanner && (
-                <BarcodeScanner
-                  onCapture={(file: File) => {
-                    setSelectedFiles((prev) => [...prev, file]);
-                    setShowScanner(false);
-                  }}
-                  onBarcodeScan={async (barcode: string) => {
-                    setScanningStatus('Looking up barcode...');
-                    try {
-                      const item = await items.lookupBarcode(barcode);
-                      if (item) {
-                        formik.setValues({
-                          ...formik.values,
-                          name: item.name,
-                          brand: item.brand || '',
-                          model_number: item.model_number || '',
-                          serial_number: item.serial_number || '',
-                          barcode: barcode,
-                        });
-                        setScanningStatus('Item found! Form updated.');
-                        setShowScanner(false);
-                      } else {
-                        setScanningStatus('No item found for this barcode. Please fill in the details manually.');
+                <Suspense fallback={<div className="mt-2 text-sm text-gray-500">Loading scanner…</div>}>
+                  <BarcodeScanner
+                    onCapture={(file: File) => {
+                      setSelectedFiles((prev) => [...prev, file]);
+                      setShowScanner(false);
+                    }}
+                    onBarcodeScan={async (barcode: string) => {
+                      setScanningStatus('Looking up barcode...');
+                      try {
+                        const item = await items.lookupBarcode(barcode);
+                        if (item) {
+                          formik.setValues({
+                            ...formik.values,
+                            name: item.name,
+                            brand: item.brand || '',
+                            model_number: item.model_number || '',
+                            serial_number: item.serial_number || '',
+                            barcode: barcode,
+                          });
+                          setScanningStatus('Item found! Form updated.');
+                          setShowScanner(false);
+                        } else {
+                          setScanningStatus('No item found for this barcode. Please fill in the details manually.');
+                        }
+                      } catch (error) {
+                        setScanningStatus('Error looking up barcode. Please try again.');
+                        console.error('Barcode lookup error:', error);
                       }
-                    } catch (error) {
-                      setScanningStatus('Error looking up barcode. Please try again.');
-                      console.error('Barcode lookup error:', error);
-                    }
-                  }}
-                  onClose={() => {
-                    setShowScanner(false);
-                    setScanningStatus(null);
-                  }}
-                />
+                    }}
+                    onClose={() => {
+                      setShowScanner(false);
+                      setScanningStatus(null);
+                    }}
+                  />
+                </Suspense>
               )}
             </div>
           </div>

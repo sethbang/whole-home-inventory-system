@@ -16,4 +16,4 @@ RUN chmod +x scripts/generate-certs.py && \
 
 EXPOSE 27182
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "27182", "--ssl-keyfile", "certs/key.pem", "--ssl-certfile", "certs/cert.pem"]
+CMD ["sh", "-c", "python scripts/bootstrap.py && exec uvicorn app.main:app --host 0.0.0.0 --port 27182 --ssl-keyfile certs/key.pem --ssl-certfile certs/cert.pem"]

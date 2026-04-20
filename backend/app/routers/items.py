@@ -1,15 +1,20 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Body
-from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session
-from sqlalchemy import or_, and_
-from typing import Any, List, Optional, Dict
-from pydantic import BaseModel
-from .. import models, schemas, security, database
-import uuid
-import pandas as pd
-import json
 import io
+import json
+import logging
+import uuid
 from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+import pandas as pd
+from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, UploadFile
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
+from sqlalchemy import and_, or_
+from sqlalchemy.orm import Session
+
+from .. import database, models, schemas, security
+
+logger = logging.getLogger(__name__)
 
 class BulkDeleteRequest(BaseModel):
     item_ids: List[uuid.UUID]
@@ -66,12 +71,9 @@ def list_items(
             page=page,
             page_size=page_size
         )
-    except Exception as e:
-        print(f"Error creating SearchFilter: {str(e)}")
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid search parameters: {str(e)}"
-        )
+    except Exception as exc:
+        logger.warning("invalid search parameters: %s", exc)
+        raise HTTPException(status_code=400, detail="Invalid search parameters")
     if not current_user:
         raise HTTPException(
             status_code=401,
@@ -129,7 +131,7 @@ def list_items(
 
 @router.get("/items/export/data")
 async def export_items(
-    format: str = Query(..., description="Export format (csv or json)", regex="^(csv|json)$"),
+    format: str = Query(..., description="Export format (csv or json)", pattern="^(csv|json)$"),
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(security.get_current_active_user_or_none)
 ) -> StreamingResponse:

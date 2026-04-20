@@ -1,20 +1,26 @@
+import os
+
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-import os
 
-# Create database directory if it doesn't exist
-DB_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "database")
-os.makedirs(DB_DIR, exist_ok=True)
+from .settings import settings
 
-SQLALCHEMY_DATABASE_URL = f"sqlite:///{os.path.join(DB_DIR, 'whis.db')}"
+# Resolve database URL: explicit override via settings wins, else default to
+# the on-disk SQLite file under backend/database/.
+if settings.DATABASE_URL:
+    SQLALCHEMY_DATABASE_URL = settings.DATABASE_URL
+else:
+    DB_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "database")
+    os.makedirs(DB_DIR, exist_ok=True)
+    SQLALCHEMY_DATABASE_URL = f"sqlite:///{os.path.join(DB_DIR, 'whis.db')}"
 
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
-)
+_connect_args = {"check_same_thread": False} if SQLALCHEMY_DATABASE_URL.startswith("sqlite") else {}
+engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args=_connect_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
+
 
 def get_db():
     db = SessionLocal()
@@ -23,5 +29,3 @@ def get_db():
     finally:
         db.close()
 
-# Create all tables on startup
-Base.metadata.create_all(bind=engine)

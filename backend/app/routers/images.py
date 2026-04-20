@@ -1,144 +1,152 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
-from sqlalchemy.orm import Session
-from sqlalchemy import and_
-from typing import Any, List
-from .. import models, schemas, security, database
-import uuid
+import io
+import logging
 import os
-import shutil
+import uuid
 from datetime import datetime
+from typing import Any, List
+
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from PIL import Image, UnidentifiedImageError
+from sqlalchemy import and_
+from sqlalchemy.orm import Session
+
+from .. import database, models, schemas, security
+from ..settings import settings
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["images"])
 
-# Create images directory if it doesn't exist
-UPLOAD_DIR = os.path.join("/app", "backend", "uploads")
+UPLOAD_DIR = str(settings.upload_path)
 os.makedirs(UPLOAD_DIR, exist_ok=True)
-print(f"Images upload directory: {UPLOAD_DIR}")
-print(f"Directory exists: {os.path.exists(UPLOAD_DIR)}")
-print(f"Directory permissions: {oct(os.stat(UPLOAD_DIR).st_mode)[-3:]}")
 
-def save_upload_file(upload_file: UploadFile, destination: str) -> None:
+ALLOWED_PIL_FORMATS = {"JPEG", "PNG", "WEBP", "HEIC", "HEIF"}
+EXT_BY_FORMAT = {
+    "JPEG": ".jpg",
+    "PNG": ".png",
+    "WEBP": ".webp",
+    "HEIC": ".heic",
+    "HEIF": ".heif",
+}
+
+
+def _validate_image_bytes(data: bytes) -> str:
+    """Return the normalized Pillow format name, or raise HTTPException."""
+    if len(data) == 0:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty")
+    if len(data) > settings.MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File exceeds maximum size of {settings.MAX_UPLOAD_BYTES} bytes",
+        )
     try:
-        with open(destination, "wb") as buffer:
-            shutil.copyfileobj(upload_file.file, buffer)
-    finally:
-        upload_file.file.close()
+        with Image.open(io.BytesIO(data)) as img:
+            img.verify()
+        # verify() leaves the image unusable for further ops; reopen for dimension check.
+        with Image.open(io.BytesIO(data)) as img:
+            fmt = (img.format or "").upper()
+            if fmt not in ALLOWED_PIL_FORMATS:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Unsupported image format: {fmt or 'unknown'}",
+                )
+            width, height = img.size
+            if max(width, height) > settings.MAX_IMAGE_DIMENSION:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Image dimensions exceed {settings.MAX_IMAGE_DIMENSION}px",
+                )
+            return fmt
+    except UnidentifiedImageError:
+        raise HTTPException(status_code=400, detail="File is not a valid image")
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001 - surface Pillow parse failures as 400
+        logger.warning("image validation failed: %s", exc)
+        raise HTTPException(status_code=400, detail="File is not a valid image")
+
 
 @router.post("/items/{item_id}/images", response_model=schemas.ItemImage)
 async def upload_item_image(
     item_id: uuid.UUID,
     file: UploadFile = File(...),
     db: Session = Depends(database.get_db),
-    current_user: models.User = Depends(security.get_current_active_user)
+    current_user: models.User = Depends(security.get_current_active_user),
 ) -> Any:
-    # Check if item exists and belongs to user
     item = db.query(models.Item).filter(
-        and_(
-            models.Item.id == item_id,
-            models.Item.owner_id == current_user.id
-        )
+        and_(models.Item.id == item_id, models.Item.owner_id == current_user.id)
     ).first()
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
-    
-    # Validate file type
-    if not file.content_type.startswith("image/"):
-        raise HTTPException(
-            status_code=400,
-            detail="File must be an image (JPEG or PNG)"
-        )
-    
-    # Generate unique filename
+
+    contents = await file.read()
+    pil_format = _validate_image_bytes(contents)
+
+    extension = EXT_BY_FORMAT.get(pil_format, ".bin")
     timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-    file_extension = os.path.splitext(file.filename)[1]
-    filename = f"{timestamp}_{uuid.uuid4()}{file_extension}"
+    filename = f"{timestamp}_{uuid.uuid4()}{extension}"
     file_path = os.path.join(UPLOAD_DIR, filename)
-    
-    print(f"Generated filename: {filename}")
-    print(f"Full file path: {file_path}")
-    
-    # Save file
+
     try:
-        print(f"Saving file to: {file_path}")
-        save_upload_file(file, file_path)
-        print(f"File saved successfully")
-        print(f"File exists: {os.path.exists(file_path)}")
-        print(f"File size: {os.path.getsize(file_path)} bytes")
-    except Exception as e:
-        print(f"Error saving file: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Could not upload file: {str(e)}"
-        )
-    
-    # Create database record
+        with open(file_path, "wb") as buffer:
+            buffer.write(contents)
+    except OSError as exc:
+        logger.exception("failed writing upload to %s", file_path)
+        raise HTTPException(status_code=500, detail="Could not persist upload") from exc
+
     try:
         db_image = models.ItemImage(
             item_id=item_id,
             filename=filename,
-            file_path=os.path.join('uploads', filename)  # Store relative path in database
+            file_path=os.path.join("uploads", filename),
         )
         db.add(db_image)
         db.commit()
         db.refresh(db_image)
-        print(f"Database record created: {db_image.id}")
         return db_image
-    except Exception as e:
-        print(f"Error creating database record: {str(e)}")
+    except Exception:
+        logger.exception("failed creating image record for item %s", item_id)
         if os.path.exists(file_path):
-            os.remove(file_path)  # Clean up file if database insert fails
-        raise HTTPException(
-            status_code=500,
-            detail=f"Could not create image record: {str(e)}"
-        )
+            try:
+                os.remove(file_path)
+            except OSError:
+                logger.warning("could not clean up orphan file at %s", file_path)
+        raise HTTPException(status_code=500, detail="Could not create image record")
+
 
 @router.get("/items/{item_id}/images", response_model=List[schemas.ItemImage])
 def list_item_images(
     item_id: uuid.UUID,
     db: Session = Depends(database.get_db),
-    current_user: models.User = Depends(security.get_current_active_user)
+    current_user: models.User = Depends(security.get_current_active_user),
 ) -> Any:
-    # Check if item exists and belongs to user
     item = db.query(models.Item).filter(
-        and_(
-            models.Item.id == item_id,
-            models.Item.owner_id == current_user.id
-        )
+        and_(models.Item.id == item_id, models.Item.owner_id == current_user.id)
     ).first()
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
-    
     return item.images
+
 
 @router.delete("/images/{image_id}")
 def delete_image(
     image_id: uuid.UUID,
     db: Session = Depends(database.get_db),
-    current_user: models.User = Depends(security.get_current_active_user)
+    current_user: models.User = Depends(security.get_current_active_user),
 ) -> Any:
-    # Get image and verify ownership
     image = db.query(models.ItemImage).join(models.Item).filter(
-        and_(
-            models.ItemImage.id == image_id,
-            models.Item.owner_id == current_user.id
-        )
+        and_(models.ItemImage.id == image_id, models.Item.owner_id == current_user.id)
     ).first()
-    
     if not image:
         raise HTTPException(status_code=404, detail="Image not found")
-    
-    # Delete file from filesystem
-    try:
-        if os.path.exists(image.file_path):
-            os.remove(image.file_path)
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Could not delete file: {str(e)}"
-        )
-    
-    # Delete database record
+
+    on_disk = os.path.join(UPLOAD_DIR, image.filename)
+    if os.path.exists(on_disk):
+        try:
+            os.remove(on_disk)
+        except OSError as exc:
+            logger.warning("could not remove image file %s: %s", on_disk, exc)
+
     db.delete(image)
     db.commit()
-    
     return {"status": "success"}
