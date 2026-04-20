@@ -65,7 +65,9 @@ async def add_cors_and_trailing_slash(request, call_next):
 
         return response
     except Exception:
-        logger.exception("middleware caught unhandled error for %s %s", request.method, request.url)
+        logger.exception(
+            "middleware caught unhandled error for %s %s", request.method, request.url
+        )
         return JSONResponse(
             status_code=500,
             content={"detail": "Internal server error", "status_code": 500},
@@ -129,9 +131,12 @@ async def general_exception_handler(request, exc):
     else:
         content = {"detail": "Internal server error", "status_code": 500}
 
-    return JSONResponse(status_code=500, content=content, headers=get_cors_headers(request))
+    return JSONResponse(
+        status_code=500, content=content, headers=get_cors_headers(request)
+    )
 
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=27182)

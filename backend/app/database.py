@@ -15,7 +15,9 @@ else:
     os.makedirs(DB_DIR, exist_ok=True)
     SQLALCHEMY_DATABASE_URL = f"sqlite:///{os.path.join(DB_DIR, 'whis.db')}"
 
-_connect_args = {"check_same_thread": False} if SQLALCHEMY_DATABASE_URL.startswith("sqlite") else {}
+_connect_args = (
+    {"check_same_thread": False} if SQLALCHEMY_DATABASE_URL.startswith("sqlite") else {}
+)
 engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args=_connect_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -28,4 +30,3 @@ def get_db():
         yield db
     finally:
         db.close()
-

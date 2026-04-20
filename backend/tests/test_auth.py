@@ -1,5 +1,9 @@
 def test_register_then_login_round_trip(client):
-    payload = {"email": "bob@example.com", "username": "bob", "password": "super-secret-pw"}
+    payload = {
+        "email": "bob@example.com",
+        "username": "bob",
+        "password": "super-secret-pw",
+    }
     reg = client.post("/api/register", json=payload)
     assert reg.status_code == 200, reg.text
     assert reg.json()["username"] == "bob"

@@ -6,7 +6,16 @@ import zipfile
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, Body, Depends, File, HTTPException, Query, UploadFile
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Body,
+    Depends,
+    File,
+    HTTPException,
+    Query,
+    UploadFile,
+)
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session, selectinload
 
@@ -37,13 +46,17 @@ def _inspect_backup_zip(file_path: str) -> int:
     ``.zip`` extension — an attacker can rename any file to ``.zip``.
     """
     if not zipfile.is_zipfile(file_path):
-        raise HTTPException(status_code=400, detail="Uploaded file is not a valid zip archive")
+        raise HTTPException(
+            status_code=400, detail="Uploaded file is not a valid zip archive"
+        )
 
     try:
         with zipfile.ZipFile(file_path, "r") as zf:
             corrupt = zf.testzip()
             if corrupt is not None:
-                raise HTTPException(status_code=400, detail="Backup zip contains a corrupt entry")
+                raise HTTPException(
+                    status_code=400, detail="Backup zip contains a corrupt entry"
+                )
             total = sum(info.file_size for info in zf.infolist())
     except zipfile.BadZipFile:
         raise HTTPException(status_code=400, detail="Backup zip is malformed")
@@ -57,9 +70,7 @@ def _inspect_backup_zip(file_path: str) -> int:
 
 
 async def create_backup_file(
-    user_id: str,
-    db: Session,
-    backup_record: models.Backup
+    user_id: str, db: Session, backup_record: models.Backup
 ) -> None:
     try:
         logger.info("starting backup for user %s", user_id)
@@ -93,10 +104,14 @@ async def create_backup_file(
                 "brand": item.brand,
                 "model_number": item.model_number,
                 "serial_number": item.serial_number,
-                "purchase_date": item.purchase_date.isoformat() if item.purchase_date else None,
+                "purchase_date": item.purchase_date.isoformat()
+                if item.purchase_date
+                else None,
                 "purchase_price": item.purchase_price,
                 "current_value": item.current_value,
-                "warranty_expiration": item.warranty_expiration.isoformat() if item.warranty_expiration else None,
+                "warranty_expiration": item.warranty_expiration.isoformat()
+                if item.warranty_expiration
+                else None,
                 "notes": item.notes,
                 "custom_fields": item.custom_fields,
                 "created_at": item.created_at.isoformat(),
@@ -109,11 +124,13 @@ async def create_backup_file(
                 if os.path.exists(image.file_path):
                     backup_image_path = os.path.join(images_dir, image.filename)
                     shutil.copy2(image.file_path, backup_image_path)
-                    item_data["images"].append({
-                        "id": str(image.id),
-                        "filename": image.filename,
-                        "created_at": image.created_at.isoformat(),
-                    })
+                    item_data["images"].append(
+                        {
+                            "id": str(image.id),
+                            "filename": image.filename,
+                            "created_at": image.created_at.isoformat(),
+                        }
+                    )
 
             backup_data["items"].append(item_data)
 
@@ -154,9 +171,13 @@ async def create_backup_file(
 async def create_backup(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
+    current_user: models.User = Depends(get_current_active_user),
 ):
-    owner_id = str(current_user.id) if not isinstance(current_user.id, str) else current_user.id
+    owner_id = (
+        str(current_user.id)
+        if not isinstance(current_user.id, str)
+        else current_user.id
+    )
     backup = None
     try:
         backup = models.Backup(owner_id=owner_id, status="in_progress")
@@ -184,21 +205,35 @@ async def create_backup(
 @router.get("/backups", response_model=schemas.BackupList)
 async def list_backups(
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
+    current_user: models.User = Depends(get_current_active_user),
 ):
-    backups = db.query(models.Backup).filter(
-        models.Backup.owner_id == current_user.id,
-        models.Backup.filename.isnot(None),
-        models.Backup.file_path.isnot(None),
-        models.Backup.size_bytes.isnot(None),
-        models.Backup.item_count.isnot(None),
-        models.Backup.image_count.isnot(None),
-    ).order_by(models.Backup.created_at.desc()).all()
+    backups = (
+        db.query(models.Backup)
+        .filter(
+            models.Backup.owner_id == current_user.id,
+            models.Backup.filename.isnot(None),
+            models.Backup.file_path.isnot(None),
+            models.Backup.size_bytes.isnot(None),
+            models.Backup.item_count.isnot(None),
+            models.Backup.image_count.isnot(None),
+        )
+        .order_by(models.Backup.created_at.desc())
+        .all()
+    )
 
-    valid_backups = [b for b in backups if all([
-        b.filename, b.file_path, b.size_bytes is not None,
-        b.item_count is not None, b.image_count is not None,
-    ])]
+    valid_backups = [
+        b
+        for b in backups
+        if all(
+            [
+                b.filename,
+                b.file_path,
+                b.size_bytes is not None,
+                b.item_count is not None,
+                b.image_count is not None,
+            ]
+        )
+    ]
 
     return {"backups": valid_backups}
 
@@ -218,10 +253,14 @@ async def restore_backup(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_active_user),
 ):
-    backup = db.query(models.Backup).filter(
-        models.Backup.id == backup_id,
-        models.Backup.owner_id == current_user.id,
-    ).first()
+    backup = (
+        db.query(models.Backup)
+        .filter(
+            models.Backup.id == backup_id,
+            models.Backup.owner_id == current_user.id,
+        )
+        .first()
+    )
 
     if not backup:
         raise HTTPException(status_code=404, detail="Backup not found")
@@ -248,13 +287,19 @@ async def restore_backup(
         with open(data_file) as f:
             backup_data = json.load(f)
         if not isinstance(backup_data, dict) or "items" not in backup_data:
-            raise HTTPException(status_code=400, detail="Backup data structure is invalid")
+            raise HTTPException(
+                status_code=400, detail="Backup data structure is invalid"
+            )
 
-        current_item_count = db.query(models.Item).filter(
-            models.Item.owner_id == current_user.id
-        ).count()
+        current_item_count = (
+            db.query(models.Item)
+            .filter(models.Item.owner_id == current_user.id)
+            .count()
+        )
         backup_item_count = len(backup_data["items"])
-        backup_image_count = sum(len(it.get("images", [])) for it in backup_data["items"])
+        backup_image_count = sum(
+            len(it.get("images", [])) for it in backup_data["items"]
+        )
 
         if dry_run:
             return {
@@ -313,10 +358,16 @@ async def restore_backup(
                     brand=item_data["brand"],
                     model_number=item_data["model_number"],
                     serial_number=item_data["serial_number"],
-                    purchase_date=datetime.fromisoformat(item_data["purchase_date"]) if item_data["purchase_date"] else None,
+                    purchase_date=datetime.fromisoformat(item_data["purchase_date"])
+                    if item_data["purchase_date"]
+                    else None,
                     purchase_price=item_data["purchase_price"],
                     current_value=item_data["current_value"],
-                    warranty_expiration=datetime.fromisoformat(item_data["warranty_expiration"]) if item_data["warranty_expiration"] else None,
+                    warranty_expiration=datetime.fromisoformat(
+                        item_data["warranty_expiration"]
+                    )
+                    if item_data["warranty_expiration"]
+                    else None,
                     notes=item_data["notes"],
                     custom_fields=item_data["custom_fields"],
                 )
@@ -324,7 +375,9 @@ async def restore_backup(
                 db.flush()
 
                 for image_data in item_data.get("images", []):
-                    backup_image_path = os.path.join(temp_dir, "images", image_data["filename"])
+                    backup_image_path = os.path.join(
+                        temp_dir, "images", image_data["filename"]
+                    )
                     if os.path.exists(backup_image_path):
                         on_disk_path = os.path.join(upload_dir, image_data["filename"])
                         shutil.copy2(backup_image_path, on_disk_path)
@@ -340,7 +393,9 @@ async def restore_backup(
                 items_restored += 1
             except Exception:
                 logger.exception("error restoring item %s", item_data.get("name"))
-                errors.append(f"Error restoring item {item_data.get('name', '<unknown>')}")
+                errors.append(
+                    f"Error restoring item {item_data.get('name', '<unknown>')}"
+                )
 
         db.commit()
 
@@ -373,7 +428,7 @@ async def restore_backup(
 async def upload_backup(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
+    current_user: models.User = Depends(get_current_active_user),
 ):
     # Extension is a cheap first filter; the real validation comes after the
     # bytes are on disk via ``_inspect_backup_zip``.
@@ -402,7 +457,9 @@ async def upload_backup(
 
         data_file = os.path.join(temp_dir, "data.json")
         if not os.path.exists(data_file):
-            raise HTTPException(status_code=400, detail="Invalid backup file: missing data.json")
+            raise HTTPException(
+                status_code=400, detail="Invalid backup file: missing data.json"
+            )
 
         with open(data_file) as f:
             backup_data = json.load(f)
@@ -433,7 +490,9 @@ async def upload_backup(
     except json.JSONDecodeError:
         if saved and os.path.exists(file_path):
             os.remove(file_path)
-        raise HTTPException(status_code=400, detail="Backup data.json is not valid JSON")
+        raise HTTPException(
+            status_code=400, detail="Backup data.json is not valid JSON"
+        )
     except Exception:
         logger.exception("error processing uploaded backup")
         if saved and os.path.exists(file_path):
@@ -448,12 +507,16 @@ async def upload_backup(
 async def delete_backup(
     backup_id: str,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
+    current_user: models.User = Depends(get_current_active_user),
 ):
-    backup = db.query(models.Backup).filter(
-        models.Backup.id == backup_id,
-        models.Backup.owner_id == current_user.id,
-    ).first()
+    backup = (
+        db.query(models.Backup)
+        .filter(
+            models.Backup.id == backup_id,
+            models.Backup.owner_id == current_user.id,
+        )
+        .first()
+    )
 
     if not backup:
         raise HTTPException(status_code=404, detail="Backup not found")
@@ -470,12 +533,16 @@ async def delete_backup(
 async def download_backup(
     backup_id: str,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user)
+    current_user: models.User = Depends(get_current_active_user),
 ):
-    backup = db.query(models.Backup).filter(
-        models.Backup.id == backup_id,
-        models.Backup.owner_id == current_user.id,
-    ).first()
+    backup = (
+        db.query(models.Backup)
+        .filter(
+            models.Backup.id == backup_id,
+            models.Backup.owner_id == current_user.id,
+        )
+        .first()
+    )
 
     if not backup:
         raise HTTPException(status_code=404, detail="Backup not found")
@@ -494,7 +561,9 @@ async def download_backup(
             media_type="application/zip",
             filename=backup.filename,
         )
-        response.headers["Content-Disposition"] = f'attachment; filename="{backup.filename}"'
+        response.headers["Content-Disposition"] = (
+            f'attachment; filename="{backup.filename}"'
+        )
         return response
     except Exception:
         logger.exception("error serving backup file")

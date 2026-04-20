@@ -16,12 +16,20 @@ router = APIRouter(tags=["authentication"])
 
 
 @router.post("/register", response_model=schemas.User)
-def register_user(user: schemas.UserCreate, db: Session = Depends(database.get_db)) -> Any:
-    db_user = db.query(models.User).filter(
-        (models.User.email == user.email) | (models.User.username == user.username)
-    ).first()
+def register_user(
+    user: schemas.UserCreate, db: Session = Depends(database.get_db)
+) -> Any:
+    db_user = (
+        db.query(models.User)
+        .filter(
+            (models.User.email == user.email) | (models.User.username == user.username)
+        )
+        .first()
+    )
     if db_user:
-        raise HTTPException(status_code=400, detail="Email or username already registered")
+        raise HTTPException(
+            status_code=400, detail="Email or username already registered"
+        )
 
     db_user = models.User(
         email=user.email,
@@ -42,8 +50,12 @@ async def login_for_access_token(
     if settings.BYPASS_AUTH:
         return {"access_token": "dev_token", "token_type": "bearer"}
 
-    user = db.query(models.User).filter(models.User.username == form_data.username).first()
-    if not user or not security.verify_password(form_data.password, user.hashed_password):
+    user = (
+        db.query(models.User).filter(models.User.username == form_data.username).first()
+    )
+    if not user or not security.verify_password(
+        form_data.password, user.hashed_password
+    ):
         logger.info("failed login attempt for username=%s", form_data.username)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

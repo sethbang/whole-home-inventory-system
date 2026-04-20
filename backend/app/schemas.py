@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, ConfigDict, EmailStr, UUID4
+from pydantic import UUID4, BaseModel, ConfigDict, EmailStr
 
 
 class UserBase(BaseModel):

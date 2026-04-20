@@ -5,7 +5,6 @@ from typing import Annotated, List
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
-
 _PLACEHOLDER_SECRETS = {
     "your-secret-key-stored-in-env",
     "change-me",
@@ -43,10 +42,24 @@ class Settings(BaseSettings):
         ]
     )
     CORS_ALLOW_METHODS: Annotated[List[str], NoDecode] = Field(
-        default_factory=lambda: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"]
+        default_factory=lambda: [
+            "GET",
+            "POST",
+            "PUT",
+            "DELETE",
+            "OPTIONS",
+            "HEAD",
+            "PATCH",
+        ]
     )
     CORS_ALLOW_HEADERS: Annotated[List[str], NoDecode] = Field(
-        default_factory=lambda: ["Content-Type", "Authorization", "Accept", "Origin", "X-Requested-With"]
+        default_factory=lambda: [
+            "Content-Type",
+            "Authorization",
+            "Accept",
+            "Origin",
+            "X-Requested-With",
+        ]
     )
 
     # Upload limits
@@ -57,7 +70,9 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     DEBUG: bool = False
 
-    @field_validator("CORS_ORIGINS", "CORS_ALLOW_METHODS", "CORS_ALLOW_HEADERS", mode="before")
+    @field_validator(
+        "CORS_ORIGINS", "CORS_ALLOW_METHODS", "CORS_ALLOW_HEADERS", mode="before"
+    )
     @classmethod
     def _split_csv(cls, value):
         if isinstance(value, str):
@@ -65,12 +80,12 @@ class Settings(BaseSettings):
         return value
 
     def model_post_init(self, _context) -> None:
-        if not self.BYPASS_AUTH:
-            if not self.SECRET_KEY or self.SECRET_KEY in _PLACEHOLDER_SECRETS:
-                raise RuntimeError(
-                    "SECRET_KEY must be set to a non-placeholder value when BYPASS_AUTH is false. "
-                    "Generate one with: python -c 'import secrets; print(secrets.token_urlsafe(64))'"
-                )
+        secret_missing = not self.SECRET_KEY or self.SECRET_KEY in _PLACEHOLDER_SECRETS
+        if not self.BYPASS_AUTH and secret_missing:
+            raise RuntimeError(
+                "SECRET_KEY must be set to a non-placeholder value when BYPASS_AUTH is false. "
+                "Generate one with: python -c 'import secrets; print(secrets.token_urlsafe(64))'"
+            )
 
     @property
     def upload_path(self) -> Path:

@@ -38,14 +38,18 @@ class UUID(TypeDecorator):
             return value
         if isinstance(value, uuid.UUID):
             if value.version != 4:
-                logger.warning("storing non-v4 UUID (version=%s): %s", value.version, value)
+                logger.warning(
+                    "storing non-v4 UUID (version=%s): %s", value.version, value
+                )
             return str(value)
         # String (or bytes) form. Let uuid.UUID do the parsing; it raises
         # ValueError on malformed input, which SQLAlchemy will surface to the
         # caller.
         uuid_obj = uuid.UUID(value)
         if uuid_obj.version != 4:
-            logger.warning("storing non-v4 UUID (version=%s): %s", uuid_obj.version, uuid_obj)
+            logger.warning(
+                "storing non-v4 UUID (version=%s): %s", uuid_obj.version, uuid_obj
+            )
         return str(uuid_obj)
 
     def process_result_value(self, value, dialect):
@@ -53,8 +57,13 @@ class UUID(TypeDecorator):
             return value
         uuid_obj = uuid.UUID(value)
         if uuid_obj.version != 4:
-            logger.warning("reading non-v4 UUID (version=%s) from storage: %s", uuid_obj.version, uuid_obj)
+            logger.warning(
+                "reading non-v4 UUID (version=%s) from storage: %s",
+                uuid_obj.version,
+                uuid_obj,
+            )
         return uuid_obj
+
 
 class User(Base):
     __tablename__ = "users"
@@ -67,6 +76,7 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     items = relationship("Item", back_populates="owner")
     backups = relationship("Backup", back_populates="owner")
+
 
 class Item(Base):
     __tablename__ = "items"
@@ -90,7 +100,10 @@ class Item(Base):
 
     owner_id = Column(UUID, ForeignKey("users.id"))
     owner = relationship("User", back_populates="items")
-    images = relationship("ItemImage", back_populates="item", cascade="all, delete-orphan")
+    images = relationship(
+        "ItemImage", back_populates="item", cascade="all, delete-orphan"
+    )
+
 
 class ItemImage(Base):
     __tablename__ = "item_images"
@@ -102,6 +115,7 @@ class ItemImage(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     item = relationship("Item", back_populates="images")
+
 
 class Backup(Base):
     __tablename__ = "backups"

@@ -62,6 +62,7 @@ def _persist_backup_record(db_session, user, zip_bytes, backup_dir):
 # Zip upload validation
 # ---------------------------------------------------------------------------
 
+
 def test_upload_rejects_non_zip_extension(client, auth_headers):
     resp = client.post(
         "/api/backups/upload",
@@ -74,7 +75,9 @@ def test_upload_rejects_non_zip_extension(client, auth_headers):
 
 def test_upload_rejects_renamed_non_zip(client, auth_headers):
     """File ends in .zip but isn't a zip. Must be rejected on magic bytes."""
-    resp = _upload_backup(client, auth_headers, b"\x7fELF-pretending-to-be-a-zip", filename="evil.zip")
+    resp = _upload_backup(
+        client, auth_headers, b"\x7fELF-pretending-to-be-a-zip", filename="evil.zip"
+    )
     assert resp.status_code == 400
     assert "zip" in resp.json()["detail"].lower()
 
@@ -85,7 +88,9 @@ def test_upload_rejects_corrupted_zip(client, auth_headers):
     # Flip a byte inside the file payload to break CRC.
     corrupted = bytearray(zip_bytes)
     corrupted[40] ^= 0xFF
-    resp = _upload_backup(client, auth_headers, bytes(corrupted), filename="corrupt.zip")
+    resp = _upload_backup(
+        client, auth_headers, bytes(corrupted), filename="corrupt.zip"
+    )
     assert resp.status_code == 400
 
 
@@ -95,7 +100,9 @@ def test_upload_rejects_decompression_bomb(client, auth_headers, monkeypatch):
 
     monkeypatch.setattr(backups_module, "MAX_BACKUP_DECOMPRESSED_BYTES", 1024)
     # Build a zip with data.json containing >1KB of deflated-small content.
-    big_items = [{"name": "x" * 200, "category": "C", "location": "L", "images": []}] * 200
+    big_items = [
+        {"name": "x" * 200, "category": "C", "location": "L", "images": []}
+    ] * 200
     zip_bytes = _build_backup_zip(items=big_items)
 
     resp = _upload_backup(client, auth_headers, zip_bytes, filename="bomb.zip")
@@ -124,21 +131,34 @@ def test_upload_accepts_valid_zip(client, auth_headers):
 # Error-detail leakage
 # ---------------------------------------------------------------------------
 
-def test_restore_does_not_leak_exception_details(client, auth_headers, user, db_session, monkeypatch):
+
+def test_restore_does_not_leak_exception_details(
+    client, auth_headers, user, db_session, monkeypatch
+):
     """An internal exception during restore returns the generic message only."""
     # Create a valid backup record whose file will exist on disk.
     backup_dir = os.environ["BACKUP_DIR"]
-    zip_bytes = _build_backup_zip(items=[
-        {
-            "name": "A", "category": "C", "location": "L",
-            "brand": None, "model_number": None, "serial_number": None,
-            "purchase_date": None, "purchase_price": None, "current_value": None,
-            "warranty_expiration": None, "notes": None, "custom_fields": None,
-            "created_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat(),
-            "images": [],
-        }
-    ])
+    zip_bytes = _build_backup_zip(
+        items=[
+            {
+                "name": "A",
+                "category": "C",
+                "location": "L",
+                "brand": None,
+                "model_number": None,
+                "serial_number": None,
+                "purchase_date": None,
+                "purchase_price": None,
+                "current_value": None,
+                "warranty_expiration": None,
+                "notes": None,
+                "custom_fields": None,
+                "created_at": datetime.utcnow().isoformat(),
+                "updated_at": datetime.utcnow().isoformat(),
+                "images": [],
+            }
+        ]
+    )
     record = _persist_backup_record(db_session, user, zip_bytes, backup_dir)
 
     # Force an unexpected crash inside the restore path.
@@ -178,6 +198,7 @@ def test_upload_does_not_leak_exception_details(client, auth_headers, monkeypatc
 # Destructive-restore gating (dry-run + confirm)
 # ---------------------------------------------------------------------------
 
+
 def _serialize_item(item: models.Item) -> dict:
     return {
         "id": str(item.id),
@@ -190,7 +211,9 @@ def _serialize_item(item: models.Item) -> dict:
         "purchase_date": item.purchase_date.isoformat() if item.purchase_date else None,
         "purchase_price": item.purchase_price,
         "current_value": item.current_value,
-        "warranty_expiration": item.warranty_expiration.isoformat() if item.warranty_expiration else None,
+        "warranty_expiration": item.warranty_expiration.isoformat()
+        if item.warranty_expiration
+        else None,
         "notes": item.notes,
         "custom_fields": item.custom_fields,
         "created_at": item.created_at.isoformat(),
@@ -204,7 +227,10 @@ def test_restore_default_is_dry_run(client, auth_headers, user, db_session):
     backup_dir = os.environ["BACKUP_DIR"]
 
     live_item = models.Item(
-        owner_id=user.id, name="live", category="C", location="L",
+        owner_id=user.id,
+        name="live",
+        category="C",
+        location="L",
     )
     db_session.add(live_item)
     db_session.commit()
@@ -224,9 +250,10 @@ def test_restore_default_is_dry_run(client, auth_headers, user, db_session):
     assert body["backup_item_count"] == 1
 
     # Item must still be present.
-    assert db_session.query(models.Item).filter(
-        models.Item.owner_id == user.id
-    ).count() == 1
+    assert (
+        db_session.query(models.Item).filter(models.Item.owner_id == user.id).count()
+        == 1
+    )
 
 
 def test_restore_commit_requires_confirm_count(client, auth_headers, user, db_session):
@@ -246,7 +273,9 @@ def test_restore_commit_rejects_stale_confirm(client, auth_headers, user, db_ses
     backup_dir = os.environ["BACKUP_DIR"]
 
     for name in ("one", "two", "three"):
-        db_session.add(models.Item(owner_id=user.id, name=name, category="C", location="L"))
+        db_session.add(
+            models.Item(owner_id=user.id, name=name, category="C", location="L")
+        )
     db_session.commit()
 
     zip_bytes = _build_backup_zip(items=[])
@@ -259,28 +288,45 @@ def test_restore_commit_rejects_stale_confirm(client, auth_headers, user, db_ses
     )
     assert resp.status_code == 409
     # User's items must still be intact.
-    assert db_session.query(models.Item).filter(
-        models.Item.owner_id == user.id
-    ).count() == 3
+    assert (
+        db_session.query(models.Item).filter(models.Item.owner_id == user.id).count()
+        == 3
+    )
 
 
-def test_restore_commit_with_correct_confirm_proceeds(client, auth_headers, user, db_session):
+def test_restore_commit_with_correct_confirm_proceeds(
+    client, auth_headers, user, db_session
+):
     backup_dir = os.environ["BACKUP_DIR"]
 
     for name in ("one", "two"):
-        db_session.add(models.Item(owner_id=user.id, name=name, category="C", location="L"))
+        db_session.add(
+            models.Item(owner_id=user.id, name=name, category="C", location="L")
+        )
     db_session.commit()
 
     # Backup contains a different single item.
-    zip_bytes = _build_backup_zip(items=[{
-        "name": "fresh", "category": "C", "location": "L",
-        "brand": None, "model_number": None, "serial_number": None,
-        "purchase_date": None, "purchase_price": None, "current_value": None,
-        "warranty_expiration": None, "notes": None, "custom_fields": None,
-        "created_at": datetime.utcnow().isoformat(),
-        "updated_at": datetime.utcnow().isoformat(),
-        "images": [],
-    }])
+    zip_bytes = _build_backup_zip(
+        items=[
+            {
+                "name": "fresh",
+                "category": "C",
+                "location": "L",
+                "brand": None,
+                "model_number": None,
+                "serial_number": None,
+                "purchase_date": None,
+                "purchase_price": None,
+                "current_value": None,
+                "warranty_expiration": None,
+                "notes": None,
+                "custom_fields": None,
+                "created_at": datetime.utcnow().isoformat(),
+                "updated_at": datetime.utcnow().isoformat(),
+                "images": [],
+            }
+        ]
+    )
     record = _persist_backup_record(db_session, user, zip_bytes, backup_dir)
 
     resp = client.post(
@@ -295,15 +341,19 @@ def test_restore_commit_with_correct_confirm_proceeds(client, auth_headers, user
 
     # Must have swapped the old 2 items for the 1 from the backup.
     db_session.expire_all()
-    remaining = [i.name for i in db_session.query(models.Item).filter(
-        models.Item.owner_id == user.id
-    ).all()]
+    remaining = [
+        i.name
+        for i in db_session.query(models.Item)
+        .filter(models.Item.owner_id == user.id)
+        .all()
+    ]
     assert remaining == ["fresh"]
 
 
 # ---------------------------------------------------------------------------
 # N+1 elimination
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def query_counter(engine):
@@ -332,11 +382,13 @@ def test_backup_create_does_not_n_plus_one(
         db_session.add(item)
         db_session.flush()
         for j in range(3):
-            db_session.add(models.ItemImage(
-                item_id=item.id,
-                filename=f"img_{i}_{j}.png",
-                file_path=f"uploads/img_{i}_{j}.png",
-            ))
+            db_session.add(
+                models.ItemImage(
+                    item_id=item.id,
+                    filename=f"img_{i}_{j}.png",
+                    file_path=f"uploads/img_{i}_{j}.png",
+                )
+            )
     db_session.commit()
 
     query_counter.clear()
@@ -344,8 +396,7 @@ def test_backup_create_does_not_n_plus_one(
     assert resp.status_code == 200, resp.text
 
     image_selects = [
-        s for s in query_counter
-        if "FROM item_images" in s and "SELECT" in s.upper()
+        s for s in query_counter if "FROM item_images" in s and "SELECT" in s.upper()
     ]
     # With eager loading we expect at most 1 image SELECT (the selectinload
     # batch). Without it we'd see 20+.

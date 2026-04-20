@@ -41,7 +41,9 @@ def test_barcode_lookup_returns_own_item(client, user, auth_headers, db_session)
     assert resp.json()["id"] == str(item.id)
 
 
-def test_barcode_lookup_does_not_leak_across_users(client, user, auth_headers, db_session):
+def test_barcode_lookup_does_not_leak_across_users(
+    client, user, auth_headers, db_session
+):
     """Alice asking for Bob's barcode must see 404, not Bob's item."""
     bob = models.User(
         email="bob@example.com",

@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime
 from typing import Any, List
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from PIL import Image, UnidentifiedImageError
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
@@ -73,9 +73,13 @@ async def upload_item_image(
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(security.get_current_active_user),
 ) -> Any:
-    item = db.query(models.Item).filter(
-        and_(models.Item.id == item_id, models.Item.owner_id == current_user.id)
-    ).first()
+    item = (
+        db.query(models.Item)
+        .filter(
+            and_(models.Item.id == item_id, models.Item.owner_id == current_user.id)
+        )
+        .first()
+    )
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
 
@@ -120,9 +124,13 @@ def list_item_images(
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(security.get_current_active_user),
 ) -> Any:
-    item = db.query(models.Item).filter(
-        and_(models.Item.id == item_id, models.Item.owner_id == current_user.id)
-    ).first()
+    item = (
+        db.query(models.Item)
+        .filter(
+            and_(models.Item.id == item_id, models.Item.owner_id == current_user.id)
+        )
+        .first()
+    )
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
     return item.images
@@ -134,9 +142,16 @@ def delete_image(
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(security.get_current_active_user),
 ) -> Any:
-    image = db.query(models.ItemImage).join(models.Item).filter(
-        and_(models.ItemImage.id == image_id, models.Item.owner_id == current_user.id)
-    ).first()
+    image = (
+        db.query(models.ItemImage)
+        .join(models.Item)
+        .filter(
+            and_(
+                models.ItemImage.id == image_id, models.Item.owner_id == current_user.id
+            )
+        )
+        .first()
+    )
     if not image:
         raise HTTPException(status_code=404, detail="Image not found")
 

@@ -20,11 +20,11 @@ sys.path.insert(0, str(ROOT))
 # fail-fast, so we can run migrations even before a real SECRET_KEY is set.
 os.environ.setdefault("BYPASS_AUTH", "true")
 
+from alembic.config import Config  # noqa: E402
+from alembic.script import ScriptDirectory  # noqa: E402
 from sqlalchemy import inspect, text  # noqa: E402
 
 from alembic import command  # noqa: E402
-from alembic.config import Config  # noqa: E402
-from alembic.script import ScriptDirectory  # noqa: E402
 from app.database import engine  # noqa: E402
 
 
@@ -39,7 +39,10 @@ def reconcile_alembic_state() -> None:
             print("[bootstrap] no alembic_version table; migrations will create it")
             return
 
-        stamped = [row[0] for row in conn.execute(text("SELECT version_num FROM alembic_version"))]
+        stamped = [
+            row[0]
+            for row in conn.execute(text("SELECT version_num FROM alembic_version"))
+        ]
         unknown = [rev for rev in stamped if rev not in known_revisions]
         if unknown:
             print(f"[bootstrap] clearing unknown alembic stamps: {unknown}")

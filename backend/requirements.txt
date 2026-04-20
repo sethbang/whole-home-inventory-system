@@ -12,3 +12,23 @@ pydantic-settings>=2.6,<3
 pandas>=2.2,<3
 python-dateutil==2.9.0
 alembic==1.14.0
+
+# --- v2.2 additions -----------------------------------------------------------
+# Rate limiting (slowapi, in-memory limiter; Redis backend lands in v3.0).
+slowapi>=0.1.9,<1
+# Structured logging. LOG_FORMAT=json|console selects renderer at startup.
+structlog>=24.4,<26
+# OpenTelemetry skeleton — tracer provider always installed; exporter only
+# activates when OTEL_ENABLED=true. Gated so unconfigured deployments pay
+# nothing.
+opentelemetry-api>=1.28,<2
+opentelemetry-sdk>=1.28,<2
+opentelemetry-exporter-otlp>=1.28,<2
+opentelemetry-instrumentation-fastapi>=0.49b0,<1
+opentelemetry-instrumentation-sqlalchemy>=0.49b0,<1
+
+# --- Pre-wired for v3.1 -------------------------------------------------------
+# httpx and tenacity are deps of the Vision + Pricing providers. Pinning them
+# here keeps the feature PRs focused on logic rather than plumbing.
+httpx>=0.27,<1
+tenacity>=9,<10
