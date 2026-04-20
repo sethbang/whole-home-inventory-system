@@ -1,134 +1,96 @@
-import React, { lazy, Suspense, useState } from 'react';
-import CustomFields from '../components/CustomFields';
-
-// Lazy-loaded: @zxing/* bundles are ~400KB gzipped and only needed when the
-// user opens the scanner.
-const BarcodeScanner = lazy(() => import('../components/BarcodeScanner'));
-import { CameraIcon, QrCodeIcon } from '@heroicons/react/24/outline';
+import { lazy, Suspense, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useDevMode } from '../contexts/DevModeContext';
-import { useFormik } from 'formik';
-import * as Yup from 'yup';
+import { Controller, useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { items, images } from '../api/client';
-import { queryKeys } from '../api/queryKeys';
+import { CameraIcon, QrCodeIcon } from '@heroicons/react/24/outline';
 
-const validationSchema = Yup.object({
-  name: Yup.string().required('Name is required'),
-  category: Yup.string().required('Category is required'),
-  location: Yup.string().required('Location is required'),
-  brand: Yup.string(),
-  model_number: Yup.string(),
-  serial_number: Yup.string(),
-  purchase_date: Yup.date().nullable(),
-  purchase_price: Yup.number().nullable().min(0, 'Price must be positive'),
-  current_value: Yup.number().nullable().min(0, 'Value must be positive'),
-  warranty_expiration: Yup.date().nullable(),
-  notes: Yup.string(),
-  custom_fields: Yup.object(),
-});
+import CustomFields from '../components/CustomFields';
+import { useDevMode } from '../contexts/DevModeContext';
+import { items, images } from '../api/client';
+import { apiErrorMessage } from '../api/errors';
+import { queryKeys } from '../api/queryKeys';
+import {
+  type AddItemFormValues,
+  type AddItemSubmitValues,
+  addItemDefaults,
+  addItemSchema,
+} from './AddItem.schema';
+
+// Lazy-loaded: @zxing/* bundles are ~400 KB gzipped and only needed when
+// the user opens the scanner.
+const BarcodeScanner = lazy(() => import('../components/BarcodeScanner'));
 
 export default function AddItem() {
   const navigate = useNavigate();
   const { isDevMode } = useDevMode();
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [serverError, setServerError] = useState<string | null>(null);
   const [showScanner, setShowScanner] = useState(false);
   const [scanningStatus, setScanningStatus] = useState<string | null>(null);
 
-  // Fetch categories and locations for autocomplete (to be implemented)
+  // Warm the autocomplete caches on mount — loader also preloads them but
+  // these hooks give React Query a live subscription.
   useQuery({
     queryKey: queryKeys.items.categories(),
     queryFn: items.getCategories,
   });
-
   useQuery({
     queryKey: queryKeys.items.locations(),
     queryFn: items.getLocations,
   });
 
-  interface FormValues {
-    name: string;
-    category: string;
-    location: string;
-    brand: string;
-    model_number: string;
-    serial_number: string;
-    barcode: string;
-    purchase_date: string;
-    purchase_price: string;
-    current_value: string;
-    warranty_expiration: string;
-    notes: string;
-    custom_fields: Record<string, unknown>;
-  }
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    control,
+    formState: { errors, isSubmitting },
+  } = useForm<AddItemFormValues, unknown, AddItemSubmitValues>({
+    resolver: zodResolver(addItemSchema),
+    defaultValues: addItemDefaults,
+  });
 
   const uploadImageMutation = useMutation({
-    mutationFn: async ({ itemId, file }: { itemId: string; file: File }) => {
-      return await images.upload(itemId, file);
-    },
-    onError: (error: any) => {
-      setError(error.response?.data?.detail || 'Failed to upload image');
-    },
+    mutationFn: async ({ itemId, file }: { itemId: string; file: File }) =>
+      images.upload(itemId, file),
   });
 
   const createItemMutation = useMutation({
-    mutationFn: async (params: { values: FormValues } & { isDev?: boolean }) => {
+    mutationFn: async (params: {
+      values: AddItemSubmitValues | Record<string, never>;
+      isDev: boolean;
+    }) => {
       const { values, isDev } = params;
-      const item = await items.create(
-        isDev ? {} : {
-          ...values,
-          purchase_price: values.purchase_price ? parseFloat(values.purchase_price) : undefined,
-          current_value: values.current_value ? parseFloat(values.current_value) : undefined,
-          purchase_date: values.purchase_date ? new Date(values.purchase_date).toISOString() : undefined,
-          warranty_expiration: values.warranty_expiration ? new Date(values.warranty_expiration).toISOString() : undefined,
-        },
-        isDev
-      );
+      const item = await items.create(values, isDev);
 
-      // Upload images after item is created
       if (selectedFiles.length > 0) {
         try {
           await Promise.all(
-            selectedFiles.map(file => uploadImageMutation.mutateAsync({ itemId: item.id, file }))
+            selectedFiles.map((file) =>
+              uploadImageMutation.mutateAsync({ itemId: item.id, file }),
+            ),
           );
-        } catch (error) {
-          console.error('Failed to upload some images:', error);
-          setError('Item was created but some images failed to upload. You can add them later.');
+        } catch {
+          setServerError(
+            'Item was created but some images failed to upload. You can add them later.',
+          );
         }
       }
-
       return item;
     },
     onSuccess: (item) => {
       navigate(`/items/${item.id}`);
     },
-    onError: (error: any) => {
-      setError(error.response?.data?.detail || 'Failed to create item');
+    onError: (err) => {
+      setServerError(apiErrorMessage(err, 'Failed to create item'));
     },
   });
 
-  const formik = useFormik({
-    initialValues: {
-      name: '',
-      category: '',
-      location: '',
-      brand: '',
-      model_number: '',
-      serial_number: '',
-      barcode: '',
-      purchase_date: '',
-      purchase_price: '',
-      current_value: '',
-      warranty_expiration: '',
-      notes: '',
-      custom_fields: {},
-    },
-    validationSchema,
-    onSubmit: async (values: FormValues) => {
-      createItemMutation.mutate({ values, isDev: false });
-    },
-  });
+  const onSubmit = (values: AddItemSubmitValues) => {
+    setServerError(null);
+    createItemMutation.mutate({ values, isDev: false });
+  };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
@@ -148,12 +110,9 @@ export default function AddItem() {
           {isDevMode && (
             <button
               type="button"
-              onClick={() => {
-                createItemMutation.mutate({
-                  values: {} as FormValues,
-                  isDev: true
-                });
-              }}
+              onClick={() =>
+                createItemMutation.mutate({ values: {}, isDev: true })
+              }
               className="ml-3 inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
             >
               Quick Add (Dev)
@@ -162,10 +121,10 @@ export default function AddItem() {
         </div>
       </div>
 
-      <form onSubmit={formik.handleSubmit} className="mt-8 space-y-8">
-        {error && (
-          <div className="rounded-md bg-red-50 p-4">
-            <div className="text-sm text-red-700">{error}</div>
+      <form onSubmit={handleSubmit(onSubmit)} className="mt-8 space-y-8" noValidate>
+        {serverError && (
+          <div role="alert" className="rounded-md bg-red-50 p-4">
+            <div className="text-sm text-red-700">{serverError}</div>
           </div>
         )}
 
@@ -176,13 +135,14 @@ export default function AddItem() {
                 Name
               </label>
               <input
-                type="text"
                 id="name"
-                {...formik.getFieldProps('name')}
+                type="text"
+                aria-invalid={errors.name ? 'true' : 'false'}
+                {...register('name')}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
               />
-              {formik.touched.name && formik.errors.name && (
-                <p className="mt-2 text-sm text-red-600">{formik.errors.name}</p>
+              {errors.name && (
+                <p className="mt-2 text-sm text-red-600">{errors.name.message}</p>
               )}
             </div>
 
@@ -191,14 +151,15 @@ export default function AddItem() {
                 Category
               </label>
               <input
-                type="text"
                 id="category"
-                {...formik.getFieldProps('category')}
+                type="text"
+                aria-invalid={errors.category ? 'true' : 'false'}
+                {...register('category')}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
                 placeholder="Enter a category"
               />
-              {formik.touched.category && formik.errors.category && (
-                <p className="mt-2 text-sm text-red-600">{formik.errors.category}</p>
+              {errors.category && (
+                <p className="mt-2 text-sm text-red-600">{errors.category.message}</p>
               )}
             </div>
 
@@ -207,14 +168,15 @@ export default function AddItem() {
                 Location
               </label>
               <input
-                type="text"
                 id="location"
-                {...formik.getFieldProps('location')}
+                type="text"
+                aria-invalid={errors.location ? 'true' : 'false'}
+                {...register('location')}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
                 placeholder="Enter a location"
               />
-              {formik.touched.location && formik.errors.location && (
-                <p className="mt-2 text-sm text-red-600">{formik.errors.location}</p>
+              {errors.location && (
+                <p className="mt-2 text-sm text-red-600">{errors.location.message}</p>
               )}
             </div>
 
@@ -223,9 +185,9 @@ export default function AddItem() {
                 Brand
               </label>
               <input
-                type="text"
                 id="brand"
-                {...formik.getFieldProps('brand')}
+                type="text"
+                {...register('brand')}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
               />
             </div>
@@ -235,9 +197,9 @@ export default function AddItem() {
                 Model Number
               </label>
               <input
-                type="text"
                 id="model_number"
-                {...formik.getFieldProps('model_number')}
+                type="text"
+                {...register('model_number')}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
               />
             </div>
@@ -247,9 +209,9 @@ export default function AddItem() {
                 Serial Number
               </label>
               <input
-                type="text"
                 id="serial_number"
-                {...formik.getFieldProps('serial_number')}
+                type="text"
+                {...register('serial_number')}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
               />
             </div>
@@ -259,9 +221,9 @@ export default function AddItem() {
                 Barcode
               </label>
               <input
-                type="text"
                 id="barcode"
-                {...formik.getFieldProps('barcode')}
+                type="text"
+                {...register('barcode')}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
               />
             </div>
@@ -271,9 +233,9 @@ export default function AddItem() {
                 Purchase Date
               </label>
               <input
-                type="date"
                 id="purchase_date"
-                {...formik.getFieldProps('purchase_date')}
+                type="date"
+                {...register('purchase_date')}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
               />
             </div>
@@ -287,14 +249,19 @@ export default function AddItem() {
                   <span className="text-gray-500 sm:text-sm">$</span>
                 </div>
                 <input
-                  type="number"
                   id="purchase_price"
+                  type="number"
                   step="0.01"
                   min="0"
-                  {...formik.getFieldProps('purchase_price')}
+                  {...register('purchase_price')}
                   className="mt-1 block w-full pl-7 rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
                 />
               </div>
+              {errors.purchase_price && (
+                <p className="mt-2 text-sm text-red-600">
+                  {errors.purchase_price.message}
+                </p>
+              )}
             </div>
 
             <div className="sm:col-span-3">
@@ -306,14 +273,19 @@ export default function AddItem() {
                   <span className="text-gray-500 sm:text-sm">$</span>
                 </div>
                 <input
-                  type="number"
                   id="current_value"
+                  type="number"
                   step="0.01"
                   min="0"
-                  {...formik.getFieldProps('current_value')}
+                  {...register('current_value')}
                   className="mt-1 block w-full pl-7 rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
                 />
               </div>
+              {errors.current_value && (
+                <p className="mt-2 text-sm text-red-600">
+                  {errors.current_value.message}
+                </p>
+              )}
             </div>
 
             <div className="sm:col-span-3">
@@ -321,9 +293,9 @@ export default function AddItem() {
                 Warranty Expiration
               </label>
               <input
-                type="date"
                 id="warranty_expiration"
-                {...formik.getFieldProps('warranty_expiration')}
+                type="date"
+                {...register('warranty_expiration')}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
               />
             </div>
@@ -335,7 +307,7 @@ export default function AddItem() {
               <textarea
                 id="notes"
                 rows={3}
-                {...formik.getFieldProps('notes')}
+                {...register('notes')}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
               />
             </div>
@@ -344,9 +316,15 @@ export default function AddItem() {
               <label className="block text-sm font-medium text-gray-700 mb-4">
                 Custom Fields
               </label>
-              <CustomFields
-                fields={formik.values.custom_fields}
-                onChange={(fields) => formik.setFieldValue('custom_fields', fields)}
+              <Controller
+                control={control}
+                name="custom_fields"
+                render={({ field }) => (
+                  <CustomFields
+                    fields={field.value}
+                    onChange={(fields) => field.onChange(fields)}
+                  />
+                )}
               />
             </div>
 
@@ -392,7 +370,13 @@ export default function AddItem() {
               )}
 
               {showScanner && (
-                <Suspense fallback={<div className="mt-2 text-sm text-gray-500">Loading scanner…</div>}>
+                <Suspense
+                  fallback={
+                    <div className="mt-2 text-sm text-gray-500">
+                      Loading scanner…
+                    </div>
+                  }
+                >
                   <BarcodeScanner
                     onCapture={(file: File) => {
                       setSelectedFiles((prev) => [...prev, file]);
@@ -403,22 +387,26 @@ export default function AddItem() {
                       try {
                         const item = await items.lookupBarcode(barcode);
                         if (item) {
-                          formik.setValues({
-                            ...formik.values,
-                            name: item.name,
-                            brand: item.brand || '',
-                            model_number: item.model_number || '',
-                            serial_number: item.serial_number || '',
-                            barcode: barcode,
-                          });
+                          setValue('name', item.name ?? '');
+                          setValue('brand', item.brand ?? '');
+                          setValue('model_number', item.model_number ?? '');
+                          setValue('serial_number', item.serial_number ?? '');
+                          setValue('barcode', barcode);
                           setScanningStatus('Item found! Form updated.');
                           setShowScanner(false);
                         } else {
-                          setScanningStatus('No item found for this barcode. Please fill in the details manually.');
+                          setValue('barcode', barcode);
+                          setScanningStatus(
+                            'No item found for this barcode. Please fill in the details manually.',
+                          );
                         }
-                      } catch (error) {
-                        setScanningStatus('Error looking up barcode. Please try again.');
-                        console.error('Barcode lookup error:', error);
+                      } catch (err) {
+                        setScanningStatus(
+                          apiErrorMessage(
+                            err,
+                            'Error looking up barcode. Please try again.',
+                          ),
+                        );
                       }
                     }}
                     onClose={() => {
@@ -443,10 +431,10 @@ export default function AddItem() {
             </button>
             <button
               type="submit"
-              disabled={formik.isSubmitting}
-              className="ml-3 inline-flex justify-center rounded-md border border-transparent bg-primary-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+              disabled={isSubmitting}
+              className="ml-3 inline-flex justify-center rounded-md border border-transparent bg-primary-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-60"
             >
-              {formik.isSubmitting ? 'Saving...' : 'Save'}
+              {isSubmitting ? 'Saving...' : 'Save'}
             </button>
           </div>
         </div>
