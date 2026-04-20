@@ -17,11 +17,11 @@ This guide provides detailed information for developers working on the WHIS (Who
 
 ### Prerequisites
 
-- Python 3.11+
-- Node.js 16+
+- Python 3.11+ (CI runs on 3.11 and 3.12)
+- Node.js 20+ (CI uses 20)
 - Git
 - VS Code (recommended)
-- Docker (optional)
+- Docker + Docker Compose (recommended for local end-to-end testing)
 
 ### VS Code Extensions
 
@@ -63,11 +63,25 @@ node scripts/generate-certs.js
 # Install certificates (see CERTIFICATE-SETUP.md for OS-specific instructions)
 ```
 
-3. **Database Setup**
+3. **Environment config**
 ```bash
 cd ../backend
-alembic upgrade head
-python create_dev_user.py  # Creates a development user account
+cp .env.example .env
+# Generate a SECRET_KEY and paste into .env:
+python -c "import secrets; print(secrets.token_urlsafe(64))"
+
+# For quick local dev against the real auth flow, leave BYPASS_AUTH=false.
+# For convenience during UI exploration, you can set BYPASS_AUTH=true in .env
+# (settings fail-fast is skipped when bypass is on).
+```
+
+4. **Database Setup**
+```bash
+# bootstrap.py handles both fresh DBs and legacy-stamped DBs (pre-2.0.0)
+python scripts/bootstrap.py
+
+# Only needed if BYPASS_AUTH=false and you want a known local user:
+python create_dev_user.py
 ```
 
 4. **IDE Configuration**
@@ -91,16 +105,21 @@ VS Code settings.json:
 ### Backend Structure
 ```
 backend/
-├── alembic/              # Database migrations
+├── alembic/              # Database migrations (baseline: 20260420_0001)
 ├── app/
-│   ├── routers/         # API route handlers
-│   ├── models.py        # SQLAlchemy models
-│   ├── schemas.py       # Pydantic schemas
-│   ├── database.py      # Database configuration
-│   ├── security.py      # Authentication/authorization
-│   └── main.py          # FastAPI application
-├── tests/               # Test files
-└── requirements.txt     # Python dependencies
+│   ├── routers/         # API route handlers (auth, items, images, analytics, backups, ebay)
+│   ├── ebay/            # eBay CSV export submodule
+│   ├── models.py        # SQLAlchemy models (User, Item, ItemImage, Backup)
+│   ├── schemas.py       # Pydantic v2 schemas (ConfigDict-based)
+│   ├── database.py      # Engine + SessionLocal; reads DATABASE_URL from settings
+│   ├── security.py      # PyJWT-based auth; driven entirely by settings
+│   ├── settings.py      # pydantic-settings singleton (fail-fast on missing SECRET_KEY)
+│   └── main.py          # FastAPI app factory + middleware + exception handlers
+├── scripts/
+│   └── bootstrap.py     # Runtime migration + legacy-stamp reconciliation
+├── tests/               # pytest suite with in-memory SQLite conftest
+├── .env.example
+└── requirements.txt
 ```
 
 ### Frontend Structure
@@ -156,6 +175,8 @@ def downgrade():
 
 3. **Apply Migration**
 ```bash
+python scripts/bootstrap.py   # preferred — handles legacy stamps and is idempotent
+# or, on known-clean databases:
 alembic upgrade head
 ```
 
@@ -163,6 +184,8 @@ alembic upgrade head
 ```bash
 alembic downgrade -1  # Revert last migration
 ```
+
+**Note:** `Base.metadata.create_all()` is no longer called at startup as of 2.0.0 — Alembic is the sole source of truth for schema. When adding models, always accompany with a new Alembic revision.
 
 ### Working with TypeScript Types
 
@@ -464,14 +487,22 @@ npm update
 ```bash
 cd backend
 pip install -r requirements.txt
-alembic upgrade head
+python scripts/bootstrap.py
+# start uvicorn or let the Dockerfile CMD handle it
 ```
 
 2. **Frontend**
 ```bash
 cd frontend
 npm install
-npm run build
+npm run build   # tsc --noEmit + vite build
+```
+
+3. **Docker (recommended)**
+```bash
+# from repo root, with SECRET_KEY set in .env
+docker compose up --build                              # dev stack
+docker compose -f docker-compose.nas.yml up -d --build # NAS / prod variant
 ```
 
 ### Troubleshooting

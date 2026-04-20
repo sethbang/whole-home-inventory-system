@@ -143,83 +143,106 @@ frontend/
    - Error handling
    - Request caching
 
-### Backend Architecture
+### Backend Architecture (actual layout, 2.0.0)
 
 ```
 backend/
+├── alembic/
+│   ├── env.py
+│   └── versions/
+│       └── 20260420_0001_baseline.py   # idempotent baseline
 ├── app/
-│   ├── routers/         # API routes
-│   ├── models/          # Database models
-│   ├── schemas/         # Pydantic schemas
-│   ├── services/        # Business logic
-│   ├── core/            # Core functionality
-│   └── utils/           # Utilities
+│   ├── routers/         # auth, items, images, analytics, backups, ebay
+│   ├── ebay/            # eBay CSV export submodule
+│   ├── models.py        # single-file SQLAlchemy models
+│   ├── schemas.py       # single-file Pydantic schemas (ConfigDict-based)
+│   ├── database.py      # engine + SessionLocal; reads DATABASE_URL from settings
+│   ├── settings.py      # pydantic-settings singleton; fail-fast on SECRET_KEY
+│   ├── security.py      # PyJWT auth, BYPASS_AUTH short-circuit
+│   └── main.py          # FastAPI app factory + middleware + exception handlers
+├── scripts/
+│   └── bootstrap.py     # reconciles legacy alembic stamps, runs upgrade head
+├── tests/               # pytest suite with in-memory SQLite conftest
+├── .env.example
+├── Dockerfile
+└── requirements.txt
 ```
+
+A dedicated `services/` layer does not exist today — business logic sits in the router modules. Extraction (particularly for `routers/items.py`) is deferred work documented in CLAUDE.md.
 
 #### Key Components
 
-1. **API Layer**
-   - Route handlers
-   - Request validation
-   - Response formatting
-   - Error handling
+1. **API Layer** — route handlers in `app/routers/*`, Pydantic request/response schemas, FastAPI dependency injection for DB sessions and auth.
 
-2. **Service Layer**
-   - Business logic
-   - Data processing
-   - External integrations
-   - Caching logic
+2. **Settings Layer** — `app/settings.py` provides a `Settings` singleton backed by `pydantic-settings`. All operator-tunable knobs (auth bypass, secret key, upload dir, CORS, logging, debug) flow through it. Fail-fast at import time if `BYPASS_AUTH=false` and `SECRET_KEY` is missing or a known placeholder.
 
-3. **Data Layer**
-   - Database models
-   - Data access
-   - Migrations
-   - Query optimization
+3. **Data Layer** — SQLAlchemy 2.x models with a custom `UUID` TypeDecorator that stores UUIDs as 36-char strings and coerces non-v4 UUIDs to v4. Alembic is the sole source of truth for schema (no `create_all()` at startup).
 
 ## Data Architecture
 
 ### Database Schema
 
+Current schema (mirrors `backend/app/models.py`; produced by Alembic baseline `20260420_0001`). All UUID columns are stored as 36-char `VARCHAR` by the custom `UUID` TypeDecorator.
+
 ```sql
--- Core Tables
 CREATE TABLE users (
-    id UUID PRIMARY KEY,
-    username TEXT UNIQUE,
-    password_hash TEXT,
-    email TEXT,
-    created_at TIMESTAMP
+    id               VARCHAR(36) PRIMARY KEY,
+    email            VARCHAR,
+    username         VARCHAR,
+    hashed_password  VARCHAR,
+    is_active        BOOLEAN,
+    created_at       DATETIME
 );
+CREATE UNIQUE INDEX ix_users_email    ON users(email);
+CREATE UNIQUE INDEX ix_users_username ON users(username);
 
 CREATE TABLE items (
-    id UUID PRIMARY KEY,
-    name TEXT,
-    category TEXT,
-    location TEXT,
-    description TEXT,
-    purchase_date DATE,
-    purchase_price DECIMAL,
-    current_value DECIMAL,
-    user_id UUID REFERENCES users(id),
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP
+    id                  VARCHAR(36) PRIMARY KEY,
+    name                VARCHAR,
+    category            VARCHAR,
+    location            VARCHAR,
+    brand               VARCHAR,
+    model_number        VARCHAR,
+    serial_number       VARCHAR,
+    barcode             VARCHAR,
+    purchase_date       DATETIME,
+    purchase_price      FLOAT,
+    current_value       FLOAT,
+    warranty_expiration DATETIME,
+    notes               VARCHAR,
+    custom_fields       JSON,                          -- per-item blob, not a separate table
+    created_at          DATETIME,
+    updated_at          DATETIME,
+    owner_id            VARCHAR(36) REFERENCES users(id)
+);
+CREATE INDEX ix_items_name     ON items(name);
+CREATE INDEX ix_items_category ON items(category);
+CREATE INDEX ix_items_location ON items(location);
+CREATE INDEX ix_items_barcode  ON items(barcode);
+
+CREATE TABLE item_images (
+    id          VARCHAR(36) PRIMARY KEY,
+    item_id     VARCHAR(36) REFERENCES items(id),
+    filename    VARCHAR,
+    file_path   VARCHAR,
+    created_at  DATETIME
 );
 
-CREATE TABLE images (
-    id UUID PRIMARY KEY,
-    item_id UUID REFERENCES items(id),
-    filename TEXT,
-    path TEXT,
-    created_at TIMESTAMP
-);
-
-CREATE TABLE custom_fields (
-    id UUID PRIMARY KEY,
-    item_id UUID REFERENCES items(id),
-    field_name TEXT,
-    field_value TEXT,
-    created_at TIMESTAMP
+CREATE TABLE backups (
+    id             VARCHAR(36) PRIMARY KEY,
+    owner_id       VARCHAR(36) REFERENCES users(id),
+    filename       VARCHAR,
+    file_path      VARCHAR,
+    size_bytes     INTEGER,
+    item_count     INTEGER,
+    image_count    INTEGER,
+    created_at     DATETIME,
+    status         VARCHAR,           -- 'completed' | 'failed' | 'in_progress'
+    error_message  VARCHAR
 );
 ```
+
+**Note:** `custom_fields` is a JSON column on `items`, not a separate table. Earlier versions of this doc described a normalized `custom_fields` table — that was aspirational and never shipped.
 
 ### Data Flow
 
@@ -273,23 +296,27 @@ Request Authorization
 
 ### Security Layers
 
-1. **Network Security**
-   - HTTPS only
-   - CORS policy
-   - Rate limiting
-   - Request validation
+See `SECURITY.md` for the full posture. Summary of what the app itself provides vs. what is expected to be terminated at the reverse proxy / host layer:
 
-2. **Application Security**
-   - Input sanitization
-   - Output encoding
-   - Error handling
-   - Logging
+1. **Network Security (app-provided)**
+   - HTTPS-only origins in CORS defaults
+   - Origin whitelist via `CORS_ORIGINS`
+   - Pydantic request validation
 
-3. **Data Security**
-   - Encryption at rest
-   - Secure backups
-   - Access control
-   - Audit logging
+2. **Network Security (operator-provided)**
+   - Rate limiting, WAF, HSTS, DDoS protection — the application does not include these; terminate at the reverse proxy
+
+3. **Application Security**
+   - PyJWT signature verification with `SECRET_KEY` (HS256 by default)
+   - bcrypt password hashing via passlib
+   - Pillow magic-byte upload validation with size + dimension caps
+   - Redacted exception responses (stack traces gated on `DEBUG=true`)
+   - `logging` module throughout server code — no `print()` leaking sensitive data
+
+4. **Data Security**
+   - SQLite file protected by OS-level filesystem permissions
+   - Backups are zip archives — **not** encrypted at rest; encrypt the host volume or the backup destination if threat model requires it
+   - No audit log layer; standard application logs only
 
 ## Integration Architecture
 

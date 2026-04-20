@@ -71,25 +71,29 @@ WHIS provides comprehensive documentation to help you understand, use, and contr
 ## Tech Stack
 
 ### Backend
-- Python 3.11
-- FastAPI
-- SQLite
+- Python 3.11+ (CI tests 3.11 and 3.12)
+- FastAPI 0.115
+- SQLAlchemy 2.0 + SQLite
 - Uvicorn
-- Alembic (Database migrations)
+- Alembic (database migrations — sole source of truth for schema)
+- PyJWT + passlib/bcrypt for auth
+- pydantic-settings for env-driven config
 
 ### Frontend
-- React 18
-- TypeScript
-- Tailwind CSS
-- Vite
-- PWA Support
+- React 19
+- TypeScript 5.6
+- Tailwind CSS 3.4
+- Vite 6
+- PWA Support (`vite-plugin-pwa`)
+- TanStack Query, Formik + Yup, React Router v7
 
 ## Prerequisites
 
 - Python 3.11 or higher
-- Node.js 16 or higher
-- npm or yarn
+- Node.js 20 or higher (CI uses 20)
+- npm
 - Git
+- Optional: Docker + Docker Compose for the containerized stack
 
 ## Installation
 
@@ -105,13 +109,21 @@ cd backend
 python -m venv venv
 source venv/bin/activate  # On Windows use: venv\Scripts\activate
 pip install -r requirements.txt
-alembic upgrade head  # Initialize the database
+
+# Copy the env template and set a SECRET_KEY (required when BYPASS_AUTH=false).
+cp .env.example .env
+python -c "import secrets; print(secrets.token_urlsafe(64))"   # paste into SECRET_KEY in .env
+
+# Apply migrations. Use bootstrap.py (not bare alembic) so legacy
+# stamps from pre-2.0.0 databases are reconciled automatically.
+python scripts/bootstrap.py
 ```
 
 3. Set up the frontend:
 ```bash
 cd frontend
 npm install
+cp .env.example .env   # optional — override VITE_BACKEND_URL if running backend outside Docker
 ```
 
 ## Development Setup
@@ -161,7 +173,9 @@ For detailed instructions including mobile devices and NAS setup, see `certs/CER
 ```bash
 cd backend
 source venv/bin/activate  # On Windows use: venv\Scripts\activate
-uvicorn app.main:app --reload
+uvicorn app.main:app --reload --port 27182 \
+  --ssl-keyfile ../frontend/certs/key.pem \
+  --ssl-certfile ../frontend/certs/cert.pem
 ```
 
 4. Start the frontend development server:
@@ -173,6 +187,20 @@ npm run dev
 The application will be available at:
 - Local development: https://localhost:5173
 - Network access: https://[your-ip]:5173 or https://[your-nas]:5173
+
+### Docker (recommended for local testing)
+
+```bash
+# at the repo root — generate a SECRET_KEY once, shared by both compose files
+cat > .env <<EOF
+SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(64))')
+EOF
+grep -q '^\.env$' .gitignore || echo '.env' >> .gitignore
+
+docker compose up --build
+```
+
+The backend container's startup script (`scripts/bootstrap.py`) runs `alembic upgrade head` automatically and reconciles any legacy migration stamps from pre-2.0.0 databases.
 
 ## Quick Start Guide
 

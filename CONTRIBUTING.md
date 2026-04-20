@@ -42,9 +42,9 @@ We are committed to providing a welcoming and inclusive experience for everyone.
 
 ### Prerequisites
 
-- Python 3.11 or higher
-- Node.js 16 or higher
-- npm or yarn
+- Python 3.11 or higher (CI tests 3.11 and 3.12)
+- Node.js 20 or higher
+- npm
 - Git
 - A code editor (VS Code recommended)
 
@@ -56,7 +56,13 @@ We are committed to providing a welcoming and inclusive experience for everyone.
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    pip install -r requirements.txt
-   alembic upgrade head
+
+   # Copy env template and set a SECRET_KEY (required when BYPASS_AUTH=false)
+   cp .env.example .env
+   python -c "import secrets; print(secrets.token_urlsafe(64))"   # paste into SECRET_KEY
+
+   # Apply migrations (use bootstrap.py so legacy stamps are reconciled)
+   python scripts/bootstrap.py
    ```
 
 2. Set up the frontend:
@@ -158,26 +164,20 @@ We are committed to providing a welcoming and inclusive experience for everyone.
 
 ### Backend Testing
 
-- Use pytest for unit tests
-- Maintain test coverage above 80%
-- Mock external dependencies
+- Use pytest; `backend/tests/conftest.py` provides `client`, `user`, `auth_headers` fixtures against in-memory SQLite
 - Test edge cases and error conditions
-- Use fixtures for common test data
+- Run locally with `pytest` before opening a PR; CI runs the same on Python 3.11 and 3.12
+- Coverage targets (80%) are aspirational — not currently enforced by CI
 
 ### Frontend Testing
 
-- Use React Testing Library
-- Write unit tests for components
-- Test user interactions
-- Test error states
-- Use mock service worker for API calls
+- Use React Testing Library + jest (preset `ts-jest`, jsdom)
+- Write unit tests for components and API client modules under `**/__tests__/**/*.test.[jt]s?(x)`
+- Run locally with `npm test` or `npm test -- --ci`
 
 ### End-to-End Testing
 
-- Use Playwright for E2E tests
-- Cover critical user flows
-- Test on multiple browsers
-- Include mobile viewport testing
+- Not currently present. Playwright or Cypress integration is deferred work — contributions welcome.
 
 ## Documentation Guidelines
 

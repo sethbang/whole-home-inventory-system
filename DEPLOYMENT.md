@@ -1,218 +1,151 @@
 # Deploying WHIS on Synology NAS
 
-This guide explains how to deploy the Whole Home Inventory System (WHIS) on a Synology NAS at 192.168.1.122.
+This guide explains how to deploy WHIS on a Synology NAS (or any Docker host) using the committed `docker-compose.nas.yml` file.
 
 ## Prerequisites
 
-1. Synology NAS with Docker package installed
-2. Git installed on the NAS (can be installed via Package Center)
-3. Docker Compose installed on the NAS
+1. Synology NAS with **Container Manager** (or the older Docker package) installed
+2. Git on the NAS (Package Center) — or clone on your workstation and `scp` the project
+3. Shell access via SSH or DSM's terminal
+4. Your user added to the `docker` group:
+   ```bash
+   sudo synogroup --add docker $(whoami)
+   ```
+   Log out and back in for the group change to take effect.
 
-## Setup Steps
+## One-time setup
 
-1. Ensure you have the correct permissions:
-   - Log into DSM web interface
-   - Go to Control Panel > User & Group
-   - Add your user to the 'docker' group:
-     ```bash
-     sudo synogroup --add docker $(whoami)
-     ```
-   - Log out and log back in for the changes to take effect
+### 1. Clone the repository
 
-2. Clone the repository to your NAS:
 ```bash
+cd /volume1/docker
 git clone https://github.com/sethbang/whole-home-inventory-system.git
-cd /volume1/docker/whole-home-inventory-system
+cd whole-home-inventory-system
 ```
 
-2. Create the following directory structure on your NAS for persistent storage:
+### 2. Create persistent data directories
+
 ```bash
 mkdir -p /volume1/docker/whole-home-inventory-system/database
 mkdir -p /volume1/docker/whole-home-inventory-system/uploads
 mkdir -p /volume1/docker/whole-home-inventory-system/backups
 ```
 
-3. Create a `docker-compose.nas.yml` file with the following content:
-```yaml
-services:
-  backend:
-    build: 
-      context: ./backend
-      dockerfile: Dockerfile
-    ports:
-      - "27182:27182"
-    environment:
-      - DATABASE_URL=sqlite:///./app.db
-      - CORS_ORIGINS=http://192.168.1.122:5173
-    volumes:
-      - /volume1/docker/whole-home-inventory-system/database:/app/database
-      - /volume1/docker/whole-home-inventory-system/uploads:/app/backend/uploads
-      - /volume1/docker/whole-home-inventory-system/backups:/app/backend/backups
-    networks:
-      - whis-network
-    restart: unless-stopped
+The volume mount paths in `docker-compose.nas.yml` expect this layout.
 
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    ports:
-      - "5173:80"
-    depends_on:
-      - backend
-    networks:
-      - whis-network
-    restart: unless-stopped
+### 3. Generate a `SECRET_KEY`
 
-networks:
-  whis-network:
-    driver: bridge
+```bash
+cat > .env <<EOF
+SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(64))')
+EOF
+chmod 600 .env
 ```
 
-4. Update the frontend nginx configuration (`frontend/nginx.conf`):
-```nginx
-server {
-    listen 80;
-    server_name localhost;
+Optional env vars you can set in the same `.env`:
 
-    location / {
-        root /usr/share/nginx/html;
-        index index.html;
-        try_files $uri $uri/ /index.html;
-    }
+- `NAS_ORIGINS` — override the default CORS origins (e.g. `https://whis.mydomain.example`) when fronting the stack with a reverse proxy on a different hostname
+- `LOG_LEVEL` — defaults to `INFO`; set to `DEBUG` temporarily for troubleshooting
+- `ACCESS_TOKEN_EXPIRE_MINUTES` — defaults to 30
 
-    location /api {
-        proxy_pass http://backend:27182;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-```
+The compose file refuses to start without `SECRET_KEY`; this is intentional (prevents shipping a placeholder secret in production).
 
 ## Deployment
 
-There are two ways to deploy the application:
+### Command line
 
-### Method 1: Command Line
-
-1. SSH into your Synology NAS or use the terminal in DSM.
-
-2. Navigate to the project directory:
 ```bash
 cd /volume1/docker/whole-home-inventory-system
+docker compose -f docker-compose.nas.yml up -d --build
+docker compose -f docker-compose.nas.yml logs backend | head -30
 ```
 
-3. Build and start the containers (choose one of these methods):
-```bash
-# If you've added your user to the docker group:
-docker-compose -f docker-compose.nas.yml up -d --build
+On first boot after upgrading from pre-2.0.0 databases, you should see `scripts/bootstrap.py` clear the legacy `cafb3d2c47a1` Alembic stamp and run the new baseline migration. Your existing data is preserved.
 
-# If you need to use sudo:
-sudo docker-compose -f docker-compose.nas.yml up -d --build
-```
+### Container Manager UI
 
-### Method 2: Synology Docker UI
+The modern path:
 
-You can also use the Synology DSM interface:
+1. Open Container Manager → **Project** → **Create**
+2. Point it at `/volume1/docker/whole-home-inventory-system`
+3. Select `docker-compose.nas.yml`
+4. Supply the same `SECRET_KEY` via the environment section
+5. Run
 
-1. Open DSM in your web browser
-2. Go to Package Center > Docker
-3. Open Docker
-4. Go to Registry
-5. Import both Dockerfiles:
-   - Click "Add File" and select the backend Dockerfile
-   - Repeat for the frontend Dockerfile
-6. Go to Containers
-7. Create both containers using the settings from docker-compose.nas.yml:
-   - Use the same ports (27182:27182 for backend, 5173:80 for frontend)
-   - Add the environment variables for the backend
-   - Map the volumes as specified
-   - Enable auto-restart
+## Verification
 
-4. Verify the deployment:
-- Backend API should be accessible at: `http://192.168.1.122:27182`
-- Frontend interface should be accessible at: `http://192.168.1.122:5173`
+After the stack is up:
+
+- Backend health: `curl -k https://192.168.1.122:27182/api/health` → `{"status":"healthy","version":"2.0.0"}`
+- Frontend: open `http://<nas-ip>:5173` in a browser. If you've added a reverse proxy, use the external hostname instead.
+
+## HTTPS and external exposure
+
+The frontend container's nginx listens on plain HTTP port 80 (mapped to host 5173). That's fine for LAN-only use. For external exposure you should:
+
+1. Terminate TLS at Synology DSM's **Login Portal → Advanced → Reverse Proxy** (or Caddy/Traefik), pointing the external hostname at `http://<nas-ip>:5173`.
+2. Set `NAS_ORIGINS=https://your-domain.example` in `.env` so the backend's CORS whitelist includes the external origin.
+3. Consider adding rate limiting at the proxy layer — the application does not enforce it.
 
 ## Maintenance
 
-### Viewing Logs
+### Viewing logs
 ```bash
-# If you've added your user to the docker group:
-docker-compose -f docker-compose.nas.yml logs
-
-# If you need to use sudo:
-sudo docker-compose -f docker-compose.nas.yml logs
-
-# View specific service logs (with sudo if needed)
-docker-compose -f docker-compose.nas.yml logs backend
-docker-compose -f docker-compose.nas.yml logs frontend
+docker compose -f docker-compose.nas.yml logs               # all services
+docker compose -f docker-compose.nas.yml logs -f backend    # follow backend
+docker compose -f docker-compose.nas.yml logs frontend      # frontend only
 ```
 
-### Updating the Application
-1. Pull the latest changes:
+### Updating the application
 ```bash
+cd /volume1/docker/whole-home-inventory-system
 git pull origin main
+docker compose -f docker-compose.nas.yml up -d --build
 ```
 
-2. Rebuild and restart the containers:
+The `bootstrap.py` startup step is idempotent — it's safe to restart containers arbitrarily often.
+
+### Managing containers
 ```bash
-# If you've added your user to the docker group:
-docker-compose -f docker-compose.nas.yml up -d --build
+# Stop (preserves volumes and data)
+docker compose -f docker-compose.nas.yml down
 
-# If you need to use sudo:
-sudo docker-compose -f docker-compose.nas.yml up -d --build
+# Stop AND delete volumes (destroys the DB, uploads, backups — only use if you
+# know what you're doing, and only after you've verified a backup zip)
+docker compose -f docker-compose.nas.yml down --volumes
 ```
 
-### Managing Containers
-```bash
-# Stop containers (with sudo if needed)
-docker-compose -f docker-compose.nas.yml down
+### Backup data
 
-# Remove containers and networks (with sudo if needed)
-docker-compose -f docker-compose.nas.yml down --volumes
-```
+Persistent data lives in:
 
-### Backup Data
-The following directories contain persistent data:
-- `/volume1/docker/whole-home-inventory-system/database`: SQLite database
-- `/volume1/docker/whole-home-inventory-system/uploads`: Uploaded files
-- `/volume1/docker/whole-home-inventory-system/backups`: System backups
+- `/volume1/docker/whole-home-inventory-system/database` — SQLite database
+- `/volume1/docker/whole-home-inventory-system/uploads` — uploaded images
+- `/volume1/docker/whole-home-inventory-system/backups` — zip archives created via the in-app Backups page
 
-Regular backups of these directories are recommended using Synology's built-in backup tools.
+Use Synology's Hyper Backup (or `tar`/`rsync` to another volume) to snapshot these directories. The in-app backup feature produces a restorable zip that covers items + images but not users.
 
 ## Troubleshooting
 
-1. Docker Permission Issues:
-   - Error "permission denied while trying to connect to the Docker daemon socket":
-     ```bash
-     # Add your user to the docker group
-     sudo synogroup --add docker $(whoami)
-     # Log out and log back in, or alternatively:
-     su - $(whoami)
-     ```
-   - If still having issues, use `sudo` with Docker commands or use the Synology Docker UI
+### `SECRET_KEY must be set...` at container start
+Your `.env` is missing or doesn't set `SECRET_KEY`. Re-run the `SECRET_KEY` generation step in One-time setup.
 
-2. If the frontend can't connect to the backend:
-   - Verify both containers are running: `docker-compose -f docker-compose.nas.yml ps` (with sudo if needed)
-   - Check backend logs for errors: `docker-compose -f docker-compose.nas.yml logs backend`
-   - Ensure the CORS_ORIGINS environment variable matches your NAS IP
+### `Can't locate revision identified by 'cafb3d2c47a1'`
+Means the container hit Alembic directly instead of `scripts/bootstrap.py`. Check the Dockerfile CMD is intact (post-2.0.0 it runs `python scripts/bootstrap.py` before uvicorn). If you've built a custom image, ensure it inherits the updated CMD.
 
-3. If volumes are not accessible:
-   - Verify the directories exist on the NAS:
-     ```bash
-     ls -la /volume1/docker/whole-home-inventory-system/
-     ```
-   - Fix permissions if needed:
-     ```bash
-     sudo chown -R $(whoami):docker /volume1/docker/whole-home-inventory-system/
-     sudo chmod -R 755 /volume1/docker/whole-home-inventory-system/
-     ```
-   - Ensure the Docker user has access to these directories
+### Frontend can't reach the backend
+1. `docker compose -f docker-compose.nas.yml ps` — both services should be `running`
+2. `docker compose -f docker-compose.nas.yml logs backend` — look for uvicorn startup + migration output
+3. If you've changed `NAS_ORIGINS`, ensure the value matches the exact origin the browser uses (scheme, host, port)
 
-4. For other issues:
-   - Check container logs (use sudo if needed)
-   - Verify network connectivity between containers
-   - Ensure ports are not being used by other services on the NAS
-   - Check DSM Docker UI for container status and resource usage
+### Docker permission errors
+```bash
+sudo synogroup --add docker $(whoami)
+# log out and back in
+```
+
+### Volume permissions
+```bash
+sudo chown -R $(whoami):docker /volume1/docker/whole-home-inventory-system/
+sudo chmod -R 755 /volume1/docker/whole-home-inventory-system/
+```

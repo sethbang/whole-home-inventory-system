@@ -2,6 +2,13 @@
 
 This document outlines the testing strategy, procedures, and best practices for the WHIS (Whole-Home Inventory System) project.
 
+## Current state (as of 2.0.0)
+
+- **Backend:** 10 pytest tests in `backend/tests/` covering auth round-trip, item CRUD, and image upload validation. Runs against in-memory SQLite via `conftest.py`.
+- **Frontend:** 19 jest tests in `frontend/src/**/__tests__/`: eBay API client, `EbayFields` component, `ItemDetail` page.
+- **CI:** GitHub Actions at `.github/workflows/ci.yml` runs pytest against Python 3.11 and 3.12 plus `npm test` on Node 20. Lint is advisory (pre-existing warning count).
+- **Not yet present:** Playwright / E2E browser tests, Locust load tests, coverage gates. The examples referenced in the later sections of this document are **aspirational** — they describe the direction, not the current state.
+
 ## Table of Contents
 
 1. [Testing Overview](#testing-overview)
@@ -22,11 +29,12 @@ WHIS follows the testing pyramid approach:
 - Fewer integration tests (slower, dependencies)
 - Few end-to-end tests (slowest, full system)
 
-### Coverage Requirements
+### Coverage Targets
 
-- Backend: Minimum 80% code coverage
-- Frontend: Minimum 70% code coverage
-- Critical paths: 100% coverage
+Aspirational coverage targets (not currently enforced by CI):
+- Backend: 80%+
+- Frontend: 70%+
+- Critical paths: 100%
 
 ### Test Types
 
@@ -52,43 +60,40 @@ WHIS follows the testing pyramid approach:
 1. **Install Dependencies**
 ```bash
 cd backend
-pip install -r requirements-test.txt
+source venv/bin/activate
+pip install -r requirements.txt pytest pytest-cov httpx
 ```
 
-2. **Test Database**
+2. **Run the suite**
 ```bash
-# Create test database
-alembic upgrade head
-
-# Create test data
-python create_test_data.py
+pytest                           # all tests
+pytest --cov=app tests/          # with coverage
+pytest tests/test_items.py::test_item_crud_round_trip   # single test
 ```
 
-3. **Environment Variables**
-```bash
-export TESTING=true
-export TEST_DATABASE_URL=sqlite:///./test.db
-```
+3. **How the fixtures work**
+The suite at `backend/tests/conftest.py` sets `BYPASS_AUTH=false` and a deterministic `SECRET_KEY` at import time, wires the app to an in-memory SQLite engine (`StaticPool`), creates all tables from the SQLAlchemy metadata, and exposes:
+- `client` — FastAPI `TestClient` with `get_db` dependency override
+- `user` — a real DB user with a hashed password
+- `auth_headers` — `Authorization: Bearer <real JWT>` header dict
+
+No separate `requirements-test.txt` or `TEST_DATABASE_URL` env var is used — everything is controlled by `conftest.py`.
 
 ### Frontend Test Setup
 
-1. **Install Dependencies**
+Testing libraries are already in `frontend/package.json` (`jest`, `ts-jest`, `@testing-library/react`, `@testing-library/jest-dom`). Jest config is inline in `package.json` under the `"jest"` key.
+
+1. **Install dependencies** (once)
 ```bash
 cd frontend
-npm install --save-dev @testing-library/react @testing-library/jest-dom
+npm install
 ```
 
-2. **Test Configuration**
-```javascript
-// jest.config.js
-module.exports = {
-  testEnvironment: 'jsdom',
-  setupFilesAfterEnv: ['<rootDir>/src/setupTests.ts'],
-  moduleNameMapper: {
-    '\\.(css|less|scss)$': 'identity-obj-proxy',
-    '\\.(jpg|jpeg|png|gif|svg)$': '<rootDir>/__mocks__/fileMock.js'
-  }
-};
+2. **Run the suite**
+```bash
+npm test                         # all tests (jest)
+npm test -- --ci                 # CI-style (matches the workflow)
+npm test -- src/path/To.test.tsx # single test file
 ```
 
 ## Backend Testing
@@ -401,34 +406,12 @@ def test_xss_prevention():
 
 ### GitHub Actions Workflow
 
-```yaml
-# .github/workflows/test.yml
-name: Tests
+The workflow at `.github/workflows/ci.yml` runs on every push and pull request to `main`:
 
-on: [push, pull_request]
+- **backend** job — matrix over Python 3.11 and 3.12. Installs `requirements.txt` plus `pytest httpx`, runs `alembic upgrade head` against an ephemeral SQLite file, then `pytest --cov=app --cov-report=term-missing`.
+- **frontend** job — Node 20, `npm ci`, `npm run lint` (advisory — does not fail the job; tracked separately), `npm test -- --ci`.
 
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    
-    steps:
-    - uses: actions/checkout@v2
-    
-    - name: Set up Python
-      uses: actions/setup-python@v2
-      with:
-        python-version: '3.11'
-    
-    - name: Install dependencies
-      run: |
-        pip install -r requirements.txt
-        pip install -r requirements-test.txt
-    
-    - name: Run tests
-      run: |
-        pytest --cov=app tests/
-        coverage report --fail-under=80
-```
+Coverage is reported in the job log but not yet gated. A `--cov-fail-under` threshold is aspirational work when coverage is more representative.
 
 ## Best Practices
 

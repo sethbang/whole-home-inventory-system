@@ -1,509 +1,324 @@
 # WHIS API Documentation
 
-This document provides comprehensive documentation for the WHIS (Whole-Home Inventory System) REST API.
+REST API reference for WHIS 2.0.0. All routes are mounted under `/api` in `backend/app/main.py`.
 
 ## Base URL
 
 - Development: `https://localhost:27182`
-- Production: `https://[your-server]:27182`
+- Production / NAS: `https://<your-host>:27182` (or the reverse-proxy fronting it)
 
 ## Authentication
 
-WHIS uses JWT (JSON Web Token) authentication. Include the token in the Authorization header:
+WHIS uses JWT bearer tokens signed with `SECRET_KEY` (HS256 by default). Tokens are obtained via the OAuth2 password flow (form-encoded, not JSON) and sent as `Authorization: Bearer <token>`.
 
-```
-Authorization: Bearer <your_jwt_token>
-```
+### `POST /api/register` — create a user
 
-### Authentication Endpoints
-
-#### POST /api/auth/login
-Login with username and password.
-
-**Request:**
+Request (JSON):
 ```json
 {
-  "username": "string",
-  "password": "string"
+  "email": "alice@example.com",
+  "username": "alice",
+  "password": "correct-horse-battery-staple"
 }
 ```
 
-**Response:**
+Response (200):
 ```json
 {
-  "access_token": "string",
+  "id": "a7a41c99-...",
+  "email": "alice@example.com",
+  "username": "alice",
+  "is_active": true,
+  "created_at": "2026-04-20T12:00:00"
+}
+```
+
+### `POST /api/token` — exchange credentials for a JWT
+
+Request (form-encoded, not JSON — matches the OAuth2 spec FastAPI uses):
+```
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password&username=alice&password=correct-horse-battery-staple
+```
+
+Response (200):
+```json
+{
+  "access_token": "eyJhbGci...",
   "token_type": "bearer"
 }
 ```
 
-#### POST /api/auth/register
-Register a new user (only available if no users exist).
+When `BYPASS_AUTH=true` (dev only), the endpoint returns a hardcoded `"access_token": "dev_token"`; all authenticated endpoints then also honor the bypass.
 
-**Request:**
-```json
-{
-  "username": "string",
-  "password": "string",
-  "email": "string"
-}
-```
+### `GET /api/users/me` — current user
 
-**Response:**
-```json
-{
-  "id": "uuid",
-  "username": "string",
-  "email": "string"
-}
-```
+Response (200): the `User` schema above.
+
+Returns 401 if the token is missing, expired, or invalid (unless `BYPASS_AUTH=true`).
 
 ## Items API
 
-### Item Object
+### The `Item` shape
 
 ```json
 {
   "id": "uuid",
+  "owner_id": "uuid",
   "name": "string",
   "category": "string",
   "location": "string",
-  "brand": "string",
-  "model_number": "string",
-  "serial_number": "string",
-  "barcode": "string",
-  "purchase_date": "YYYY-MM-DD",
-  "purchase_price": "number",
-  "current_value": "number",
-  "warranty_expiration": "YYYY-MM-DD",
-  "notes": "string",
-  "custom_fields": {
-    "field_name": "value"
-  },
-  "images": [
-    {
-      "id": "uuid",
-      "url": "string",
-      "filename": "string",
-      "created_at": "datetime"
-    }
-  ],
-  "created_at": "datetime",
-  "updated_at": "datetime"
+  "brand": "string | null",
+  "model_number": "string | null",
+  "serial_number": "string | null",
+  "barcode": "string | null",
+  "purchase_date": "ISO datetime | null",
+  "purchase_price": "number | null",
+  "current_value": "number | null",
+  "warranty_expiration": "ISO datetime | null",
+  "notes": "string | null",
+  "custom_fields": { "any_user_defined_key": "any" },
+  "images": [ ItemImage ],
+  "created_at": "ISO datetime",
+  "updated_at": "ISO datetime"
 }
 ```
 
 ### Endpoints
 
-#### GET /api/items
-Get all items with optional filtering.
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/api/items/` | Create an item (note trailing slash — the app sets `redirect_slashes=False`) |
+| `GET`  | `/api/items` | List items (paginated) |
+| `GET`  | `/api/items/{item_id}` | Fetch one |
+| `PUT`  | `/api/items/{item_id}` | Update |
+| `DELETE` | `/api/items/{item_id}` | Delete (cascades to item images) |
+| `POST` | `/api/items/bulk-delete` | Body: `{"item_ids": ["uuid", ...]}` |
+| `GET`  | `/api/items/barcode/{barcode}` | Lookup by barcode; 404 if absent |
+| `GET`  | `/api/items/export/data` | Export items as CSV or JSON (`?format=csv|json`) |
+| `POST` | `/api/items/import` | Upload a CSV or JSON file (`multipart/form-data`, field name `file`) |
+| `GET`  | `/api/categories` | Distinct categories currently in use |
+| `GET`  | `/api/locations` | Distinct locations currently in use |
 
-**Query Parameters:**
-- `category` (string): Filter by category
-- `location` (string): Filter by location
-- `search` (string): Search in name, notes, and custom fields
-- `sort` (string): Sort field (name, category, location, created_at, updated_at)
-- `order` (string): Sort order (asc, desc)
-- `page` (integer): Page number for pagination
-- `limit` (integer): Items per page (default: 50)
+#### `GET /api/items` query parameters
 
-**Response:**
+- `query` — full-text match across name/category/location/brand (case-insensitive)
+- `category`, `location` — exact-match filters
+- `min_value`, `max_value` — numeric range on `current_value`
+- `sort_by` — field name, e.g. `created_at`, `current_value`
+- `sort_desc` — boolean
+- `page` (default 1), `page_size` (default 20)
+
+Response:
 ```json
 {
-  "items": [Item],
-  "total": "integer",
-  "page": "integer",
-  "pages": "integer"
+  "items": [ Item, ... ],
+  "total": 42,
+  "page": 1,
+  "page_size": 20
 }
 ```
 
-#### POST /api/items
-Create a new item.
-
-**Request Body:** Item object (without id, created_at, updated_at)
-
-**Response:** Created Item object
-
-#### GET /api/items/{item_id}
-Get a specific item by ID.
-
-**Response:** Item object
-
-#### PUT /api/items/{item_id}
-Update an existing item.
-
-**Request Body:** Item object (without id, created_at, updated_at)
-
-**Response:** Updated Item object
-
-#### DELETE /api/items/{item_id}
-Delete an item.
-
-**Response:** 204 No Content
-
 ## Images API
 
-### Image Object
+### The `ItemImage` shape
 
 ```json
 {
   "id": "uuid",
   "item_id": "uuid",
-  "filename": "string",
-  "url": "string",
-  "created_at": "datetime"
+  "filename": "20260420_120000_<uuid>.png",
+  "file_path": "uploads/20260420_120000_<uuid>.png",
+  "created_at": "ISO datetime"
 }
 ```
+
+Images are served statically at `/uploads/<filename>`.
 
 ### Endpoints
 
-#### POST /api/items/{item_id}/images
-Upload images for an item.
+| Method | Path | Purpose |
+|---|---|---|
+| `POST`   | `/api/items/{item_id}/images` | Upload a single image for an item (`multipart/form-data`, field name `file`) |
+| `GET`    | `/api/items/{item_id}/images` | List images for an item |
+| `DELETE` | `/api/images/{image_id}` | Delete an image (by image id, not `/items/{item_id}/images/{image_id}`) |
 
-**Request Body:** Form data with image file(s)
-- `images`: Array of image files (multipart/form-data)
-
-**Response:**
-```json
-{
-  "images": [Image]
-}
-```
-
-#### DELETE /api/items/{item_id}/images/{image_id}
-Delete an image.
-
-**Response:** 204 No Content
+Upload validation (enforced server-side in 2.0.0):
+- Magic-byte verification via Pillow — spoofed `Content-Type` is rejected
+- Max size: `settings.MAX_UPLOAD_BYTES` (default 10 MB) → 413 Payload Too Large
+- Max dimensions: `settings.MAX_IMAGE_DIMENSION` px on the long side (default 8000) → 400
+- Allowed formats: JPEG, PNG, WebP, HEIC/HEIF
 
 ## Analytics API
 
-### Endpoints
+All endpoints require authentication. Scoped to the current user's items.
 
-#### GET /api/analytics/summary
-Get inventory summary statistics.
+| Method | Path | Returns |
+|---|---|---|
+| `GET` | `/api/analytics/value-by-category` | Array of `{category, item_count, total_value}` |
+| `GET` | `/api/analytics/value-by-location` | Array of `{location, item_count, total_value}` |
+| `GET` | `/api/analytics/value-trends`      | `{total_purchase_value, total_current_value, value_change, value_change_percentage}` |
+| `GET` | `/api/analytics/warranty-status`   | `{expiring_soon: [], expired: [], active: []}` — each entry `{id, name, expiration_date}` |
+| `GET` | `/api/analytics/age-analysis`      | `{"0-1 year": {count, total_value, items: [...]}, "1-3 years": ..., "3-5 years": ..., "5+ years": ...}` |
 
-**Response:**
-```json
-{
-  "total_items": "integer",
-  "total_value": "number",
-  "items_by_category": {
-    "category": "count"
-  },
-  "items_by_location": {
-    "location": "count"
-  }
-}
-```
+## Backups API
 
-#### GET /api/analytics/value-history
-Get historical value tracking.
+Backups are zip archives containing a JSON manifest plus copies of every image file.
 
-**Query Parameters:**
-- `period` (string): Time period (week, month, year)
+| Method | Path | Purpose |
+|---|---|---|
+| `POST`   | `/api/backups` | Create a new backup synchronously |
+| `GET`    | `/api/backups` | List backups for the current user |
+| `POST`   | `/api/backups/upload` | Upload an existing backup zip (`multipart/form-data`, field `file`) |
+| `POST`   | `/api/backups/{backup_id}/restore` | **Destructive** — deletes current items and restores from the backup |
+| `DELETE` | `/api/backups/{backup_id}` | Delete a backup record + file |
+| `GET`    | `/api/backups/{backup_id}/download` | Stream the backup zip (`Content-Disposition: attachment`) |
 
-**Response:**
-```json
-{
-  "periods": ["date"],
-  "values": ["number"]
-}
-```
+### The `Backup` shape
 
-## Backup API
-
-### Endpoints
-
-#### POST /api/backups/create
-Create a new backup.
-
-**Response:**
 ```json
 {
   "id": "uuid",
-  "filename": "string",
-  "size": "integer",
-  "created_at": "datetime"
+  "owner_id": "uuid",
+  "filename": "backup_<user-id>_<timestamp>.zip",
+  "file_path": "/app/backend/backups/backup_....zip",
+  "size_bytes": 12345,
+  "item_count": 42,
+  "image_count": 17,
+  "created_at": "ISO datetime",
+  "status": "completed | failed | in_progress",
+  "error_message": "string | null"
 }
 ```
 
-#### GET /api/backups
-List available backups.
+### Restore response
 
-**Response:**
 ```json
 {
-  "backups": [
-    {
-      "id": "uuid",
-      "filename": "string",
-      "size": "integer",
-      "created_at": "datetime"
-    }
-  ]
+  "success": true,
+  "message": "Backup restored successfully",
+  "items_restored": 42,
+  "images_restored": 17,
+  "errors": ["string", ...] | null
 }
 ```
 
-#### POST /api/backups/{backup_id}/restore
-Restore from a backup.
+## eBay API (Phase 1 — CSV export only)
 
-**Response:**
-```json
-{
-  "success": "boolean",
-  "message": "string"
-}
-```
+| Method | Path | Purpose |
+|---|---|---|
+| `GET`  | `/api/ebay/categories` | Enumerate available eBay categories; with `?item_id=...` also returns a suggested category based on the item's data |
+| `POST` | `/api/ebay/items/{item_id}/ebay-fields` | Attach/update eBay-specific fields on an item |
+| `POST` | `/api/ebay/export` | Body: `{"item_ids": [...], "default_fields": {...}?}`. Returns a link to a generated Seller Hub CSV |
 
-#### GET /api/backups/{backup_id}/download
-Download a backup file.
+## System endpoints
 
-**Response:** Backup file (application/octet-stream)
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/api/health` | `{"status": "healthy", "version": "2.0.0"}` — unauthenticated |
+| `OPTIONS` | `/{any}` | CORS preflight handler |
 
-## Data Migration API
-
-### Endpoints
-
-#### POST /api/migration/import
-Import items from CSV or JSON.
-
-**Request Body:** Form data
-- `file`: CSV or JSON file
-- `format`: "csv" or "json"
-
-**Response:**
-```json
-{
-  "imported": "integer",
-  "errors": [
-    {
-      "row": "integer",
-      "message": "string"
-    }
-  ]
-}
-```
-
-#### GET /api/migration/export
-Export items to CSV or JSON.
-
-**Query Parameters:**
-- `format` (string): "csv" or "json"
-
-**Response:** File download (text/csv or application/json)
-
-## Error Responses
-
-All endpoints may return the following error responses:
+## Error responses
 
 ### 400 Bad Request
 ```json
-{
-  "detail": "Error message explaining the problem"
-}
+{"detail": "Error message", "status_code": 400}
 ```
 
 ### 401 Unauthorized
 ```json
-{
-  "detail": "Not authenticated"
-}
-```
-
-### 403 Forbidden
-```json
-{
-  "detail": "Not enough privileges"
-}
+{"detail": "Not authenticated", "status_code": 401}
 ```
 
 ### 404 Not Found
 ```json
-{
-  "detail": "Resource not found"
-}
+{"detail": "Item not found", "status_code": 404}
+```
+
+### 413 Payload Too Large
+```json
+{"detail": "File exceeds maximum size of 10485760 bytes", "status_code": 413}
 ```
 
 ### 422 Validation Error
+FastAPI / Pydantic validation errors:
 ```json
 {
   "detail": [
-    {
-      "loc": ["field_name"],
-      "msg": "Error message",
-      "type": "error_type"
-    }
+    { "loc": ["body", "name"], "msg": "field required", "type": "value_error.missing" }
   ]
 }
 ```
 
 ### 500 Internal Server Error
 ```json
-{
-  "detail": "Internal server error"
-}
+{"detail": "Internal server error", "status_code": 500}
 ```
 
-## Rate Limiting
+By default the 500 response body is opaque. Set `DEBUG=true` in the backend's env (dev only) to include `type` and `stack_trace` fields.
 
-- Rate limit: 100 requests per minute per IP
-- Rate limit headers included in responses:
-  - `X-RateLimit-Limit`
-  - `X-RateLimit-Remaining`
-  - `X-RateLimit-Reset`
+## Things the application does NOT provide
 
-## Versioning
-
-The API version is included in the response headers:
-- `X-API-Version`: Current API version
-
-## Best Practices
-
-1. **Authentication**
-   - Store JWT tokens securely
-   - Refresh tokens before expiration
-   - Include tokens in all authenticated requests
-
-2. **Error Handling**
-   - Implement proper error handling
-   - Check for specific error types
-   - Handle rate limiting appropriately
-
-3. **Performance**
-   - Use pagination for large datasets
-   - Minimize request frequency
-   - Cache responses when appropriate
-
-4. **Security**
-   - Use HTTPS for all requests
-   - Validate input data
-   - Handle sensitive data securely
+- **Rate limiting.** Terminate at your reverse proxy.
+- **OAuth/OIDC/MFA.** Only the password-grant JWT flow above.
+- **Refresh tokens.** Tokens hard-expire after `ACCESS_TOKEN_EXPIRE_MINUTES` (default 30).
+- **`X-API-Version` response header.** Query `/api/health` instead.
 
 ## Examples
 
-### Curl Examples
+### curl — login and list items
 
-#### Login
 ```bash
-curl -X POST https://localhost:27182/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username": "user", "password": "pass"}'
+TOKEN=$(curl -sk -X POST https://localhost:27182/api/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=password&username=alice&password=correct-horse-battery-staple" \
+  | jq -r .access_token)
+
+curl -sk https://localhost:27182/api/items \
+  -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
-#### Get Items
-```bash
-curl https://localhost:27182/api/items \
-  -H "Authorization: Bearer <token>"
-```
-
-#### Create Item
-```bash
-curl -X POST https://localhost:27182/api/items \
-  -H "Authorization: Bearer <token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Example Item",
-    "category": "Electronics",
-    "location": "Office"
-  }'
-```
-
-### Python Example
+### Python
 
 ```python
-import requests
+import httpx
 
-class WHISClient:
-    def __init__(self, base_url, token=None):
-        self.base_url = base_url
-        self.token = token
-        
-    def login(self, username, password):
-        response = requests.post(
-            f"{self.base_url}/api/auth/login",
-            json={"username": username, "password": password}
-        )
-        self.token = response.json()["access_token"]
-        
-    def get_items(self, **params):
-        headers = {"Authorization": f"Bearer {self.token}"}
-        response = requests.get(
-            f"{self.base_url}/api/items",
-            headers=headers,
-            params=params
-        )
-        return response.json()
-        
-    def create_item(self, item_data):
-        headers = {"Authorization": f"Bearer {self.token}"}
-        response = requests.post(
-            f"{self.base_url}/api/items",
-            headers=headers,
-            json=item_data
-        )
-        return response.json()
+base = "https://localhost:27182"
+with httpx.Client(verify=False) as c:
+    token = c.post(
+        f"{base}/api/token",
+        data={"grant_type": "password", "username": "alice", "password": "..."},
+    ).json()["access_token"]
+    items = c.get(f"{base}/api/items", headers={"Authorization": f"Bearer {token}"}).json()
+    print(items["total"])
 ```
 
-### TypeScript Example
+### TypeScript (axios)
 
 ```typescript
-interface WHISConfig {
-  baseUrl: string;
-  token?: string;
-}
+import axios from 'axios';
 
-class WHISClient {
-  private baseUrl: string;
-  private token?: string;
+const client = axios.create({ baseURL: 'https://localhost:27182', withCredentials: true });
 
-  constructor(config: WHISConfig) {
-    this.baseUrl = config.baseUrl;
-    this.token = config.token;
-  }
+const params = new URLSearchParams();
+params.append('grant_type', 'password');
+params.append('username', 'alice');
+params.append('password', '...');
+const { data: token } = await client.post('/api/token', params, {
+  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+});
+client.defaults.headers.common.Authorization = `Bearer ${token.access_token}`;
 
-  async login(username: string, password: string): Promise<void> {
-    const response = await fetch(`${this.baseUrl}/api/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password })
-    });
-    const data = await response.json();
-    this.token = data.access_token;
-  }
-
-  async getItems(params: Record<string, string> = {}): Promise<any> {
-    const queryString = new URLSearchParams(params).toString();
-    const response = await fetch(
-      `${this.baseUrl}/api/items?${queryString}`,
-      {
-        headers: {
-          Authorization: `Bearer ${this.token}`
-        }
-      }
-    );
-    return response.json();
-  }
-
-  async createItem(itemData: Record<string, any>): Promise<any> {
-    const response = await fetch(`${this.baseUrl}/api/items`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${this.token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(itemData)
-    });
-    return response.json();
-  }
-}
+const { data: items } = await client.get('/api/items');
 ```
-
-## Support
-
-For API support and questions:
-1. Check the documentation thoroughly
-2. Search existing issues on GitHub
-3. Open a new issue if needed
 
 ## Changelog
 
-See CHANGELOG.md for API version history and changes.
+See `CHANGELOG.md` for the full version history. Breaking API-visible changes since 1.x:
+
+- Login endpoint is `POST /api/token` (not `/api/auth/login`) and uses the OAuth2 form-encoded flow.
+- Register endpoint is `POST /api/register` (not `/api/auth/register`).
+- Image delete is `DELETE /api/images/{image_id}` (by image id, no item id in the path).
+- Backup creation is `POST /api/backups` (not `POST /api/backups/create`).
+- Analytics endpoints returned to their named forms (`value-by-category`, etc.) — there is no `/api/analytics/summary`.

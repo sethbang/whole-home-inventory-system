@@ -1,8 +1,8 @@
 # Whole-Home Inventory System (WHIS)
 
-**Version:** 1.3 (Implementation Progress Update)  
-**Author:** S. Bang  
-**Last Updated:** 12/19/2024
+**Version:** 2.0.0 (Audit Remediation & Modernization)
+**Author:** S. Bang
+**Last Updated:** 2026-04-20
 
 ## 1. Introduction
 
@@ -70,9 +70,9 @@ WHIS uses a client-server model:
 
 ## 4. Technology Stack
 
-- ✓ **Backend:** Python 3.11, FastAPI, SQLite, Uvicorn
-- ✓ **Frontend:** React 18, Tailwind CSS, Axios
-- **Deployment:** Docker, Docker Compose (Upcoming)
+- ✓ **Backend:** Python 3.11+, FastAPI 0.115, SQLAlchemy 2.0, SQLite, Uvicorn 0.32, Alembic, PyJWT, pydantic-settings
+- ✓ **Frontend:** React 19, TypeScript 5.6, Tailwind CSS 3.4, Vite 6, Axios, TanStack Query, React Router v7
+- ✓ **Deployment:** Docker, Docker Compose (dev + NAS variants shipped)
 
 ## 5. User Interface
 
@@ -93,8 +93,12 @@ WHIS uses a client-server model:
 ## 6. Security & Privacy
 
 - ✓ Runs on a local network by default.
-- ✓ Username/password authentication with hashed and salted credentials.
-- HTTPS support via a reverse proxy configuration (documentation upcoming).
+- ✓ Username/password authentication with JWT bearer tokens (PyJWT, HS256 by default).
+- ✓ bcrypt password hashing via passlib.
+- ✓ HTTPS in dev and prod (self-signed dev CA; operator-provided TLS at the reverse proxy in prod).
+- ✓ `SECRET_KEY` required via environment; fail-fast on startup if unset/placeholder and `BYPASS_AUTH=false`.
+- ✓ Image uploads validated by magic bytes (not trusted `Content-Type`) with size and dimension caps.
+- Rate limiting / WAF / MFA are not provided by the application; terminate at the reverse proxy.
 
 ## 7. Performance & Scalability
 
@@ -111,23 +115,45 @@ WHIS uses a client-server model:
 
 ## 9. Roadmap
 
-### Phase 1 (MVP) - ✓ Completed
+### Phase 1 (MVP) — ✓ Completed
 - ✓ Core CRUD operations
 - ✓ Photo upload and storage
 - ✓ Basic UI implementation
 - ✓ Authentication system
 
-### Phase 2 (Current Phase)
-- ✓ Custom fields system
+### Phase 2 — ✓ Completed
+- ✓ Custom fields system (JSON column on `items`)
 - ✓ Advanced search and filtering
-- Barcode/QR code scanning (In Progress)
-- Unit and integration tests (In Progress)
+- ✓ Barcode/QR code scanning (lazy-loaded `@zxing/browser`)
+- ✓ Backend pytest suite + GitHub Actions CI
 
-### Phase 3 (Upcoming)
-- Backup/restore functionality
-- Reporting features
-- PWA implementation
-- Docker deployment
+### Phase 3 — ✓ Completed
+- ✓ Backup/restore functionality (zip archives + in-app UI)
+- ✓ Reporting features (analytics endpoints + Reports page)
+- ✓ PWA implementation (`vite-plugin-pwa`)
+- ✓ Docker deployment (dev + NAS compose files)
+
+### Phase 4 — ✓ Completed (v2.0.0 audit remediation)
+- ✓ Env-driven settings, `SECRET_KEY` required, auth bypass removed as default
+- ✓ Alembic rebaselined (destructive migration replaced with idempotent baseline + `bootstrap.py`)
+- ✓ python-jose → PyJWT swap
+- ✓ Upload hardening (magic-byte validation, size + dimension caps)
+- ✓ React 18 → 19
+- ✓ Dead deps removed (sharp, jszip); BarcodeScanner lazy-loaded
+
+### Phase 5 — eBay integration (Phase 1 shipped in v2.0.0)
+- ✓ Seller Hub CSV export
+- ✓ Category mapping
+- ✓ eBay-specific custom fields
+- eBay API (OAuth / Trading / Inventory APIs) — deferred to a future release
+
+### Future
+- Formik → React Hook Form migration
+- React Router v7 data-router (`createBrowserRouter`) migration
+- SQLAlchemy 2.x `select()` style migration
+- Tailwind v4 evaluation
+- End-to-end tests (Playwright/Cypress)
+- Coverage gates in CI
 
 ## 10. Open-Source
 
