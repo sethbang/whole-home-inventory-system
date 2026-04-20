@@ -5,22 +5,27 @@ The router is responsible only for binding FastAPI dependencies, translating
 between ``UploadFile`` / ``StreamingResponse`` and service calls, and
 centralizing the unexpected-error scrub to keep Python exception strings out
 of response bodies.
-"""
 
-from __future__ import annotations
+Note: we intentionally do NOT use ``from __future__ import annotations`` in
+router modules — FastAPI + Pydantic rely on runtime-evaluated type hints for
+body/query parameter resolution, and the combination with decorators like
+``@limiter.limit`` that wrap the function makes the forward-reference
+resolution fail at request time.
+"""
 
 import logging
 import os
 import shutil
+from typing import Optional
 
 from fastapi import (
     APIRouter,
-    BackgroundTasks,
     Body,
     Depends,
     File,
     HTTPException,
     Query,
+    Request,
     UploadFile,
 )
 from fastapi.responses import FileResponse
@@ -28,6 +33,7 @@ from sqlalchemy.orm import Session
 
 from .. import models, schemas
 from ..database import get_db
+from ..rate_limit import limiter
 from ..security import get_current_active_user
 from ..services.backups import BackupService, _backup_dir
 
@@ -41,8 +47,9 @@ def _service(db: Session, user: models.User) -> BackupService:
 
 
 @router.post("/backups", response_model=schemas.Backup)
+@limiter.limit("5/hour")
 async def create_backup(
-    background_tasks: BackgroundTasks,  # retained for API shape stability
+    request: Request,  # required by slowapi
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_active_user),
 ):
@@ -64,7 +71,9 @@ async def list_backups(
 
 
 @router.post("/backups/{backup_id}/restore", response_model=schemas.RestoreResponse)
+@limiter.limit("3/hour")
 async def restore_backup(
+    request: Request,  # required by slowapi
     backup_id: str,
     dry_run: bool = Query(
         True,
@@ -74,7 +83,7 @@ async def restore_backup(
             "confirm_item_count in the body, matching the server-side item count."
         ),
     ),
-    body: schemas.RestoreRequest | None = Body(None),
+    body: Optional[schemas.RestoreRequest] = Body(None),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_active_user),
 ):

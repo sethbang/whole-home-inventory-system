@@ -20,12 +20,13 @@ import uuid
 from typing import Any, List, Optional
 
 import pandas as pd
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from .. import database, models, schemas, security
+from ..rate_limit import limiter
 from ..services.items import ItemService
 
 logger = logging.getLogger(__name__)
@@ -98,7 +99,9 @@ def list_items(
 
 
 @router.get("/items/export/data")
+@limiter.limit("10/hour")
 async def export_items(
+    request: Request,  # required by slowapi
     format: str = Query(
         ..., description="Export format (csv or json)", pattern="^(csv|json)$"
     ),

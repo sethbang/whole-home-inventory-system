@@ -2,11 +2,12 @@ import logging
 from datetime import timedelta
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from .. import database, models, schemas, security
+from ..rate_limit import limiter
 from ..security import DEV_USER
 from ..settings import settings
 
@@ -43,7 +44,9 @@ def register_user(
 
 
 @router.post("/token", response_model=schemas.Token)
+@limiter.limit("5/minute")
 async def login_for_access_token(
+    request: Request,  # required by slowapi's request-bound rate limiter
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(database.get_db),
 ) -> Any:

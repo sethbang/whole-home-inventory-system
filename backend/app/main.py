@@ -6,9 +6,12 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from .logging_config import setup_logging
 from .middleware.request_id import RequestIdMiddleware
+from .rate_limit import limiter, rate_limit_exceeded_handler
 from .routers import analytics, auth, backups, ebay, images, items
 from .settings import settings
 from .telemetry import setup_telemetry
@@ -34,6 +37,11 @@ app = FastAPI(
 # for FastAPI + SQLAlchemy. Runs after FastAPI() but before routes are
 # included so the instrumentation wraps everything.
 setup_telemetry(app)
+
+# Rate limiter state lives on app.state; slowapi finds it there.
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 
 @app.exception_handler(405)
