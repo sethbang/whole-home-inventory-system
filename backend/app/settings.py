@@ -68,6 +68,10 @@ class Settings(BaseSettings):
 
     # Logging / debug
     LOG_LEVEL: str = "INFO"
+    # One of "console" (human-readable pretty-print) or "json" (line-delimited
+    # JSON for log aggregators). Empty string means "auto-pick from DEBUG":
+    # console when DEBUG=true, json otherwise.
+    LOG_FORMAT: str = ""
     DEBUG: bool = False
 
     @field_validator(
@@ -86,6 +90,13 @@ class Settings(BaseSettings):
                 "SECRET_KEY must be set to a non-placeholder value when BYPASS_AUTH is false. "
                 "Generate one with: python -c 'import secrets; print(secrets.token_urlsafe(64))'"
             )
+
+    def resolve_log_format(self) -> str:
+        """Return "console" or "json" after applying the DEBUG-aware default."""
+        explicit = (self.LOG_FORMAT or "").strip().lower()
+        if explicit in {"console", "json"}:
+            return explicit
+        return "console" if self.DEBUG else "json"
 
     @property
     def upload_path(self) -> Path:

@@ -125,9 +125,7 @@ def test_delete_cross_user_is_404(db_session, user, other_user):
 # ---------------------------------------------------------------------------
 
 
-def test_bulk_delete_returns_count_and_respects_ownership(
-    db_session, user, other_user
-):
+def test_bulk_delete_returns_count_and_respects_ownership(db_session, user, other_user):
     alice_items = [_seed(db_session, user, name=f"a{i}") for i in range(3)]
     bob_items = [_seed(db_session, other_user, name=f"b{i}") for i in range(2)]
 
@@ -296,11 +294,7 @@ def test_import_records_creates_items_and_drops_unknown_fields(db_session, user)
     assert result["items_imported"] == 1
     assert result["errors"] is None
 
-    [item] = (
-        db_session.query(models.Item)
-        .filter(models.Item.owner_id == user.id)
-        .all()
-    )
+    [item] = db_session.query(models.Item).filter(models.Item.owner_id == user.id).all()
     assert item.name == "Imported"
     # Server-managed fields must have been regenerated, not taken from input.
     assert item.owner_id == user.id
@@ -317,11 +311,7 @@ def test_import_records_parses_iso_dates(db_session, user):
         }
     ]
     ItemService(db_session, user).import_records(records)
-    [item] = (
-        db_session.query(models.Item)
-        .filter(models.Item.owner_id == user.id)
-        .all()
-    )
+    [item] = db_session.query(models.Item).filter(models.Item.owner_id == user.id).all()
     assert item.purchase_date == datetime(2024, 5, 1)
     assert item.warranty_expiration == datetime(2025, 5, 1)
 
@@ -357,9 +347,5 @@ def test_import_records_decodes_custom_fields_json_string(db_session, user):
         }
     ]
     ItemService(db_session, user).import_records(records)
-    [item] = (
-        db_session.query(models.Item)
-        .filter(models.Item.owner_id == user.id)
-        .all()
-    )
+    [item] = db_session.query(models.Item).filter(models.Item.owner_id == user.id).all()
     assert item.custom_fields == {"color": "blue", "rating": 4}

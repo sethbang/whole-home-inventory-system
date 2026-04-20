@@ -7,13 +7,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from .logging_config import setup_logging
+from .middleware.request_id import RequestIdMiddleware
 from .routers import analytics, auth, backups, ebay, images, items
 from .settings import settings
 
-logging.basicConfig(
-    level=getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO),
-    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-)
+# Configure structlog + stdlib logging before the rest of the app boots so
+# every module's logger picks up the shared renderer on first use.
+setup_logging()
 logger = logging.getLogger(__name__)
 
 UPLOAD_DIR = str(settings.upload_path)
@@ -47,9 +48,20 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=CORS_ALLOW_METHODS,
     allow_headers=CORS_ALLOW_HEADERS,
-    expose_headers=["Content-Type", "Content-Disposition", "Authorization"],
+    expose_headers=[
+        "Content-Type",
+        "Content-Disposition",
+        "Authorization",
+        "X-Request-ID",
+    ],
     max_age=3600,
 )
+
+# Install after CORS so CORS headers are set on every response (including
+# the ones where request_id binding happens). Middleware is LIFO: last
+# added runs first on the way in, last on the way out — so RequestId wraps
+# the inner response before CORS decorates it.
+app.add_middleware(RequestIdMiddleware)
 
 
 @app.middleware("http")

@@ -78,9 +78,7 @@ class ItemService:
     def get(self, item_id: uuid.UUID) -> models.Item:
         return self._owned_item(item_id)
 
-    def update(
-        self, item_id: uuid.UUID, updates: schemas.ItemUpdate
-    ) -> models.Item:
+    def update(self, item_id: uuid.UUID, updates: schemas.ItemUpdate) -> models.Item:
         db_item = self._owned_item(item_id)
         update_data = updates.model_dump(exclude_unset=True)
         for field, value in update_data.items():
@@ -149,9 +147,9 @@ class ItemService:
                 order_by = order_by.desc()
             base = base.order_by(order_by)
 
-        paged = base.offset(
-            (search_filter.page - 1) * search_filter.page_size
-        ).limit(search_filter.page_size)
+        paged = base.offset((search_filter.page - 1) * search_filter.page_size).limit(
+            search_filter.page_size
+        )
         items = list(self.db.execute(paged).scalars().all())
         return items, total
 
@@ -266,9 +264,7 @@ class ItemService:
                 )
                 # Don't leak exception text to the caller; surface just the
                 # item label so the frontend can show a per-row status.
-                errors.append(
-                    f"Error importing item {raw.get('name', '<unknown>')}"
-                )
+                errors.append(f"Error importing item {raw.get('name', '<unknown>')}")
 
         self.db.commit()
         return {
