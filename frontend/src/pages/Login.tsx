@@ -1,34 +1,33 @@
-import React from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useFormik } from 'formik';
-import * as Yup from 'yup';
-import { useAuth } from '../contexts/AuthContext';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 
-const validationSchema = Yup.object({
-  username: Yup.string().required('Username is required'),
-  password: Yup.string().required('Password is required'),
-});
+import { useAuth } from '../contexts/AuthContext';
+import { apiErrorMessage } from '../api/errors';
+import { type LoginFormValues, loginSchema } from './Login.schema';
 
 export default function Login() {
   const { login } = useAuth();
-  const [error, setError] = React.useState<string | null>(null);
+  const [serverError, setServerError] = useState<string | null>(null);
 
-  const formik = useFormik({
-    initialValues: {
-      username: '',
-      password: '',
-    },
-    validationSchema,
-    onSubmit: async (values) => {
-      try {
-        setError(null);
-        await login(values.username, values.password);
-      } catch (err: any) {
-        console.error('Login error:', err);
-        setError(err.response?.data?.detail || 'Invalid username or password');
-      }
-    },
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { username: '', password: '' },
   });
+
+  const onSubmit = async (values: LoginFormValues) => {
+    setServerError(null);
+    try {
+      await login(values.username, values.password);
+    } catch (err) {
+      setServerError(apiErrorMessage(err, 'Invalid username or password'));
+    }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -47,10 +46,10 @@ export default function Login() {
             </Link>
           </p>
         </div>
-        <form className="mt-8 space-y-6" onSubmit={formik.handleSubmit}>
-          {error && (
-            <div className="rounded-md bg-red-50 p-4">
-              <div className="text-sm text-red-700">{error}</div>
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)} noValidate>
+          {serverError && (
+            <div role="alert" className="rounded-md bg-red-50 p-4">
+              <div className="text-sm text-red-700">{serverError}</div>
             </div>
           )}
           <div className="rounded-md shadow-sm -space-y-px">
@@ -62,11 +61,16 @@ export default function Login() {
                 id="username"
                 type="text"
                 autoComplete="username"
-                required
+                aria-invalid={errors.username ? 'true' : 'false'}
                 className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm"
                 placeholder="Username"
-                {...formik.getFieldProps('username')}
+                {...register('username')}
               />
+              {errors.username && (
+                <div className="text-red-500 text-xs mt-1">
+                  {errors.username.message}
+                </div>
+              )}
             </div>
             <div>
               <label htmlFor="password" className="sr-only">
@@ -76,21 +80,26 @@ export default function Login() {
                 id="password"
                 type="password"
                 autoComplete="current-password"
-                required
+                aria-invalid={errors.password ? 'true' : 'false'}
                 className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm"
                 placeholder="Password"
-                {...formik.getFieldProps('password')}
+                {...register('password')}
               />
+              {errors.password && (
+                <div className="text-red-500 text-xs mt-1">
+                  {errors.password.message}
+                </div>
+              )}
             </div>
           </div>
 
           <div>
             <button
               type="submit"
-              disabled={formik.isSubmitting}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+              disabled={isSubmitting}
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-60"
             >
-              {formik.isSubmitting ? 'Signing in...' : 'Sign in'}
+              {isSubmitting ? 'Signing in...' : 'Sign in'}
             </button>
           </div>
         </form>

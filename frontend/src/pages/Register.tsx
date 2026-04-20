@@ -1,45 +1,49 @@
-import React from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useFormik } from 'formik';
-import * as Yup from 'yup';
-import { useAuth } from '../contexts/AuthContext';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 
-const validationSchema = Yup.object({
-  email: Yup.string()
-    .email('Invalid email address')
-    .required('Email is required'),
-  username: Yup.string()
-    .min(3, 'Username must be at least 3 characters')
-    .required('Username is required'),
-  password: Yup.string()
-    .min(8, 'Password must be at least 8 characters')
-    .required('Password is required'),
-  confirmPassword: Yup.string()
-    .oneOf([Yup.ref('password')], 'Passwords must match')
-    .required('Please confirm your password'),
-});
+import { useAuth } from '../contexts/AuthContext';
+import { apiErrorMessage } from '../api/errors';
+import { type RegisterFormValues, registerSchema } from './Register.schema';
 
 export default function Register() {
-  const { register } = useAuth();
-  const [error, setError] = React.useState<string | null>(null);
+  const { register: registerUser } = useAuth();
+  const [serverError, setServerError] = useState<string | null>(null);
 
-  const formik = useFormik({
-    initialValues: {
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<RegisterFormValues>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: {
       email: '',
       username: '',
       password: '',
       confirmPassword: '',
     },
-    validationSchema,
-    onSubmit: async (values) => {
-      try {
-        setError(null);
-        await register(values.email, values.username, values.password);
-      } catch (err: any) {
-        setError(err.response?.data?.detail || 'Registration failed');
-      }
-    },
   });
+
+  const onSubmit = async (values: RegisterFormValues) => {
+    setServerError(null);
+    try {
+      await registerUser(values.email, values.username, values.password);
+    } catch (err) {
+      setServerError(apiErrorMessage(err, 'Registration failed'));
+    }
+  };
+
+  const fieldErrorClass = (hasError: boolean, position: 'top' | 'middle' | 'bottom') => {
+    const radius =
+      position === 'top'
+        ? 'rounded-t-md'
+        : position === 'bottom'
+          ? 'rounded-b-md'
+          : '';
+    const border = hasError ? 'border-red-300' : 'border-gray-300';
+    return `appearance-none rounded-none relative block w-full px-3 py-2 border ${border} placeholder-gray-500 text-gray-900 ${radius} focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm`;
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -58,10 +62,10 @@ export default function Register() {
             </Link>
           </p>
         </div>
-        <form className="mt-8 space-y-6" onSubmit={formik.handleSubmit}>
-          {error && (
-            <div className="rounded-md bg-red-50 p-4">
-              <div className="text-sm text-red-700">{error}</div>
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)} noValidate>
+          {serverError && (
+            <div role="alert" className="rounded-md bg-red-50 p-4">
+              <div className="text-sm text-red-700">{serverError}</div>
             </div>
           )}
           <div className="rounded-md shadow-sm -space-y-px">
@@ -73,17 +77,13 @@ export default function Register() {
                 id="email"
                 type="email"
                 autoComplete="email"
-                required
-                className={`appearance-none rounded-none relative block w-full px-3 py-2 border ${
-                  formik.touched.email && formik.errors.email
-                    ? 'border-red-300'
-                    : 'border-gray-300'
-                } placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm`}
+                aria-invalid={errors.email ? 'true' : 'false'}
+                className={fieldErrorClass(!!errors.email, 'top')}
                 placeholder="Email address"
-                {...formik.getFieldProps('email')}
+                {...register('email')}
               />
-              {formik.touched.email && formik.errors.email && (
-                <div className="text-red-500 text-xs mt-1">{formik.errors.email}</div>
+              {errors.email && (
+                <div className="text-red-500 text-xs mt-1">{errors.email.message}</div>
               )}
             </div>
             <div>
@@ -94,17 +94,15 @@ export default function Register() {
                 id="username"
                 type="text"
                 autoComplete="username"
-                required
-                className={`appearance-none rounded-none relative block w-full px-3 py-2 border ${
-                  formik.touched.username && formik.errors.username
-                    ? 'border-red-300'
-                    : 'border-gray-300'
-                } placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm`}
+                aria-invalid={errors.username ? 'true' : 'false'}
+                className={fieldErrorClass(!!errors.username, 'middle')}
                 placeholder="Username"
-                {...formik.getFieldProps('username')}
+                {...register('username')}
               />
-              {formik.touched.username && formik.errors.username && (
-                <div className="text-red-500 text-xs mt-1">{formik.errors.username}</div>
+              {errors.username && (
+                <div className="text-red-500 text-xs mt-1">
+                  {errors.username.message}
+                </div>
               )}
             </div>
             <div>
@@ -115,17 +113,15 @@ export default function Register() {
                 id="password"
                 type="password"
                 autoComplete="new-password"
-                required
-                className={`appearance-none rounded-none relative block w-full px-3 py-2 border ${
-                  formik.touched.password && formik.errors.password
-                    ? 'border-red-300'
-                    : 'border-gray-300'
-                } placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm`}
+                aria-invalid={errors.password ? 'true' : 'false'}
+                className={fieldErrorClass(!!errors.password, 'middle')}
                 placeholder="Password"
-                {...formik.getFieldProps('password')}
+                {...register('password')}
               />
-              {formik.touched.password && formik.errors.password && (
-                <div className="text-red-500 text-xs mt-1">{formik.errors.password}</div>
+              {errors.password && (
+                <div className="text-red-500 text-xs mt-1">
+                  {errors.password.message}
+                </div>
               )}
             </div>
             <div>
@@ -136,18 +132,14 @@ export default function Register() {
                 id="confirmPassword"
                 type="password"
                 autoComplete="new-password"
-                required
-                className={`appearance-none rounded-none relative block w-full px-3 py-2 border ${
-                  formik.touched.confirmPassword && formik.errors.confirmPassword
-                    ? 'border-red-300'
-                    : 'border-gray-300'
-                } placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm`}
+                aria-invalid={errors.confirmPassword ? 'true' : 'false'}
+                className={fieldErrorClass(!!errors.confirmPassword, 'bottom')}
                 placeholder="Confirm Password"
-                {...formik.getFieldProps('confirmPassword')}
+                {...register('confirmPassword')}
               />
-              {formik.touched.confirmPassword && formik.errors.confirmPassword && (
+              {errors.confirmPassword && (
                 <div className="text-red-500 text-xs mt-1">
-                  {formik.errors.confirmPassword}
+                  {errors.confirmPassword.message}
                 </div>
               )}
             </div>
@@ -156,10 +148,10 @@ export default function Register() {
           <div>
             <button
               type="submit"
-              disabled={formik.isSubmitting}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+              disabled={isSubmitting}
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-60"
             >
-              {formik.isSubmitting ? 'Creating account...' : 'Create account'}
+              {isSubmitting ? 'Creating account...' : 'Create account'}
             </button>
           </div>
         </form>
