@@ -7,6 +7,102 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-04-20
+
+Backend structural release. Pays down the deferred work CLAUDE.md has been
+tracking (service-layer extraction, SQLAlchemy 2.x `select()` migration) and
+adds the operational plumbing that v3.1's Vision + Pricing features will lean
+on (structured logs, request-ID propagation, OTEL skeleton, rate limits).
+No HTTP behavior changes; this is refactor + observability + the schema
+pre-wire for v3.1.
+
+### Added
+
+- **Service layer** — `app/services/{items,backups,images}.py`. Every
+  router is now a thin HTTP shim that delegates to a service class whose
+  methods enforce ownership against the authenticated user. Service
+  methods are unit-tested directly with a real `db_session` (no
+  TestClient), which is how 65 of the 69 new tests land.
+  - `routers/images.py`: 168 → 60 lines.
+  - `routers/backups.py`: 405 → 154 lines.
+  - `routers/items.py`: 429 → 221 lines.
+- **Structured logging** (`structlog` 25.x). `logging.basicConfig` is
+  replaced with a shared renderer that both structlog-native and stdlib
+  `logging.getLogger` calls use. New `LOG_FORMAT` env var picks between
+  `console` (human-readable pretty-print) and `json` (line-delimited);
+  unset auto-selects based on `DEBUG`.
+- **Request-ID middleware** (`app/middleware/request_id.py`). Every
+  request gets an `X-Request-ID` (generated if absent, propagated if
+  supplied) bound to `structlog.contextvars` so every log line during
+  the request carries `request_id=<id>`. Echoed back in the response
+  header for client-side correlation.
+- **OpenTelemetry skeleton** (`app/telemetry.py`). Gated behind
+  `OTEL_ENABLED=true` so unconfigured deployments pay nothing. When on:
+  tracer provider, OTLP gRPC exporter, and FastAPI + SQLAlchemy
+  instrumentors. Endpoint override via `OTEL_EXPORTER_OTLP_ENDPOINT`.
+- **Rate limiting** (`slowapi`, in-memory). User-aware key function
+  (JWT → `user:<username>`, fallback → `ip:<addr>`). Limits:
+  - `POST /api/token` — 5/minute (IP)
+  - `POST /api/backups` — 5/hour (per user/IP)
+  - `POST /api/backups/{id}/restore` — 3/hour (per user/IP)
+  - `GET /api/items/export/data` — 10/hour (per user/IP)
+  The 429 response body is generic — no policy leak.
+- **Alembic migration `20260420_0002_pricing_prewire`**. Adds five nullable
+  columns on `items` (`estimated_value_low/median/high`,
+  `price_last_checked`, `price_provider`) and a new `price_cache` table
+  (identity_hash PK, provider, JSON payload, expires_at index). Done in
+  v2.2 so v3.1's pricing feature PR isn't also a schema-migration PR.
+- **Test coverage: 33 → 121 backend tests (+88).** New files:
+  `test_image_service.py` (17), `test_backup_service.py` (20),
+  `test_item_service.py` (25), `test_logging.py` (12), `test_telemetry.py`
+  (4), `test_rate_limits.py` (7), `test_migrations.py` (3).
+
+### Changed
+
+- **SQLAlchemy 2.x `select()` migration across the service layer**. Every
+  query path routed through the new services uses
+  `db.execute(select(...).where(...))` + `scalar_one_or_none()` /
+  `.scalars()` instead of the legacy `db.query(...).filter(...)` chain.
+  Future-compat for SQLAlchemy 3.x, which removes `.query()`.
+- All item endpoints migrated from `get_current_active_user_or_none` +
+  `if not current_user: 401` to strict `get_current_active_user`. The
+  optional-auth pattern was only ever needed for the barcode endpoint,
+  which v2.1 already fixed.
+- Routers now raise a generic 500 on unexpected exceptions and log the
+  full traceback server-side (pattern established in v2.1 for backups;
+  extended to items/import in v2.2).
+- `tests/conftest.py`: `db_session` fixture now wipes all tables on
+  teardown — matches the cleanup contract the `client` fixture already
+  provided. Fixes cross-test contamination for tests that only use
+  `db_session`.
+- CORS `expose_headers` now includes `X-Request-ID` so browsers can read
+  the header after a preflighted request.
+- Pre-existing broken `tsc --noEmit` / `npm run build` fixed in v2.1;
+  v2.2 adds no frontend changes.
+
+### Dependencies
+
+Added to `backend/requirements.txt`:
+- `slowapi>=0.1.9,<1`
+- `structlog>=24.4,<26`
+- `opentelemetry-api/-sdk/-exporter-otlp/-instrumentation-fastapi/-instrumentation-sqlalchemy`
+  (1.28 / 0.49b+)
+- `httpx>=0.27,<1` and `tenacity>=9,<10` — pre-wired for v3.1 so those
+  feature PRs stay focused on logic rather than plumbing.
+
+### Operator notes
+
+- **New env vars**: `LOG_FORMAT`, `OTEL_ENABLED`, `OTEL_SERVICE_NAME`,
+  `OTEL_EXPORTER_OTLP_ENDPOINT`. All optional, all documented in
+  `backend/.env.example`. Existing deployments need no action.
+- **Run the new migration**: `alembic upgrade head` (or let
+  `scripts/bootstrap.py` do it on container start). Adds columns/table
+  but populates nothing; the pricing feature in v3.1 will fill them in.
+- Rate limit counters are in-memory and reset on worker restart. That's
+  fine for single-worker household deployments; v3.0 will swap in Redis
+  when the job queue lands.
+- No breaking changes at the HTTP boundary.
+
 ## [2.1.0] - 2026-04-20
 
 Security and correctness patch driven by the 2026-04-20 post-2.0 audit. Focuses

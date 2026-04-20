@@ -83,6 +83,15 @@ class Item(ItemBase):
     updated_at: datetime
     images: List[ItemImage] = []
 
+    # v2.2 pre-wire for the v3.1 pricing feature. Always NULL in v2.2 — the
+    # fields are surfaced on the response shape now so the frontend can be
+    # built against a stable schema ahead of the feature actually shipping.
+    estimated_value_low: Optional[float] = None
+    estimated_value_median: Optional[float] = None
+    estimated_value_high: Optional[float] = None
+    price_last_checked: Optional[datetime] = None
+    price_provider: Optional[str] = None
+
     model_config = ConfigDict(from_attributes=True)
 
 

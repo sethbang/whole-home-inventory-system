@@ -98,6 +98,17 @@ class Item(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    # --- v2.2 pre-wire for the v3.1 pricing feature ------------------------
+    # Dedicated columns (rather than hiding these in ``custom_fields``) so
+    # the UI can sort/filter by estimated value and "last checked" without
+    # JSON-column gymnastics. Populated by v3.1's PricingService; left
+    # NULL until the first estimate is requested.
+    estimated_value_low = Column(Float, nullable=True)
+    estimated_value_median = Column(Float, nullable=True)
+    estimated_value_high = Column(Float, nullable=True)
+    price_last_checked = Column(DateTime, nullable=True)
+    price_provider = Column(String(32), nullable=True)
+
     owner_id = Column(UUID, ForeignKey("users.id"))
     owner = relationship("User", back_populates="items")
     images = relationship(
@@ -132,3 +143,21 @@ class Backup(Base):
     error_message = Column(String, nullable=True)
 
     owner = relationship("User", back_populates="backups")
+
+
+class PriceCache(Base):
+    """Cached resale-price estimates keyed by a normalized identity hash.
+
+    Populated by v3.1's PricingService. Stored alongside ``items`` so the
+    same DB backup captures the warmed cache, which is operationally nice
+    for self-hosted deployments that don't want to burn through their eBay
+    quota after every migration.
+    """
+
+    __tablename__ = "price_cache"
+
+    identity_hash = Column(String(64), primary_key=True)
+    provider = Column(String(32), nullable=False)
+    payload = Column(JSON, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    expires_at = Column(DateTime, nullable=False, index=True)
