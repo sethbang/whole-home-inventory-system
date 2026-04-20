@@ -9,6 +9,7 @@ import { useFormik } from 'formik';
 import * as Yup from 'yup';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { items, images, ebay } from '../api/client';
+import { queryKeys } from '../api/queryKeys';
 import type { Item, EbayCategoryResponse } from '../api/client';
 import { format } from 'date-fns';
 
@@ -36,17 +37,17 @@ export default function ItemDetail() {
   const [showCamera, setShowCamera] = useState(false);
 
   const { data: item, isLoading } = useQuery({
-    queryKey: ['items', id],
+    queryKey: queryKeys.items.detail(id!),
     queryFn: () => items.get(id!),
   });
 
   const { data: categories = [] } = useQuery({
-    queryKey: ['categories'],
+    queryKey: queryKeys.items.categories(),
     queryFn: items.getCategories,
   });
 
   const { data: locations = [] } = useQuery({
-    queryKey: ['locations'],
+    queryKey: queryKeys.items.locations(),
     queryFn: items.getLocations,
   });
 
@@ -55,7 +56,7 @@ export default function ItemDetail() {
       return await items.update(id!, values);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['items', id] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.items.detail(id!) });
       navigate('/');
     },
     onError: (error: any) => {
@@ -68,7 +69,7 @@ export default function ItemDetail() {
       return await images.upload(id!, file);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['items', id] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.items.detail(id!) });
       setSelectedFiles([]);
     },
     onError: (error: any) => {
@@ -79,7 +80,7 @@ export default function ItemDetail() {
   const deleteImageMutation = useMutation({
     mutationFn: (imageId: string) => images.delete(imageId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['items', id] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.items.detail(id!) });
     },
     onError: (error: any) => {
       setError(error.response?.data?.detail || 'Failed to delete image');
@@ -101,7 +102,7 @@ export default function ItemDetail() {
       return await ebay.updateFields(id!, fields);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['items', id] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.items.detail(id!) });
     },
     onError: (error: any) => {
       setError(error.response?.data?.detail || 'Failed to update eBay fields');

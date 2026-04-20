@@ -1,31 +1,32 @@
 import { useQuery } from '@tanstack/react-query';
 import { analytics } from '../api/client';
+import { queryKeys } from '../api/queryKeys';
 import type { ValueByCategory, ValueByLocation, WarrantyItem } from '../api/client';
 import { ChartBarIcon, MapPinIcon, ClockIcon, CurrencyDollarIcon } from '@heroicons/react/24/outline';
 
 export default function Reports() {
   const { data: categoryData } = useQuery({
-    queryKey: ['analytics', 'value-by-category'],
+    queryKey: queryKeys.analytics.valueByCategory(),
     queryFn: analytics.getValueByCategory,
   });
 
   const { data: locationData } = useQuery({
-    queryKey: ['analytics', 'value-by-location'],
+    queryKey: queryKeys.analytics.valueByLocation(),
     queryFn: analytics.getValueByLocation,
   });
 
   const { data: trendsData } = useQuery({
-    queryKey: ['analytics', 'value-trends'],
+    queryKey: queryKeys.analytics.valueTrends(),
     queryFn: analytics.getValueTrends,
   });
 
   const { data: warrantyData } = useQuery({
-    queryKey: ['analytics', 'warranty-status'],
+    queryKey: queryKeys.analytics.warrantyStatus(),
     queryFn: analytics.getWarrantyStatus,
   });
 
   const { data: ageData } = useQuery({
-    queryKey: ['analytics', 'age-analysis'],
+    queryKey: queryKeys.analytics.ageAnalysis(),
     queryFn: analytics.getAgeAnalysis,
   });
 

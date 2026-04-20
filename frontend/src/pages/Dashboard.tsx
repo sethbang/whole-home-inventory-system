@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { items } from '../api/client';
+import { queryKeys } from '../api/queryKeys';
 import type { Item, ItemListResponse } from '../api/client';
 import DataMigration from '../components/DataMigration';
 
@@ -30,7 +31,7 @@ export default function Dashboard() {
       await items.bulkDelete(Array.from(selectedItems));
       setSelectedItems(new Set());
       setShowDeleteConfirm(false);
-      queryClient.invalidateQueries({ queryKey: ['items'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.items.all });
     } catch (error) {
       console.error('Error deleting items:', error);
       alert('Failed to delete items. Please try again.');
@@ -43,7 +44,7 @@ export default function Dashboard() {
       await items.bulkDelete(data.items.map(item => item.id));
       setShowDeleteAllConfirm(false);
       setDeleteAllConfirmCount(0);
-      queryClient.invalidateQueries({ queryKey: ['items'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.items.all });
     } catch (error) {
       console.error('Error deleting all items:', error);
       alert('Failed to delete all items. Please try again.');
@@ -61,17 +62,17 @@ export default function Dashboard() {
   };
 
   const { data, isLoading } = useQuery<ItemListResponse>({
-    queryKey: ['items', searchFilters],
+    queryKey: queryKeys.items.list(searchFilters),
     queryFn: () => items.list(searchFilters),
   });
 
   const { data: categories } = useQuery<string[]>({
-    queryKey: ['categories'],
+    queryKey: queryKeys.items.categories(),
     queryFn: items.getCategories,
   });
 
   const { data: locations } = useQuery<string[]>({
-    queryKey: ['locations'],
+    queryKey: queryKeys.items.locations(),
     queryFn: items.getLocations,
   });
 

@@ -11,6 +11,7 @@ import { useFormik } from 'formik';
 import * as Yup from 'yup';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { items, images } from '../api/client';
+import { queryKeys } from '../api/queryKeys';
 
 const validationSchema = Yup.object({
   name: Yup.string().required('Name is required'),
@@ -37,12 +38,12 @@ export default function AddItem() {
 
   // Fetch categories and locations for autocomplete (to be implemented)
   useQuery({
-    queryKey: ['categories'],
+    queryKey: queryKeys.items.categories(),
     queryFn: items.getCategories,
   });
 
   useQuery({
-    queryKey: ['locations'],
+    queryKey: queryKeys.items.locations(),
     queryFn: items.getLocations,
   });
 
