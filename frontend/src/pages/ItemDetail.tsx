@@ -1,44 +1,37 @@
-import React, { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { Controller, useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { format } from 'date-fns';
+import { CameraIcon } from '@heroicons/react/24/outline';
+
 import CustomFields from '../components/CustomFields';
 import CameraCapture from '../components/CameraCapture';
 import ImageGallery from '../components/ImageGallery';
 import EbayFields, { EbayFieldsData } from '../components/EbayFields';
-import { CameraIcon } from '@heroicons/react/24/outline';
-import { useNavigate, useParams } from 'react-router-dom';
-import { useFormik } from 'formik';
-import * as Yup from 'yup';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { items, images, ebay } from '../api/client';
+import { apiErrorMessage } from '../api/errors';
 import { queryKeys } from '../api/queryKeys';
-import type { Item, EbayCategoryResponse } from '../api/client';
-import { format } from 'date-fns';
-
-const validationSchema = Yup.object({
-  name: Yup.string().required('Name is required'),
-  category: Yup.string().required('Category is required'),
-  location: Yup.string().required('Location is required'),
-  brand: Yup.string(),
-  model_number: Yup.string(),
-  serial_number: Yup.string(),
-  purchase_date: Yup.date().nullable(),
-  purchase_price: Yup.number().nullable().min(0, 'Price must be positive'),
-  current_value: Yup.number().nullable().min(0, 'Value must be positive'),
-  warranty_expiration: Yup.date().nullable(),
-  notes: Yup.string(),
-  custom_fields: Yup.object(),
-});
+import type { EbayCategoryResponse, Item } from '../api/client';
+import {
+  type AddItemFormValues,
+  type AddItemSubmitValues,
+  addItemDefaults,
+  addItemSchema,
+} from './AddItem.schema';
 
 export default function ItemDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [serverError, setServerError] = useState<string | null>(null);
   const [showCamera, setShowCamera] = useState(false);
 
   const { data: item, isLoading } = useQuery({
     queryKey: queryKeys.items.detail(id!),
     queryFn: () => items.get(id!),
+    enabled: !!id,
   });
 
   const { data: categories = [] } = useQuery({
@@ -51,29 +44,62 @@ export default function ItemDetail() {
     queryFn: items.getLocations,
   });
 
+  const {
+    register,
+    handleSubmit,
+    control,
+    reset,
+    watch,
+    setValue,
+    formState: { errors, isSubmitting },
+  } = useForm<AddItemFormValues, unknown, AddItemSubmitValues>({
+    resolver: zodResolver(addItemSchema),
+    defaultValues: addItemDefaults,
+  });
+
+  // Populate the form once the item loads. ``reset`` with ``keepDirty: false``
+  // so subsequent manual edits aren't flagged until the user changes them.
+  useEffect(() => {
+    if (!item) return;
+    reset({
+      name: item.name ?? '',
+      category: item.category ?? '',
+      location: item.location ?? '',
+      brand: item.brand ?? '',
+      model_number: item.model_number ?? '',
+      serial_number: item.serial_number ?? '',
+      barcode: item.barcode ?? '',
+      purchase_date: item.purchase_date
+        ? format(new Date(item.purchase_date), 'yyyy-MM-dd')
+        : '',
+      purchase_price: item.purchase_price?.toString() ?? '',
+      current_value: item.current_value?.toString() ?? '',
+      warranty_expiration: item.warranty_expiration
+        ? format(new Date(item.warranty_expiration), 'yyyy-MM-dd')
+        : '',
+      notes: item.notes ?? '',
+      custom_fields: (item.custom_fields ?? {}) as Record<string, unknown>,
+    });
+  }, [item, reset]);
+
   const updateItemMutation = useMutation({
-    mutationFn: async (values: Partial<Item>) => {
-      return await items.update(id!, values);
-    },
+    mutationFn: async (values: AddItemSubmitValues) => items.update(id!, values),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.items.detail(id!) });
       navigate('/');
     },
-    onError: (error: any) => {
-      setError(error.response?.data?.detail || 'Failed to update item');
+    onError: (err) => {
+      setServerError(apiErrorMessage(err, 'Failed to update item'));
     },
   });
 
   const uploadImageMutation = useMutation({
-    mutationFn: async (file: File) => {
-      return await images.upload(id!, file);
-    },
+    mutationFn: async (file: File) => images.upload(id!, file),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.items.detail(id!) });
-      setSelectedFiles([]);
     },
-    onError: (error: any) => {
-      setError(error.response?.data?.detail || 'Failed to upload image');
+    onError: (err) => {
+      setServerError(apiErrorMessage(err, 'Failed to upload image'));
     },
   });
 
@@ -82,89 +108,56 @@ export default function ItemDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.items.detail(id!) });
     },
-    onError: (error: any) => {
-      setError(error.response?.data?.detail || 'Failed to delete image');
+    onError: (err) => {
+      setServerError(apiErrorMessage(err, 'Failed to delete image'));
     },
   });
 
   const deleteItemMutation = useMutation({
     mutationFn: () => items.delete(id!),
-    onSuccess: () => {
-      navigate('/');
-    },
-    onError: (error: any) => {
-      setError(error.response?.data?.detail || 'Failed to delete item');
+    onSuccess: () => navigate('/'),
+    onError: (err) => {
+      setServerError(apiErrorMessage(err, 'Failed to delete item'));
     },
   });
 
   const updateEbayFieldsMutation = useMutation({
-    mutationFn: async (fields: EbayFieldsData) => {
-      return await ebay.updateFields(id!, fields);
-    },
+    mutationFn: async (fields: EbayFieldsData) => ebay.updateFields(id!, fields),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.items.detail(id!) });
     },
-    onError: (error: any) => {
-      setError(error.response?.data?.detail || 'Failed to update eBay fields');
+    onError: (err) => {
+      setServerError(apiErrorMessage(err, 'Failed to update eBay fields'));
     },
   });
 
   const lookupEbayCategoryMutation = useMutation({
-    mutationFn: async () => {
-      return await ebay.getCategories(id);
-    },
+    mutationFn: async () => ebay.getCategories(id),
     onSuccess: (data: EbayCategoryResponse) => {
       if (data.suggested_category) {
-        const ebayFields = formik.values.custom_fields?.ebay || {};
-        formik.setFieldValue('custom_fields', {
-          ...formik.values.custom_fields,
-          ebay: {
-            ...ebayFields,
-            category_id: data.suggested_category.id,
-          },
+        const current = (watch('custom_fields') ?? {}) as Record<string, unknown>;
+        const ebayFields = (current.ebay ?? {}) as Record<string, unknown>;
+        setValue('custom_fields', {
+          ...current,
+          ebay: { ...ebayFields, category_id: data.suggested_category.id },
         });
       }
     },
-    onError: (error: any) => {
-      setError(error.response?.data?.detail || 'Failed to lookup eBay category');
+    onError: (err) => {
+      setServerError(apiErrorMessage(err, 'Failed to lookup eBay category'));
     },
   });
 
-  const formik = useFormik({
-    initialValues: {
-      name: item?.name || '',
-      category: item?.category || '',
-      location: item?.location || '',
-      brand: item?.brand || '',
-      model_number: item?.model_number || '',
-      serial_number: item?.serial_number || '',
-      purchase_date: item?.purchase_date ? format(new Date(item.purchase_date), 'yyyy-MM-dd') : '',
-      purchase_price: item?.purchase_price?.toString() || '',
-      current_value: item?.current_value?.toString() || '',
-      warranty_expiration: item?.warranty_expiration ? format(new Date(item.warranty_expiration), 'yyyy-MM-dd') : '',
-      notes: item?.notes || '',
-      custom_fields: item?.custom_fields || {},
-    },
-    validationSchema,
-    enableReinitialize: true,
-    onSubmit: async (values) => {
-      const itemData: Partial<Item> = {
-        ...values,
-        purchase_price: values.purchase_price ? parseFloat(values.purchase_price) : undefined,
-        current_value: values.current_value ? parseFloat(values.current_value) : undefined,
-        purchase_date: values.purchase_date ? new Date(values.purchase_date).toISOString() : undefined,
-        warranty_expiration: values.warranty_expiration ? new Date(values.warranty_expiration).toISOString() : undefined,
-      };
-      updateItemMutation.mutate(itemData);
-    },
-  });
+  const onSubmit = (values: AddItemSubmitValues) => {
+    setServerError(null);
+    updateItemMutation.mutate(values);
+  };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
-      Array.from(event.target.files).forEach(file => {
+      Array.from(event.target.files).forEach((file) => {
         uploadImageMutation.mutate(file);
       });
-      // Clear the input
       event.target.value = '';
     }
   };
@@ -176,16 +169,18 @@ export default function ItemDetail() {
   };
 
   const handleDeleteItem = async () => {
-    if (window.confirm('Are you sure you want to delete this item? This action cannot be undone.')) {
+    if (
+      window.confirm(
+        'Are you sure you want to delete this item? This action cannot be undone.',
+      )
+    ) {
       deleteItemMutation.mutate();
     }
   };
 
   const handleEbayFieldsChange = (fields: EbayFieldsData) => {
-    formik.setFieldValue('custom_fields', {
-      ...formik.values.custom_fields,
-      ebay: fields,
-    });
+    const current = (watch('custom_fields') ?? {}) as Record<string, unknown>;
+    setValue('custom_fields', { ...current, ebay: fields });
     updateEbayFieldsMutation.mutate(fields);
   };
 
@@ -196,6 +191,10 @@ export default function ItemDetail() {
       </div>
     );
   }
+
+  const customFieldsValue = watch('custom_fields') ?? {};
+  const ebayFieldsValue = (customFieldsValue as Record<string, unknown>)
+    .ebay as EbayFieldsData | undefined;
 
   return (
     <div>
@@ -216,23 +215,21 @@ export default function ItemDetail() {
         </div>
       </div>
 
-      <form onSubmit={formik.handleSubmit} className="mt-8 space-y-8">
-        {error && (
-          <div className="rounded-md bg-red-50 p-4">
-            <div className="text-sm text-red-700">{error}</div>
+      <form onSubmit={handleSubmit(onSubmit)} className="mt-8 space-y-8" noValidate>
+        {serverError && (
+          <div role="alert" className="rounded-md bg-red-50 p-4">
+            <div className="text-sm text-red-700">{serverError}</div>
           </div>
         )}
 
         <div className="space-y-8 divide-y divide-gray-200">
-          {/* Current Images */}
           {item?.images && item.images.length > 0 && (
             <div className="pt-8">
-              <h3 className="text-lg font-medium leading-6 text-gray-900">Current Images</h3>
+              <h3 className="text-lg font-medium leading-6 text-gray-900">
+                Current Images
+              </h3>
               <div className="mt-4">
-                <ImageGallery
-                  images={item.images}
-                  onDelete={handleDeleteImage}
-                />
+                <ImageGallery images={item.images} onDelete={handleDeleteImage} />
               </div>
             </div>
           )}
@@ -243,13 +240,14 @@ export default function ItemDetail() {
                 Name
               </label>
               <input
-                type="text"
                 id="name"
-                {...formik.getFieldProps('name')}
+                type="text"
+                aria-invalid={errors.name ? 'true' : 'false'}
+                {...register('name')}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
               />
-              {formik.touched.name && formik.errors.name && (
-                <p className="mt-2 text-sm text-red-600">{formik.errors.name}</p>
+              {errors.name && (
+                <p className="mt-2 text-sm text-red-600">{errors.name.message}</p>
               )}
             </div>
 
@@ -259,7 +257,8 @@ export default function ItemDetail() {
               </label>
               <select
                 id="category"
-                {...formik.getFieldProps('category')}
+                aria-invalid={errors.category ? 'true' : 'false'}
+                {...register('category')}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
               >
                 <option value="">Select a category</option>
@@ -269,8 +268,8 @@ export default function ItemDetail() {
                   </option>
                 ))}
               </select>
-              {formik.touched.category && formik.errors.category && (
-                <p className="mt-2 text-sm text-red-600">{formik.errors.category}</p>
+              {errors.category && (
+                <p className="mt-2 text-sm text-red-600">{errors.category.message}</p>
               )}
             </div>
 
@@ -280,7 +279,8 @@ export default function ItemDetail() {
               </label>
               <select
                 id="location"
-                {...formik.getFieldProps('location')}
+                aria-invalid={errors.location ? 'true' : 'false'}
+                {...register('location')}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
               >
                 <option value="">Select a location</option>
@@ -290,8 +290,8 @@ export default function ItemDetail() {
                   </option>
                 ))}
               </select>
-              {formik.touched.location && formik.errors.location && (
-                <p className="mt-2 text-sm text-red-600">{formik.errors.location}</p>
+              {errors.location && (
+                <p className="mt-2 text-sm text-red-600">{errors.location.message}</p>
               )}
             </div>
 
@@ -300,9 +300,9 @@ export default function ItemDetail() {
                 Brand
               </label>
               <input
-                type="text"
                 id="brand"
-                {...formik.getFieldProps('brand')}
+                type="text"
+                {...register('brand')}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
               />
             </div>
@@ -312,9 +312,9 @@ export default function ItemDetail() {
                 Model Number
               </label>
               <input
-                type="text"
                 id="model_number"
-                {...formik.getFieldProps('model_number')}
+                type="text"
+                {...register('model_number')}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
               />
             </div>
@@ -324,9 +324,9 @@ export default function ItemDetail() {
                 Serial Number
               </label>
               <input
-                type="text"
                 id="serial_number"
-                {...formik.getFieldProps('serial_number')}
+                type="text"
+                {...register('serial_number')}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
               />
             </div>
@@ -336,9 +336,9 @@ export default function ItemDetail() {
                 Purchase Date
               </label>
               <input
-                type="date"
                 id="purchase_date"
-                {...formik.getFieldProps('purchase_date')}
+                type="date"
+                {...register('purchase_date')}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
               />
             </div>
@@ -352,14 +352,19 @@ export default function ItemDetail() {
                   <span className="text-gray-500 sm:text-sm">$</span>
                 </div>
                 <input
-                  type="number"
                   id="purchase_price"
+                  type="number"
                   step="0.01"
                   min="0"
-                  {...formik.getFieldProps('purchase_price')}
+                  {...register('purchase_price')}
                   className="mt-1 block w-full pl-7 rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
                 />
               </div>
+              {errors.purchase_price && (
+                <p className="mt-2 text-sm text-red-600">
+                  {errors.purchase_price.message}
+                </p>
+              )}
             </div>
 
             <div className="sm:col-span-3">
@@ -371,14 +376,19 @@ export default function ItemDetail() {
                   <span className="text-gray-500 sm:text-sm">$</span>
                 </div>
                 <input
-                  type="number"
                   id="current_value"
+                  type="number"
                   step="0.01"
                   min="0"
-                  {...formik.getFieldProps('current_value')}
+                  {...register('current_value')}
                   className="mt-1 block w-full pl-7 rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
                 />
               </div>
+              {errors.current_value && (
+                <p className="mt-2 text-sm text-red-600">
+                  {errors.current_value.message}
+                </p>
+              )}
             </div>
 
             <div className="sm:col-span-3">
@@ -386,9 +396,9 @@ export default function ItemDetail() {
                 Warranty Expiration
               </label>
               <input
-                type="date"
                 id="warranty_expiration"
-                {...formik.getFieldProps('warranty_expiration')}
+                type="date"
+                {...register('warranty_expiration')}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
               />
             </div>
@@ -400,7 +410,7 @@ export default function ItemDetail() {
               <textarea
                 id="notes"
                 rows={3}
-                {...formik.getFieldProps('notes')}
+                {...register('notes')}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
               />
             </div>
@@ -409,9 +419,15 @@ export default function ItemDetail() {
               <label className="block text-sm font-medium text-gray-700 mb-4">
                 Custom Fields
               </label>
-              <CustomFields
-                fields={formik.values.custom_fields}
-                onChange={(fields) => formik.setFieldValue('custom_fields', fields)}
+              <Controller
+                control={control}
+                name="custom_fields"
+                render={({ field }) => (
+                  <CustomFields
+                    fields={field.value}
+                    onChange={(fields) => field.onChange(fields)}
+                  />
+                )}
               />
             </div>
 
@@ -450,11 +466,12 @@ export default function ItemDetail() {
               )}
             </div>
 
-            {/* eBay Fields */}
             <div className="sm:col-span-6 pt-8">
-              <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">eBay Listing Details</h3>
+              <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">
+                eBay Listing Details
+              </h3>
               <EbayFields
-                fields={formik.values.custom_fields?.ebay || {}}
+                fields={ebayFieldsValue ?? {}}
                 onChange={handleEbayFieldsChange}
                 onCategoryLookup={() => lookupEbayCategoryMutation.mutate()}
               />
@@ -473,10 +490,10 @@ export default function ItemDetail() {
             </button>
             <button
               type="submit"
-              disabled={formik.isSubmitting}
-              className="ml-3 inline-flex justify-center rounded-md border border-transparent bg-primary-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+              disabled={isSubmitting}
+              className="ml-3 inline-flex justify-center rounded-md border border-transparent bg-primary-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-60"
             >
-              {formik.isSubmitting ? 'Saving...' : 'Save'}
+              {isSubmitting ? 'Saving...' : 'Save'}
             </button>
           </div>
         </div>
