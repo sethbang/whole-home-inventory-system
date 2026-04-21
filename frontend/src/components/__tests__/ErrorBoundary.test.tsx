@@ -7,10 +7,10 @@ import { ApiError } from '../../api/errors';
 
 // react-error-boundary logs the swallowed error to console.error by design;
 // silence it so Jest output stays clean.
-let consoleErrorSpy: jest.SpyInstance;
+let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 
 beforeEach(() => {
-  consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+  consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 afterEach(() => {
   consoleErrorSpy.mockRestore();

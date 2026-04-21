@@ -15,12 +15,10 @@ import { ApiError } from './errors';
 // assets (nginx / caddy), so a blank baseURL works for both.
 const API_URL = '';
 
-// NODE_ENV is replaced at build time by Vite (to 'production' in prod
-// builds) and always set by Node/Jest. Avoid ``import.meta.env.DEV`` here
-// so this module is importable under ts-jest's CommonJS target without
-// transform gymnastics.
-const isDev =
-  typeof process !== 'undefined' && process.env?.NODE_ENV !== 'production';
+// v2.4: restored to `import.meta.env.DEV` now that Vitest is the test
+// runner. The v2.3 NODE_ENV workaround existed only for ts-jest's
+// CommonJS compilation.
+const isDev = import.meta.env.DEV;
 
 export const apiClient = axios.create({
   baseURL: API_URL,

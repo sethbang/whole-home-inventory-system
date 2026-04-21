@@ -7,19 +7,19 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Backups from '../Backups';
 import { backups } from '../../api/backups';
 
-jest.mock('../../api/backups', () => ({
+vi.mock('../../api/backups', () => ({
   backups: {
-    list: jest.fn(),
-    create: jest.fn(),
-    previewRestore: jest.fn(),
-    commitRestore: jest.fn(),
-    upload: jest.fn(),
-    delete: jest.fn(),
-    download: jest.fn(),
+    list: vi.fn(),
+    create: vi.fn(),
+    previewRestore: vi.fn(),
+    commitRestore: vi.fn(),
+    upload: vi.fn(),
+    delete: vi.fn(),
+    download: vi.fn(),
   },
 }));
 
-const alertSpy = jest.spyOn(window, 'alert').mockImplementation(() => {});
+const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
 
 const mockBackup = {
   id: 'backup-1',
@@ -45,14 +45,14 @@ const renderBackups = () => {
 };
 
 beforeEach(() => {
-  jest.clearAllMocks();
+  vi.clearAllMocks();
   alertSpy.mockClear();
-  (backups.list as jest.Mock).mockResolvedValue({ backups: [mockBackup] });
+  (backups.list as ReturnType<typeof vi.fn>).mockResolvedValue({ backups: [mockBackup] });
 });
 
 describe('Backups two-phase restore', () => {
   it('shows the preview dialog after clicking Restore', async () => {
-    (backups.previewRestore as jest.Mock).mockResolvedValue({
+    (backups.previewRestore as ReturnType<typeof vi.fn>).mockResolvedValue({
       success: true,
       message: 'Dry run',
       dry_run: true,
@@ -73,7 +73,7 @@ describe('Backups two-phase restore', () => {
   });
 
   it('rejects a wrong-count confirmation client-side', async () => {
-    (backups.previewRestore as jest.Mock).mockResolvedValue({
+    (backups.previewRestore as ReturnType<typeof vi.fn>).mockResolvedValue({
       success: true,
       message: 'Dry run',
       dry_run: true,
@@ -99,7 +99,7 @@ describe('Backups two-phase restore', () => {
   });
 
   it('commits with the correct count and shows success', async () => {
-    (backups.previewRestore as jest.Mock).mockResolvedValue({
+    (backups.previewRestore as ReturnType<typeof vi.fn>).mockResolvedValue({
       success: true,
       message: 'Dry run',
       dry_run: true,
@@ -107,7 +107,7 @@ describe('Backups two-phase restore', () => {
       backup_item_count: 3,
       backup_image_count: 2,
     });
-    (backups.commitRestore as jest.Mock).mockResolvedValue({
+    (backups.commitRestore as ReturnType<typeof vi.fn>).mockResolvedValue({
       success: true,
       message: 'Restored',
       items_restored: 3,

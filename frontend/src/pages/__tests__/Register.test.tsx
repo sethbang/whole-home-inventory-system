@@ -6,9 +6,9 @@ import { MemoryRouter } from 'react-router-dom';
 import Register from '../Register';
 import { ApiError } from '../../api/errors';
 
-const mockRegister = jest.fn();
+const mockRegister = vi.fn();
 
-jest.mock('../../contexts/AuthContext', () => ({
+vi.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({ register: mockRegister }),
 }));
 

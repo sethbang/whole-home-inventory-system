@@ -4,25 +4,24 @@
  * The goal: prove that info/debug are silent in production, while warn/error
  * still surface (they represent actionable signals operators need to see).
  *
- * Uses ``require('../logger')`` on purpose so ``jest.resetModules()`` in
+ * Uses dynamic ``await import('../logger')`` so ``vi.resetModules()`` in
  * ``beforeEach`` can hand each test a fresh module instance (the logger
  * caches the isDev flag at import time).
  */
-/* eslint-disable @typescript-eslint/no-require-imports */
 
 describe('logger', () => {
   const originalConsole = { ...console };
-  let debugSpy: jest.SpyInstance;
-  let infoSpy: jest.SpyInstance;
-  let warnSpy: jest.SpyInstance;
-  let errorSpy: jest.SpyInstance;
+  let debugSpy: ReturnType<typeof vi.spyOn>;
+  let infoSpy: ReturnType<typeof vi.spyOn>;
+  let warnSpy: ReturnType<typeof vi.spyOn>;
+  let errorSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    debugSpy = jest.spyOn(console, 'debug').mockImplementation(() => {});
-    infoSpy = jest.spyOn(console, 'info').mockImplementation(() => {});
-    warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
-    errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-    jest.resetModules();
+    debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
+    infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+    warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.resetModules();
   });
 
   afterEach(() => {
@@ -33,27 +32,26 @@ describe('logger', () => {
     Object.assign(console, originalConsole);
   });
 
-  it('forwards debug/info to console when in dev build', () => {
-    jest.doMock('../../vite-env.d', () => ({}), { virtual: true });
-    // In the jest environment, import.meta.env.DEV defaults to `true` because
-    // we run with NODE_ENV=test (jsdom). The logger treats any truthy DEV as dev.
-    const { logger } = require('../logger');
+  it('forwards debug/info to console when in dev build', async () => {
+    // Under Vitest, import.meta.env.DEV is truthy by default during tests.
+    // The logger treats any truthy DEV as dev mode.
+    const { logger } = await import('../logger');
     logger.debug('a', 1);
     logger.info('b', 2);
     expect(debugSpy).toHaveBeenCalledWith('a', 1);
     expect(infoSpy).toHaveBeenCalledWith('b', 2);
   });
 
-  it('always forwards warn and error', () => {
-    const { logger } = require('../logger');
+  it('always forwards warn and error', async () => {
+    const { logger } = await import('../logger');
     logger.warn('warning');
     logger.error('bad thing');
     expect(warnSpy).toHaveBeenCalledWith('warning');
     expect(errorSpy).toHaveBeenCalledWith('bad thing');
   });
 
-  it('never leaks raw credentials when used like api/client.ts does', () => {
-    const { logger } = require('../logger');
+  it('never leaks raw credentials when used like api/client.ts does', async () => {
+    const { logger } = await import('../logger');
     logger.debug('auth.login attempt', { username: 'alice' });
     // The call structurally excludes the password — the point of this test is
     // to document the expected usage pattern.

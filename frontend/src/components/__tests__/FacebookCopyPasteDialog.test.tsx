@@ -6,30 +6,30 @@ import FacebookCopyPasteDialog from '../FacebookCopyPasteDialog';
 import { facebook } from '../../api/facebook';
 import { ApiError } from '../../api/errors';
 
-jest.mock('../../api/facebook', () => ({
+vi.mock('../../api/facebook', () => ({
   facebook: {
-    copyPasteBlock: jest.fn(),
-    downloadImagesZip: jest.fn(),
+    copyPasteBlock: vi.fn(),
+    downloadImagesZip: vi.fn(),
   },
 }));
 
-const clipboardWrite = jest.fn().mockResolvedValue(undefined);
+const clipboardWrite = vi.fn().mockResolvedValue(undefined);
 
 beforeAll(() => {
-  Object.defineProperty(global.navigator, 'clipboard', {
+  Object.defineProperty(globalThis.navigator, 'clipboard', {
     value: { writeText: clipboardWrite },
     configurable: true,
   });
 });
 
 beforeEach(() => {
-  jest.clearAllMocks();
+  vi.clearAllMocks();
   clipboardWrite.mockClear();
 });
 
 describe('FacebookCopyPasteDialog', () => {
   it('fetches and renders the copy-paste block', async () => {
-    (facebook.copyPasteBlock as jest.Mock).mockResolvedValue({
+    (facebook.copyPasteBlock as ReturnType<typeof vi.fn>).mockResolvedValue({
       title: 'Drill',
       description: 'great',
       price: 60,
@@ -50,7 +50,7 @@ describe('FacebookCopyPasteDialog', () => {
   });
 
   it('copies the block to the clipboard on button click', async () => {
-    (facebook.copyPasteBlock as jest.Mock).mockResolvedValue({
+    (facebook.copyPasteBlock as ReturnType<typeof vi.fn>).mockResolvedValue({
       title: 'Drill',
       description: '',
       price: null,
@@ -70,14 +70,14 @@ describe('FacebookCopyPasteDialog', () => {
   });
 
   it('triggers the image-zip download when the button is clicked', async () => {
-    (facebook.copyPasteBlock as jest.Mock).mockResolvedValue({
+    (facebook.copyPasteBlock as ReturnType<typeof vi.fn>).mockResolvedValue({
       title: 'Drill',
       description: '',
       price: null,
       tags: [],
       block: 'Drill',
     });
-    (facebook.downloadImagesZip as jest.Mock).mockResolvedValue(undefined);
+    (facebook.downloadImagesZip as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 
     render(<FacebookCopyPasteDialog itemId="abc" onClose={() => {}} />);
     await screen.findByLabelText('Copy-paste block');
@@ -93,7 +93,7 @@ describe('FacebookCopyPasteDialog', () => {
   });
 
   it('surfaces ApiError.detail when the block fetch fails', async () => {
-    (facebook.copyPasteBlock as jest.Mock).mockRejectedValue(
+    (facebook.copyPasteBlock as ReturnType<typeof vi.fn>).mockRejectedValue(
       new ApiError(500, 'server unavailable'),
     );
 
@@ -104,14 +104,14 @@ describe('FacebookCopyPasteDialog', () => {
   });
 
   it('calls onClose when the close button is clicked', async () => {
-    (facebook.copyPasteBlock as jest.Mock).mockResolvedValue({
+    (facebook.copyPasteBlock as ReturnType<typeof vi.fn>).mockResolvedValue({
       title: 'Drill',
       description: '',
       price: null,
       tags: [],
       block: 'Drill',
     });
-    const onClose = jest.fn();
+    const onClose = vi.fn();
 
     render(<FacebookCopyPasteDialog itemId="abc" onClose={onClose} />);
     await screen.findByLabelText('Copy-paste block');

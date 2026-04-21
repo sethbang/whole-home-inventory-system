@@ -21,40 +21,40 @@ import {
 
 // Mock every api module that the loaders touch. The ``../http`` mock
 // isn't necessary because we replace the helper objects wholesale.
-jest.mock('../../api/items', () => ({
+vi.mock('../../api/items', () => ({
   items: {
-    list: jest.fn().mockResolvedValue({
+    list: vi.fn().mockResolvedValue({
       items: [{ id: '1', name: 'X' }],
       total: 1,
       page: 1,
       page_size: 20,
     }),
-    get: jest.fn().mockResolvedValue({ id: '1', name: 'Drill' }),
-    getCategories: jest.fn().mockResolvedValue(['Tools']),
-    getLocations: jest.fn().mockResolvedValue(['Garage']),
+    get: vi.fn().mockResolvedValue({ id: '1', name: 'Drill' }),
+    getCategories: vi.fn().mockResolvedValue(['Tools']),
+    getLocations: vi.fn().mockResolvedValue(['Garage']),
   },
 }));
-jest.mock('../../api/analytics', () => ({
+vi.mock('../../api/analytics', () => ({
   analytics: {
-    getValueByCategory: jest.fn().mockResolvedValue([]),
-    getValueByLocation: jest.fn().mockResolvedValue([]),
-    getValueTrends: jest.fn().mockResolvedValue({
+    getValueByCategory: vi.fn().mockResolvedValue([]),
+    getValueByLocation: vi.fn().mockResolvedValue([]),
+    getValueTrends: vi.fn().mockResolvedValue({
       total_purchase_value: 0,
       total_current_value: 0,
       value_change: 0,
       value_change_percentage: 0,
     }),
-    getWarrantyStatus: jest.fn().mockResolvedValue({
+    getWarrantyStatus: vi.fn().mockResolvedValue({
       expiring_soon: [],
       expired: [],
       active: [],
     }),
-    getAgeAnalysis: jest.fn().mockResolvedValue({}),
+    getAgeAnalysis: vi.fn().mockResolvedValue({}),
   },
 }));
-jest.mock('../../api/backups', () => ({
+vi.mock('../../api/backups', () => ({
   backups: {
-    list: jest.fn().mockResolvedValue({ backups: [] }),
+    list: vi.fn().mockResolvedValue({ backups: [] }),
   },
 }));
 

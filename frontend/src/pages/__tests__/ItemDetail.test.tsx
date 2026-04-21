@@ -8,29 +8,29 @@ import { items, ebay } from '../../api/client';
 import type { Item, EbayCategoryResponse } from '../../api/client';
 
 // Mock the API client modules
-jest.mock('../../api/client', () => ({
+vi.mock('../../api/client', () => ({
   items: {
-    get: jest.fn(),
-    update: jest.fn(),
-    delete: jest.fn(),
-    getCategories: jest.fn(),
-    getLocations: jest.fn(),
+    get: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+    getCategories: vi.fn(),
+    getLocations: vi.fn(),
   },
   images: {
-    upload: jest.fn(),
-    delete: jest.fn(),
+    upload: vi.fn(),
+    delete: vi.fn(),
   },
   ebay: {
-    getCategories: jest.fn(),
-    updateFields: jest.fn(),
+    getCategories: vi.fn(),
+    updateFields: vi.fn(),
   },
   facebook: {
-    getCategories: jest.fn().mockResolvedValue({
+    getCategories: vi.fn().mockResolvedValue({
       categories: ['Tools', 'Electronics', 'Miscellaneous'],
     }),
-    updateFields: jest.fn(),
-    copyPasteBlock: jest.fn(),
-    downloadImagesZip: jest.fn(),
+    updateFields: vi.fn(),
+    copyPasteBlock: vi.fn(),
+    downloadImagesZip: vi.fn(),
   },
 }));
 
@@ -89,13 +89,13 @@ describe('ItemDetail', () => {
 
   beforeEach(() => {
     // Reset all mocks
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     // Setup default mock responses
-    (items.get as jest.Mock).mockResolvedValue(mockItem);
-    (items.getCategories as jest.Mock).mockResolvedValue(mockCategories);
-    (items.getLocations as jest.Mock).mockResolvedValue(mockLocations);
-    (ebay.getCategories as jest.Mock).mockResolvedValue(mockEbayCategoryResponse);
+    (items.get as ReturnType<typeof vi.fn>).mockResolvedValue(mockItem);
+    (items.getCategories as ReturnType<typeof vi.fn>).mockResolvedValue(mockCategories);
+    (items.getLocations as ReturnType<typeof vi.fn>).mockResolvedValue(mockLocations);
+    (ebay.getCategories as ReturnType<typeof vi.fn>).mockResolvedValue(mockEbayCategoryResponse);
   });
 
   const renderComponent = () => {

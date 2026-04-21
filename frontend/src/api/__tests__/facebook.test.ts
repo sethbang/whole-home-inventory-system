@@ -1,25 +1,25 @@
 import { facebook } from '../facebook';
 import { apiClient } from '../http';
 
-jest.mock('../http', () => ({
+vi.mock('../http', () => ({
   apiClient: {
-    get: jest.fn(),
-    post: jest.fn(),
+    get: vi.fn(),
+    post: vi.fn(),
   },
 }));
 
 beforeAll(() => {
-  (global.URL.createObjectURL as unknown) = jest.fn(() => 'blob:stub');
-  (global.URL.revokeObjectURL as unknown) = jest.fn();
+  (globalThis.URL.createObjectURL as unknown) = vi.fn(() => 'blob:stub');
+  (globalThis.URL.revokeObjectURL as unknown) = vi.fn();
 });
 
 beforeEach(() => {
-  jest.clearAllMocks();
+  vi.clearAllMocks();
 });
 
 describe('facebook API client', () => {
   it('getCategories hits /api/facebook/categories', async () => {
-    (apiClient.get as jest.Mock).mockResolvedValue({
+    (apiClient.get as ReturnType<typeof vi.fn>).mockResolvedValue({
       data: { categories: ['Tools', 'Miscellaneous'] },
     });
     const result = await facebook.getCategories();
@@ -28,7 +28,7 @@ describe('facebook API client', () => {
   });
 
   it('updateFields posts FbFields to the per-item endpoint', async () => {
-    (apiClient.post as jest.Mock).mockResolvedValue({
+    (apiClient.post as ReturnType<typeof vi.fn>).mockResolvedValue({
       data: { price: 49.99, condition: 'USED_LIKE_NEW' },
     });
     const result = await facebook.updateFields('abc', {
@@ -43,7 +43,7 @@ describe('facebook API client', () => {
   });
 
   it('copyPasteBlock posts to the copy-paste endpoint', async () => {
-    (apiClient.post as jest.Mock).mockResolvedValue({
+    (apiClient.post as ReturnType<typeof vi.fn>).mockResolvedValue({
       data: {
         title: 'Drill',
         description: 'great drill',
@@ -61,7 +61,7 @@ describe('facebook API client', () => {
   });
 
   it('downloadImagesZip triggers a blob GET', async () => {
-    (apiClient.get as jest.Mock).mockResolvedValue({
+    (apiClient.get as ReturnType<typeof vi.fn>).mockResolvedValue({
       data: new Blob(['zipbytes']),
       headers: {
         'content-disposition': 'attachment; filename="item-abc-images.zip"',
@@ -75,7 +75,7 @@ describe('facebook API client', () => {
   });
 
   it('exportItems triggers a blob POST', async () => {
-    (apiClient.post as jest.Mock).mockResolvedValue({
+    (apiClient.post as ReturnType<typeof vi.fn>).mockResolvedValue({
       data: new Blob(['csvbytes']),
       headers: {
         'content-disposition': 'attachment; filename="whis-facebook-catalog.csv"',

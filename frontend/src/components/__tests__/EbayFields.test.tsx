@@ -4,7 +4,7 @@ import '@testing-library/jest-dom';
 import EbayFields, { EbayFieldsData } from '../EbayFields';
 
 describe('EbayFields', () => {
-  const mockOnChange = jest.fn();
+  const mockOnChange = vi.fn();
   const defaultProps = {
     fields: {} as EbayFieldsData,
     onChange: mockOnChange,
@@ -151,7 +151,7 @@ describe('EbayFields', () => {
   });
 
   it('shows category lookup button when onCategoryLookup is provided', () => {
-    const onCategoryLookup = jest.fn();
+    const onCategoryLookup = vi.fn();
     render(<EbayFields {...defaultProps} onCategoryLookup={onCategoryLookup} />);
 
     const lookupButton = screen.getByText('Look Up');

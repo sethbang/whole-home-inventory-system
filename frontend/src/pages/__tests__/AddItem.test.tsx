@@ -8,25 +8,25 @@ import AddItem from '../AddItem';
 import { items, images } from '../../api/client';
 import { ApiError } from '../../api/errors';
 
-jest.mock('../../api/client', () => ({
+vi.mock('../../api/client', () => ({
   items: {
-    create: jest.fn(),
-    getCategories: jest.fn().mockResolvedValue([]),
-    getLocations: jest.fn().mockResolvedValue([]),
-    lookupBarcode: jest.fn(),
+    create: vi.fn(),
+    getCategories: vi.fn().mockResolvedValue([]),
+    getLocations: vi.fn().mockResolvedValue([]),
+    lookupBarcode: vi.fn(),
   },
   images: {
-    upload: jest.fn(),
+    upload: vi.fn(),
   },
 }));
 
-jest.mock('../../contexts/DevModeContext', () => ({
+vi.mock('../../contexts/DevModeContext', () => ({
   useDevMode: () => ({ isDevMode: false }),
 }));
 
 // BarcodeScanner is lazy-loaded and touches camera APIs; stub it out so
 // the Suspense boundary doesn't stall.
-jest.mock('../../components/BarcodeScanner', () => ({
+vi.mock('../../components/BarcodeScanner', () => ({
   __esModule: true,
   default: () => <div data-testid="barcode-scanner" />,
 }));
@@ -45,7 +45,7 @@ const renderAddItem = () => {
 };
 
 beforeEach(() => {
-  jest.clearAllMocks();
+  vi.clearAllMocks();
 });
 
 describe('AddItem form', () => {
@@ -60,7 +60,7 @@ describe('AddItem form', () => {
   });
 
   it('submits a valid item with coerced number/date fields', async () => {
-    (items.create as jest.Mock).mockResolvedValue({ id: 'new-1' });
+    (items.create as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'new-1' });
 
     renderAddItem();
     fireEvent.change(screen.getByLabelText(/^name$/i), {
@@ -78,7 +78,7 @@ describe('AddItem form', () => {
     fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
 
     await waitFor(() => expect(items.create).toHaveBeenCalledTimes(1));
-    const [payload] = (items.create as jest.Mock).mock.calls[0];
+    const [payload] = (items.create as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(payload.name).toBe('Drill');
     expect(payload.category).toBe('Tools');
     expect(payload.location).toBe('Garage');
@@ -89,7 +89,7 @@ describe('AddItem form', () => {
   });
 
   it('surfaces ApiError server detail as a server banner', async () => {
-    (items.create as jest.Mock).mockRejectedValue(
+    (items.create as ReturnType<typeof vi.fn>).mockRejectedValue(
       new ApiError(400, 'Name is already in use'),
     );
 
@@ -132,8 +132,8 @@ describe('AddItem form', () => {
   });
 
   it('uploads selected images after item creation', async () => {
-    (items.create as jest.Mock).mockResolvedValue({ id: 'new-2' });
-    (images.upload as jest.Mock).mockResolvedValue({ id: 'img-1' });
+    (items.create as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'new-2' });
+    (images.upload as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'img-1' });
 
     renderAddItem();
     fireEvent.change(screen.getByLabelText(/^name$/i), {

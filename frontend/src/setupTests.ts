@@ -1,23 +1,10 @@
-import '@testing-library/jest-dom';
+import '@testing-library/jest-dom/vitest';
+import { afterEach } from 'vitest';
+import { cleanup } from '@testing-library/react';
 
-// Mock TextEncoder/TextDecoder
-class MockTextEncoder {
-  encode(input: string): Uint8Array {
-    return new Uint8Array(Buffer.from(input));
-  }
-}
-
-class MockTextDecoder {
-  decode(input?: Uint8Array): string {
-    if (!input) return '';
-    return Buffer.from(input).toString();
-  }
-}
-
-Object.defineProperty(global, 'TextEncoder', {
-  value: MockTextEncoder,
-});
-
-Object.defineProperty(global, 'TextDecoder', {
-  value: MockTextDecoder,
+// React Testing Library doesn't auto-cleanup under Vitest the way it does
+// under Jest; wire it up explicitly so elements from a prior test don't
+// leak into the next.
+afterEach(() => {
+  cleanup();
 });

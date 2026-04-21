@@ -14,12 +14,10 @@
 
 type LogFn = (...args: unknown[]) => void;
 
-// NODE_ENV is replaced at build time by Vite (to 'production' in prod builds)
-// and is always set by Node/Jest. We avoid `import.meta.env.DEV` here so that
-// this module is also importable under ts-jest's CommonJS target without any
-// transform gymnastics.
-const isDev =
-  typeof process !== 'undefined' && process.env?.NODE_ENV !== 'production';
+// v2.4: restored to `import.meta.env.DEV` now that Vitest is the test
+// runner. The v2.1 NODE_ENV workaround existed only because ts-jest
+// compiled this module as CommonJS and couldn't parse `import.meta`.
+const isDev = import.meta.env.DEV;
 
 const noop: LogFn = () => {
   /* intentionally empty */

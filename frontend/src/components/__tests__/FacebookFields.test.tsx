@@ -7,7 +7,7 @@ import type { FbFieldsData } from '../../types/facebook';
 
 describe('FacebookFields', () => {
   const renderComponent = (overrides: Partial<FbFieldsData> = {}) => {
-    const onChange = jest.fn();
+    const onChange = vi.fn();
     render(
       <FacebookFields
         fields={overrides}
