@@ -2,7 +2,8 @@ import React from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
-import { items } from '../api/client';
+import { items, ebay, facebook } from '../api/client';
+import { apiErrorMessage } from '../api/errors';
 import { queryKeys } from '../api/queryKeys';
 import type { Item, ItemListResponse } from '../api/client';
 import DataMigration from '../components/DataMigration';
@@ -95,13 +96,43 @@ export default function Dashboard() {
         </div>
         <div className="mt-4 sm:ml-16 sm:mt-0 flex space-x-4">
           {selectedItems.size > 0 && (
-            <button
-              onClick={() => setShowDeleteConfirm(true)}
-              className="inline-flex items-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500"
-            >
-              <TrashIcon className="h-5 w-5 mr-1" />
-              Delete Selected ({selectedItems.size})
-            </button>
+            <>
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="inline-flex items-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500"
+              >
+                <TrashIcon className="h-5 w-5 mr-1" />
+                Delete Selected ({selectedItems.size})
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    await ebay.exportItems({
+                      item_ids: Array.from(selectedItems),
+                    });
+                  } catch (err) {
+                    alert(apiErrorMessage(err, 'eBay export failed'));
+                  }
+                }}
+                className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50"
+              >
+                Export eBay CSV ({selectedItems.size})
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    await facebook.exportItems({
+                      item_ids: Array.from(selectedItems),
+                    });
+                  } catch (err) {
+                    alert(apiErrorMessage(err, 'Facebook export failed'));
+                  }
+                }}
+                className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50"
+              >
+                Export FB Catalog ({selectedItems.size})
+              </button>
+            </>
           )}
           <button
             onClick={() => {
