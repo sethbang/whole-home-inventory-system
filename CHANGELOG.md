@@ -7,6 +7,165 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-04-21
+
+Frontend refit + Facebook Marketplace integration. Pays down the
+deferred work CLAUDE.md has been tracking (Formik → RHF + Zod,
+RRv7 data router, API client split, typed error narrowing) and adds
+the second marketplace integration (assist-only, since Meta doesn't
+expose a public listing API for individual sellers).
+
+### Added
+
+- **Facebook Marketplace integration (assist workflow)**:
+  - New `backend/app/facebook/` subpackage with
+    `schemas.py` (FbFields / FbCondition / FbAvailability /
+    FbCopyPasteBlock / FbCatalogExportRequest), `category_mapping.py`
+    (curated WHIS → FB taxonomy map with Miscellaneous fallback),
+    and `formatter.py` (pure build_copy_paste_block +
+    build_catalog_csv_row helpers).
+  - New `backend/app/routers/facebook.py` with five endpoints:
+    `GET /api/facebook/categories`,
+    `POST /api/facebook/items/{id}/fb-fields`,
+    `POST /api/facebook/items/{id}/copy-paste`,
+    `GET /api/facebook/items/{id}/images.zip`,
+    `POST /api/facebook/export`.
+  - Frontend surface: `src/types/facebook.ts`, `src/api/facebook.ts`,
+    `src/components/FacebookFields.tsx`,
+    `src/components/FacebookCopyPasteDialog.tsx`.
+  - ItemDetail gains a "Marketplace Integrations" Headless UI Tab
+    group with eBay (default) and Facebook panels. Facebook panel
+    surfaces FacebookFields + a "Generate copy-paste block" button.
+  - Dashboard's bulk action bar (visible when items are selected)
+    gains "Export eBay CSV (N)" and "Export FB Catalog (N)" buttons
+    that stream the respective CSVs as browser downloads.
+- **Strict `CustomFieldsSchema`**: HTTP boundary (`ItemCreate` /
+  `ItemUpdate`) now rejects unknown top-level keys on
+  `custom_fields` with a 422. Known slots (`ebay`, `facebook`)
+  get per-schema type checking; an explicit `user_defined` catchall
+  preserves hand-edited shapes. The import endpoint uses a lenient
+  `CustomFieldsSchema.coerce_from_raw()` helper that folds legacy
+  top-level keys into `user_defined` so CSV imports stay portable.
+- **React Router v7 data router** (`createBrowserRouter`): every
+  route declares a `loader` that prefetches its React Query data via
+  `queryClient.ensureQueryData(...)` before the component mounts —
+  no loading flash on navigation. Every route has a
+  `RouteErrorBoundary` for localized failure UI. Every page is
+  lazy-loaded via `lazy: () => import(...)` for per-route code
+  splitting.
+- **Error boundaries**: `src/components/ErrorBoundary.tsx` exports a
+  `RouteErrorBoundary` (consumes `useRouteError`) and a
+  `SectionErrorBoundary` (wraps risky subtrees with
+  react-error-boundary; has a custom-fallback escape hatch and a
+  `resetKey` prop).
+- **Typed API errors**: `src/api/errors.ts` with `ApiError`,
+  `isApiError`, `apiErrorMessage` helpers. The axios response
+  interceptor in `src/api/http.ts` normalizes every network failure
+  into an `ApiError` before rejecting, replacing the
+  `catch (error: any)` pattern across the codebase.
+- **Per-resource API modules**: `src/api/client.ts` split into
+  `http.ts` (axios instance + interceptors),
+  `auth.ts` / `items.ts` / `images.ts` / `backups.ts` /
+  `analytics.ts` / `ebay.ts` / `facebook.ts` (per-resource
+  helpers), and `errors.ts` / `download.ts` (shared infrastructure).
+  `client.ts` is now a thin barrel for backward compatibility.
+- **Centralized query keys**: `src/api/queryKeys.ts` — hierarchical
+  factory (`queryKeys.items.detail(id)`, `queryKeys.analytics.all`,
+  etc.). Every `useQuery` / `invalidateQueries` call migrated off
+  inline string tuples so invalidations hit the right prefix.
+- **Backup two-phase restore UI**: `src/pages/Backups.tsx` rewired
+  for the v2.1 two-phase server contract. Clicking Restore now opens
+  a modal that loads the preview, shows the expected counts, and
+  requires the user to type the current item count to confirm
+  before committing.
+
+### Changed
+
+- **Formik → react-hook-form + zod** across all five forms (Login,
+  Register, AddItem, ItemDetail, Backups restore confirm). Form
+  errors now flow via `formState.errors` (typed), server errors
+  surface through a shared `role="alert"` banner driven by
+  `apiErrorMessage()`. Zod schemas colocated at
+  `<page>.schema.ts` next to each form.
+- **`routers/ebay.py` POST /export**: returns `StreamingResponse`
+  with a CSV body instead of the former `EbayExportResponse`
+  JSON + TODO-to-store-file. Mirrors the new FB export endpoint so
+  both integrations share the same client-side download path. The
+  frontend helper uses a new shared `api/download.ts`
+  (`downloadPost` / `downloadGet`) that handles
+  `Content-Disposition` parsing + Blob URL download trigger.
+- **`main.py`**: CORS `expose_headers` augmented with
+  `Content-Disposition` so browsers can read the filename returned
+  by the streaming CSV endpoints.
+- **`AuthProvider` / `Layout`** now live under a `RootLayout` /
+  `ProtectedLayout` composition inside the RRv7 route tree — both
+  consume `<Outlet />` so `useNavigate()` works inside
+  `AuthProvider` (required by RRv7's context rules).
+- **eBay router** and **items router** migrated off
+  `get_current_active_user_or_none` + manual `if not current_user:
+  401` checks; every endpoint now uses strict
+  `get_current_active_user`.
+
+### Removed
+
+- `formik` and `yup` npm packages. Every form now uses
+  react-hook-form + @hookform/resolvers + zod. The `yup`-style
+  `Yup.ref`-based cross-field validation (password confirmation)
+  is replaced with a `z.refine()` on the Zod schema.
+- Dead `handleDownload` function in `ImageGallery.tsx` that logged
+  to console and was never wired to a UI affordance.
+- Several unused locals across `BarcodeScanner.tsx` and
+  `CameraCapture.tsx` surfaced by ESLint.
+
+### Dependencies
+
+Added:
+- `react-hook-form ^7` + `@hookform/resolvers ^4`
+- `zod ^4`
+- `react-error-boundary ^6`
+
+Removed:
+- `formik`
+- `yup`
+
+### Test coverage
+
+- Backend: 135 → 161 (+26 for the Facebook router + formatter).
+- Frontend: 28 → 90 (+62). New files: `api/__tests__/errors.test.ts`,
+  `api/__tests__/queryKeys.test.ts`, `api/__tests__/facebook.test.ts`,
+  `router/__tests__/loaders.test.ts`,
+  `components/__tests__/ErrorBoundary.test.tsx`,
+  `components/__tests__/FacebookFields.test.tsx`,
+  `components/__tests__/FacebookCopyPasteDialog.test.tsx`,
+  `pages/__tests__/Login.test.tsx`,
+  `pages/__tests__/Register.test.tsx`,
+  `pages/__tests__/AddItem.test.tsx`,
+  `pages/__tests__/Backups.test.tsx`.
+
+### Bundle impact
+
+- Main bundle: 586 KB / 178 KB gzip → 436 KB / 143 KB gzip
+  (~25% reduction from per-route code splitting).
+- Each page is now its own chunk: Dashboard 22 KB,
+  ItemDetail 29 KB, AddItem 13 KB, Reports 11 KB, Backups 5 KB,
+  Login 3 KB, Register 5 KB. Users only download what they visit.
+
+### Operator notes
+
+- No new env vars, no new migrations, no API-shape changes at the
+  pre-existing endpoints (FB endpoints are all-new). Existing
+  deployments upgrade seamlessly.
+- The eBay POST `/api/ebay/export` response body is now a streaming
+  CSV instead of JSON. Only the frontend calls this today (via the
+  `ebay` API client, which was updated in lockstep), so there's no
+  external migration — but if you built your own tooling against
+  the legacy `{ success, file_url: null, ... }` shape, point it at
+  the streamed CSV instead.
+- CI lint gate remains advisory (`continue-on-error: true`). 31
+  remaining ESLint findings are concentrated `any`-related typing
+  debt in the camera + barcode scanner components; a dedicated
+  typing pass is slated for v2.4.
+
 ## [2.2.0] - 2026-04-20
 
 Backend structural release. Pays down the deferred work CLAUDE.md has been
