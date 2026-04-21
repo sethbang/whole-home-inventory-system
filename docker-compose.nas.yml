@@ -40,6 +40,16 @@ services:
       - /volume1/docker/whole-home-inventory-system/database:/app/database
       - /volume1/docker/whole-home-inventory-system/uploads:/app/backend/uploads
       - /volume1/docker/whole-home-inventory-system/backups:/app/backend/backups
+      # Shared certs volume (written by the frontend build's generate-certs
+      # output in Part B's Caddy flow, or prepared out-of-band on first
+      # deploy).
+      - /volume1/docker/whole-home-inventory-system/certs:/app/certs:ro
+    healthcheck:
+      test: ["CMD", "curl", "-kfsS", "https://localhost:27182/api/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
     networks:
       - whole-home-inventory-system-network
     restart: unless-stopped
@@ -51,7 +61,14 @@ services:
     ports:
       - "5173:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost/"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
     networks:
       - whole-home-inventory-system-network
     restart: unless-stopped

@@ -23,6 +23,16 @@ services:
       - ./backend/database:/app/database
       - ./backend/uploads:/app/backend/uploads
       - ./backend/backups:/app/backend/backups
+      # Certs written by `cd frontend && node scripts/generate-certs.js`
+      # on the host. Mounted read-only into the backend container so
+      # uvicorn can read them without needing its own openssl toolchain.
+      - ./frontend/certs:/app/certs:ro
+    healthcheck:
+      test: ["CMD", "curl", "-kfsS", "https://localhost:27182/api/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
     networks:
       - whole-home-inventory-system-network
 
@@ -35,13 +45,20 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
-      - ./certs:/root/certs:rw
+      - ./frontend/certs:/app/certs:rw
     environment:
       - NODE_ENV=development
       - VITE_API_URL=
-      - CERT_OUTPUT_DIR=/root/certs
+      - CERT_OUTPUT_DIR=/app/certs
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-kfsS", "https://localhost:5173/"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
     networks:
       - whole-home-inventory-system-network
 
