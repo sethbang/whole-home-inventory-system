@@ -22,6 +22,7 @@ export { images } from './images';
 export { backups } from './backups';
 export { analytics } from './analytics';
 export { ebay } from './ebay';
+export { facebook } from './facebook';
 
 // Type re-exports so ``import type { Item } from '../api/client'`` keeps
 // working. New code should prefer importing from ``types/``.
@@ -60,3 +61,11 @@ export type {
   EbayExportResponse,
   EbayFields,
 } from '../types/ebay';
+export type {
+  FbAvailability,
+  FbCatalogExportRequest,
+  FbCategoriesResponse,
+  FbCondition,
+  FbCopyPasteBlock,
+  FbFieldsData,
+} from '../types/facebook';
