@@ -139,7 +139,7 @@ export default function AddItem() {
                 type="text"
                 aria-invalid={errors.name ? 'true' : 'false'}
                 {...register('name')}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
               />
               {errors.name && (
                 <p className="mt-2 text-sm text-red-600">{errors.name.message}</p>
@@ -155,7 +155,7 @@ export default function AddItem() {
                 type="text"
                 aria-invalid={errors.category ? 'true' : 'false'}
                 {...register('category')}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
                 placeholder="Enter a category"
               />
               {errors.category && (
@@ -172,7 +172,7 @@ export default function AddItem() {
                 type="text"
                 aria-invalid={errors.location ? 'true' : 'false'}
                 {...register('location')}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
                 placeholder="Enter a location"
               />
               {errors.location && (
@@ -188,7 +188,7 @@ export default function AddItem() {
                 id="brand"
                 type="text"
                 {...register('brand')}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
               />
             </div>
 
@@ -200,7 +200,7 @@ export default function AddItem() {
                 id="model_number"
                 type="text"
                 {...register('model_number')}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
               />
             </div>
 
@@ -212,7 +212,7 @@ export default function AddItem() {
                 id="serial_number"
                 type="text"
                 {...register('serial_number')}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
               />
             </div>
 
@@ -224,7 +224,7 @@ export default function AddItem() {
                 id="barcode"
                 type="text"
                 {...register('barcode')}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
               />
             </div>
 
@@ -236,7 +236,7 @@ export default function AddItem() {
                 id="purchase_date"
                 type="date"
                 {...register('purchase_date')}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
               />
             </div>
 
@@ -254,7 +254,7 @@ export default function AddItem() {
                   step="0.01"
                   min="0"
                   {...register('purchase_price')}
-                  className="mt-1 block w-full pl-7 rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+                  className="mt-1 block w-full pl-7 rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
                 />
               </div>
               {errors.purchase_price && (
@@ -278,7 +278,7 @@ export default function AddItem() {
                   step="0.01"
                   min="0"
                   {...register('current_value')}
-                  className="mt-1 block w-full pl-7 rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+                  className="mt-1 block w-full pl-7 rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
                 />
               </div>
               {errors.current_value && (
@@ -296,7 +296,7 @@ export default function AddItem() {
                 id="warranty_expiration"
                 type="date"
                 {...register('warranty_expiration')}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
               />
             </div>
 
@@ -308,7 +308,7 @@ export default function AddItem() {
                 id="notes"
                 rows={3}
                 {...register('notes')}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
               />
             </div>
 
@@ -340,13 +340,13 @@ export default function AddItem() {
                     multiple
                     accept="image/*"
                     onChange={handleFileChange}
-                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"
+                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary-subtle file:text-primary-hover hover:file:bg-primary-subtle-hover"
                   />
                   <div className="flex gap-2">
                     <button
                       type="button"
                       onClick={() => setShowScanner(true)}
-                      className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                      className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
                     >
                       <CameraIcon className="h-5 w-5 mr-2" />
                       Camera
@@ -354,7 +354,7 @@ export default function AddItem() {
                     <button
                       type="button"
                       onClick={() => setShowScanner(true)}
-                      className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                      className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
                     >
                       <QrCodeIcon className="h-5 w-5 mr-2" />
                       Scan Barcode
@@ -425,14 +425,14 @@ export default function AddItem() {
             <button
               type="button"
               onClick={() => navigate('/')}
-              className="rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+              className="rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="ml-3 inline-flex justify-center rounded-md border border-transparent bg-primary-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-60"
+              className="ml-3 inline-flex justify-center rounded-md border border-transparent bg-primary py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-60"
             >
               {isSubmitting ? 'Saving...' : 'Save'}
             </button>

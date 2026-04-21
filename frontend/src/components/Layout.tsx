@@ -42,7 +42,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                         to={item.href}
                         className={classNames(
                           location.pathname === item.href
-                            ? 'border-primary-500 text-gray-900'
+                            ? 'border-primary text-gray-900'
                             : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700',
                           'inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium'
                         )}
@@ -55,10 +55,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <div className="hidden sm:ml-6 sm:flex sm:items-center">
                   <Menu as="div" className="relative ml-3">
                     <div>
-                      <Menu.Button className="flex rounded-full bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2">
+                      <Menu.Button className="flex rounded-full bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
                         <span className="sr-only">Open user menu</span>
-                        <div className="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center">
-                          <span className="text-primary-800 font-medium">
+                        <div className="h-8 w-8 rounded-full bg-primary-subtle-hover flex items-center justify-center">
+                          <span className="text-primary-hover font-medium">
                             {user?.username.charAt(0).toUpperCase()}
                           </span>
                         </div>
@@ -105,7 +105,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   </Menu>
                 </div>
                 <div className="-mr-2 flex items-center sm:hidden">
-                  <Disclosure.Button className="inline-flex items-center justify-center rounded-md bg-white p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2">
+                  <Disclosure.Button className="inline-flex items-center justify-center rounded-md bg-white p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
                     <span className="sr-only">Open main menu</span>
                     {open ? (
                       <XMarkIcon className="block h-6 w-6" aria-hidden="true" />
@@ -125,7 +125,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     to={item.href}
                     className={classNames(
                       location.pathname === item.href
-                        ? 'bg-primary-50 border-primary-500 text-primary-700'
+                        ? 'bg-primary-subtle border-primary text-primary-hover'
                         : 'border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800',
                       'block border-l-4 py-2 pl-3 pr-4 text-base font-medium'
                     )}
@@ -137,8 +137,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <div className="border-t border-gray-200 pb-3 pt-4">
                 <div className="flex items-center px-4">
                   <div className="flex-shrink-0">
-                    <div className="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center">
-                      <span className="text-primary-800 font-medium">
+                    <div className="h-8 w-8 rounded-full bg-primary-subtle-hover flex items-center justify-center">
+                      <span className="text-primary-hover font-medium">
                         {user?.username.charAt(0).toUpperCase()}
                       </span>
                     </div>
@@ -181,7 +181,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div className="sm:hidden">
           <Link
             to="/items/new"
-            className="fixed bottom-6 right-6 h-14 w-14 rounded-full bg-primary-600 flex items-center justify-center text-white shadow-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+            className="fixed bottom-6 right-6 h-14 w-14 rounded-full bg-primary flex items-center justify-center text-white shadow-lg hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
             aria-label="Add new item"
           >
             <svg

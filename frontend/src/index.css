@@ -1,3 +1,24 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@plugin "@tailwindcss/forms";
+
+/**
+ * v2.4 moved from tailwind.config.js (v3) to CSS-first config via @theme
+ * (v4). All WHIS component / page files use semantic tokens — no more
+ * numeric palette (primary-50 .. primary-900) in JSX. Change these CSS
+ * variables to re-skin the app without touching any component.
+ *
+ * Sky palette baseline:
+ *   #f0f9ff  sky-50   (subtle tint background)
+ *   #e0f2fe  sky-100  (subtle tint hover)
+ *   #0ea5e9  sky-500  (legacy button baseline — kept as --color-primary-accent
+ *                      for the few spots that want the brighter shade)
+ *   #0284c7  sky-600  (default action color)
+ *   #0369a1  sky-700  (action hover, strong text)
+ */
+@theme {
+  --color-primary: #0284c7;
+  --color-primary-hover: #0369a1;
+  --color-primary-accent: #0ea5e9;
+  --color-primary-subtle: #f0f9ff;
+  --color-primary-subtle-hover: #e0f2fe;
+}

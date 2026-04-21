@@ -156,7 +156,7 @@ export default function FacebookCopyPasteDialog({
             type="button"
             onClick={handleCopy}
             disabled={!block}
-            className="rounded-md border border-transparent bg-primary-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-primary-700 disabled:opacity-60"
+            className="rounded-md border border-transparent bg-primary px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-primary-hover disabled:opacity-60"
           >
             Copy to clipboard
           </button>

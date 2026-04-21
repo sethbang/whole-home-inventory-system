@@ -80,7 +80,7 @@ export default function Dashboard() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
       </div>
     );
   }
@@ -146,7 +146,7 @@ export default function Dashboard() {
           </button>
           <Link
             to="/items/new"
-            className="block rounded-md bg-primary-600 px-3 py-2 text-center text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600"
+            className="block rounded-md bg-primary px-3 py-2 text-center text-sm font-semibold text-white shadow-sm hover:bg-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             <PlusIcon className="inline-block h-5 w-5 mr-1" />
             Add Item
@@ -159,7 +159,7 @@ export default function Dashboard() {
               onClick={() => setViewMode('list')}
               className={`relative inline-flex items-center rounded-l-md px-3 py-2 text-sm font-semibold ${
                 viewMode === 'list'
-                  ? 'bg-primary-600 text-white'
+                  ? 'bg-primary text-white'
                   : 'bg-white text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50'
               }`}
             >
@@ -170,7 +170,7 @@ export default function Dashboard() {
               onClick={() => setViewMode('grid')}
               className={`relative -ml-px inline-flex items-center rounded-r-md px-3 py-2 text-sm font-semibold ${
                 viewMode === 'grid'
-                  ? 'bg-primary-600 text-white'
+                  ? 'bg-primary text-white'
                   : 'bg-white text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50'
               }`}
             >
@@ -194,7 +194,7 @@ export default function Dashboard() {
                 id="search"
                 value={searchFilters.query}
                 onChange={(e) => setSearchFilters((prev) => ({ ...prev, query: e.target.value }))}
-                className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6"
+                className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary sm:text-sm sm:leading-6"
                 placeholder="Search items..."
               />
             </div>
@@ -208,7 +208,7 @@ export default function Dashboard() {
                 name="category"
                 value={searchFilters.category}
                 onChange={(e) => setSearchFilters((prev) => ({ ...prev, category: e.target.value }))}
-                className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6"
+                className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary sm:text-sm sm:leading-6"
               >
                 <option value="">All Categories</option>
                 {categories?.map((category) => (
@@ -228,7 +228,7 @@ export default function Dashboard() {
                 name="location"
                 value={searchFilters.location}
                 onChange={(e) => setSearchFilters((prev) => ({ ...prev, location: e.target.value }))}
-                className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6"
+                className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary sm:text-sm sm:leading-6"
               >
                 <option value="">All Locations</option>
                 {locations?.map((location) => (
@@ -254,7 +254,7 @@ export default function Dashboard() {
                   step="0.01"
                   value={searchFilters.min_value || ''}
                   onChange={(e) => setSearchFilters((prev) => ({ ...prev, min_value: e.target.value ? Number(e.target.value) : undefined }))}
-                  className="block w-full pl-7 rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6"
+                  className="block w-full pl-7 rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary sm:text-sm sm:leading-6"
                 />
               </div>
             </div>
@@ -274,7 +274,7 @@ export default function Dashboard() {
                   step="0.01"
                   value={searchFilters.max_value || ''}
                   onChange={(e) => setSearchFilters((prev) => ({ ...prev, max_value: e.target.value ? Number(e.target.value) : undefined }))}
-                  className="block w-full pl-7 rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6"
+                  className="block w-full pl-7 rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary sm:text-sm sm:leading-6"
                 />
               </div>
             </div>
@@ -287,7 +287,7 @@ export default function Dashboard() {
                 id="sort_by"
                 value={searchFilters.sort_by}
                 onChange={(e) => setSearchFilters((prev) => ({ ...prev, sort_by: e.target.value }))}
-                className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6"
+                className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary sm:text-sm sm:leading-6"
               >
                 <option value="">None</option>
                 <option value="name">Name</option>
@@ -306,7 +306,7 @@ export default function Dashboard() {
                 id="sort_order"
                 value={searchFilters.sort_desc ? 'desc' : 'asc'}
                 onChange={(e) => setSearchFilters((prev) => ({ ...prev, sort_desc: e.target.value === 'desc' }))}
-                className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6"
+                className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary sm:text-sm sm:leading-6"
               >
                 <option value="asc">Ascending</option>
                 <option value="desc">Descending</option>
@@ -334,7 +334,7 @@ export default function Dashboard() {
                       <th scope="col" className="relative px-4 sm:px-6 py-3.5">
                         <input
                           type="checkbox"
-                          className="absolute left-4 top-1/2 -mt-2 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-600"
+                          className="absolute left-4 top-1/2 -mt-2 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
                           checked={data?.items && data.items.length > 0 && data.items.length === selectedItems.size}
                           onChange={(e) => {
                             if (e.target.checked && data?.items) {
@@ -368,13 +368,13 @@ export default function Dashboard() {
                         <td className="relative whitespace-nowrap py-4 pl-4 pr-3 sm:pl-6">
                           <input
                             type="checkbox"
-                            className="absolute left-4 top-1/2 -mt-2 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-600"
+                            className="absolute left-4 top-1/2 -mt-2 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
                             checked={selectedItems.has(item.id)}
                             onChange={() => toggleItemSelection(item.id)}
                           />
                         </td>
                         <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900">
-                          <Link to={`/items/${item.id}`} className="hover:text-primary-600">
+                          <Link to={`/items/${item.id}`} className="hover:text-primary">
                             {item.name}
                           </Link>
                         </td>
@@ -384,7 +384,7 @@ export default function Dashboard() {
                           ${item.current_value?.toFixed(2) ?? '0.00'}
                         </td>
                         <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                          <Link to={`/items/${item.id}`} className="text-primary-600 hover:text-primary-900">
+                          <Link to={`/items/${item.id}`} className="text-primary hover:text-primary-hover">
                             Edit
                           </Link>
                         </td>
@@ -404,7 +404,7 @@ export default function Dashboard() {
               <div className="absolute top-4 left-4">
                 <input
                   type="checkbox"
-                  className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-600"
+                  className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
                   checked={selectedItems.has(item.id)}
                   onChange={() => toggleItemSelection(item.id)}
                 />
@@ -420,7 +420,7 @@ export default function Dashboard() {
               )}
               <div className="flex flex-1 flex-col p-4">
                 <h3 className="text-sm font-medium text-gray-900">
-                  <Link to={`/items/${item.id}`} className="hover:text-primary-600">
+                  <Link to={`/items/${item.id}`} className="hover:text-primary">
                     {item.name}
                   </Link>
                 </h3>
@@ -437,7 +437,7 @@ export default function Dashboard() {
                 <div className="mt-4">
                   <Link
                     to={`/items/${item.id}`}
-                    className="text-sm font-medium text-primary-600 hover:text-primary-500"
+                    className="text-sm font-medium text-primary hover:text-primary"
                   >
                     Edit
                   </Link>

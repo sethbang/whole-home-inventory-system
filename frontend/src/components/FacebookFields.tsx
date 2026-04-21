@@ -69,7 +69,7 @@ export default function FacebookFields({
             min="0"
             value={fields.price ?? ''}
             onChange={handle('price')}
-            className="mt-1 block w-full pl-7 rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+            className="mt-1 block w-full pl-7 rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
           />
         </div>
       </div>
@@ -85,7 +85,7 @@ export default function FacebookFields({
           id="fb-condition"
           value={fields.condition ?? ''}
           onChange={handle('condition')}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
         >
           <option value="">Select condition</option>
           {CONDITIONS.map((c) => (
@@ -107,7 +107,7 @@ export default function FacebookFields({
           id="fb-category"
           value={fields.category ?? ''}
           onChange={handle('category')}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
         >
           <option value="">Auto-suggest from item category</option>
           {categories.map((c) => (
@@ -124,7 +124,7 @@ export default function FacebookFields({
             type="checkbox"
             checked={(fields.availability ?? 'in stock') === 'in stock'}
             onChange={handleAvailability}
-            className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
           />
           <span className="ml-2 text-sm text-gray-700">Available (in stock)</span>
         </label>
@@ -143,7 +143,7 @@ export default function FacebookFields({
           value={fields.description_override ?? ''}
           onChange={handle('description_override')}
           placeholder="Leave blank to use the item's notes + brand/model."
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
         />
       </div>
     </div>

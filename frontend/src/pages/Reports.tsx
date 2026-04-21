@@ -61,25 +61,25 @@ export default function Reports() {
           </h2>
           {trendsData && (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="bg-primary-50 p-4 rounded-lg">
+              <div className="bg-primary-subtle p-4 rounded-lg">
                 <p className="text-sm text-gray-500">Total Purchase Value</p>
-                <p className="text-2xl font-semibold text-primary-600">
+                <p className="text-2xl font-semibold text-primary">
                   {formatCurrency(trendsData.total_purchase_value)}
                 </p>
               </div>
-              <div className="bg-primary-50 p-4 rounded-lg">
+              <div className="bg-primary-subtle p-4 rounded-lg">
                 <p className="text-sm text-gray-500">Current Total Value</p>
-                <p className="text-2xl font-semibold text-primary-600">
+                <p className="text-2xl font-semibold text-primary">
                   {formatCurrency(trendsData.total_current_value)}
                 </p>
               </div>
-              <div className="bg-primary-50 p-4 rounded-lg">
+              <div className="bg-primary-subtle p-4 rounded-lg">
                 <p className="text-sm text-gray-500">Value Change</p>
                 <p className={`text-2xl font-semibold ${trendsData.value_change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                   {formatCurrency(trendsData.value_change)}
                 </p>
               </div>
-              <div className="bg-primary-50 p-4 rounded-lg">
+              <div className="bg-primary-subtle p-4 rounded-lg">
                 <p className="text-sm text-gray-500">Change Percentage</p>
                 <p className={`text-2xl font-semibold ${trendsData.value_change_percentage >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                   {trendsData.value_change_percentage.toFixed(1)}%

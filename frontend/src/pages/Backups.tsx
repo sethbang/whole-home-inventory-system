@@ -102,7 +102,7 @@ function RestoreDialog({
             aria-label="Confirm item count"
             aria-invalid={errors.confirm ? 'true' : 'false'}
             {...register('confirm')}
-            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
           />
           {errors.confirm && (
             <p className="text-sm text-red-600">{errors.confirm.message}</p>
