@@ -7,6 +7,93 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-04-21
+
+Ops + style release. No new product surface — this release hardens the
+deployment story (non-root containers, healthchecks, Caddy with
+auto-TLS), modernizes the toolchain (Tailwind v4 semantic tokens,
+Vitest, mkcert-aware certs), and flips CI's security gates on
+(pip-audit, npm audit, Trivy, blocking lint). All four ambiguous
+choices from the v2.3 retrospective were committed to the ambitious
+option: semantic Tailwind tokens, Caddy + LE, full Jest → Vitest, and
+a typing pass that brought ESLint to 0 errors.
+
+### Added
+
+- **Caddy reverse proxy for NAS deployments** (`Caddyfile` at repo
+  root). Replaces the nginx image. Auto-provisions Let's Encrypt
+  certs when `WHIS_DOMAIN` resolves publicly; falls back to Caddy's
+  internal CA on the `whis.local` default. Emits HSTS, CSP, nosniff,
+  X-Frame-Options, and Referrer-Policy headers on every response.
+  Same-origin `/api/*` + `/uploads/*` reverse proxy to the backend on
+  the internal docker network.
+- **HEALTHCHECK on every service** (both compose files). `depends_on`
+  with `condition: service_healthy` gates the frontend on a ready
+  backend.
+- **mkcert-aware dev cert generator** (`frontend/scripts/generate-certs.js`).
+  Detects mkcert on `PATH` and uses it for system-trusted certs; falls
+  back to the legacy OpenSSL CA flow when mkcert isn't available.
+  Container check (`/.dockerenv`) skips `mkcert -install` inside
+  containers where there's no host trust store.
+- **Backend cert-existence guard** in `bootstrap.py` — fails fast with
+  an actionable message when the shared certs volume is empty,
+  instead of cascading into a cryptic uvicorn SSL handshake error.
+- **Tailwind v4 semantic design tokens** in `frontend/src/index.css`
+  via `@theme`. Palette consolidated to `primary`, `primary-hover`,
+  `primary-accent`, `primary-subtle`, `primary-subtle-hover` — 106
+  class occurrences across 15 files migrated.
+- **Vitest** replaces Jest + ts-jest across all 16 frontend test
+  files. Runtime dropped from ~6.5s to ~3.3s; ESM-native, so
+  `import.meta.env.DEV` works directly (the v2.1 `NODE_ENV`
+  workaround in `src/lib/logger.ts` is gone).
+- **CI security gates**:
+  - `pip-audit --strict` on `backend/requirements.txt` (Python 3.12
+    matrix leg).
+  - `npm audit --omit=dev --audit-level=high` on runtime frontend
+    deps.
+  - `aquasecurity/trivy-action` scans the built backend + Caddy
+    images; fails on CRITICAL/HIGH, `ignore-unfixed` so unpatched
+    upstream CVEs don't permanently block.
+- **.github scaffolding**: `CODEOWNERS`, `pull_request_template.md`,
+  `ISSUE_TEMPLATE/{bug_report,feature_request}.md`.
+
+### Changed
+
+- **Dockerfiles hardened**: backend image is multi-stage (deps in a
+  venv stage, runtime stage is python:3.11-slim with a non-root
+  `whis` user at uid 1000). Frontend dev image runs as `USER node`.
+  Both drop the baked-in cert generation — certs come from a shared
+  volume now.
+- **`docker-compose.nas.yml`**: frontend service replaced with a
+  `caddy` service on 80/443 (+443/udp for HTTP/3). Persists
+  `/data` + `/config` to preserve ACME state across rebuilds.
+  `CORS_ORIGINS` now derives from `WHIS_DOMAIN` by default.
+- **CI lint gate flipped**: the 31 ESLint findings from v2.3 were
+  resolved in a typing pass (proper types on `BarcodeScanner`,
+  `CameraCapture`, `DataMigration`, `CustomFields`, `EbayFields`;
+  `AuthContext` / `DevModeContext` split into provider + hook files;
+  `useCallback` wrapping on camera lifecycle helpers).
+  `continue-on-error: true` is gone from the CI lint step.
+- **Bumped backend deps to patch 8 pip-audit findings**:
+  `python-multipart 0.0.12 → >=0.0.26`,
+  `pyjwt 2.9.0 → >=2.12.0`,
+  widened `pillow` to `<13` so `>=12.2.0` resolves,
+  explicit `starlette>=0.49.1` pin.
+- **Bumped transitive npm pins via `npm audit fix`** to patch 5
+  runtime CVEs (axios / form-data / react-router).
+
+### Removed
+
+- `frontend/nginx.conf` — Caddy replaces it.
+- `backend/scripts/generate-certs.py` — the unified
+  `frontend/scripts/generate-certs.js` script is now the single
+  source of dev certs.
+- `frontend/postcss.config.js` and `frontend/tailwind.config.js` —
+  Tailwind v4 reads its config from the `@theme` block in CSS; no JS
+  config file required.
+- Jest / ts-jest / jest-environment-jsdom / @types/jest /
+  identity-obj-proxy from `package.json` devDependencies.
+
 ## [2.3.0] - 2026-04-21
 
 Frontend refit + Facebook Marketplace integration. Pays down the

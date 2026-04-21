@@ -28,7 +28,7 @@ logger.info("upload directory: %s", UPLOAD_DIR)
 app = FastAPI(
     title="WHIS - Whole-Home Inventory System",
     description="A self-hosted platform for managing household inventories",
-    version="2.0.0",
+    version="2.4.0",
     redirect_slashes=False,
 )
 
@@ -120,7 +120,7 @@ app.include_router(facebook.router, prefix="/api")
 
 @app.get("/api/health")
 async def health_check():
-    return {"status": "healthy", "version": "2.0.0"}
+    return {"status": "healthy", "version": "2.4.0"}
 
 
 def get_cors_headers(request):
