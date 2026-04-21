@@ -24,6 +24,14 @@ jest.mock('../../api/client', () => ({
     getCategories: jest.fn(),
     updateFields: jest.fn(),
   },
+  facebook: {
+    getCategories: jest.fn().mockResolvedValue({
+      categories: ['Tools', 'Electronics', 'Miscellaneous'],
+    }),
+    updateFields: jest.fn(),
+    copyPasteBlock: jest.fn(),
+    downloadImagesZip: jest.fn(),
+  },
 }));
 
 const mockItem: Item = {
@@ -126,11 +134,13 @@ describe('ItemDetail', () => {
   it('displays eBay fields section', async () => {
     renderComponent();
 
+    // v2.3: the per-integration panels live under a "Marketplace
+    // Integrations" tab group. eBay is the default-selected tab so its
+    // fields render on first paint.
     await waitFor(() => {
-      expect(screen.getByText('eBay Listing Details')).toBeInTheDocument();
+      expect(screen.getByText('Marketplace Integrations')).toBeInTheDocument();
     });
 
-    // Check if eBay fields are populated
     expect(screen.getByLabelText(/listing format/i)).toHaveValue('FIXED_PRICE');
     expect(screen.getByLabelText(/condition/i)).toHaveValue('NEW');
   });

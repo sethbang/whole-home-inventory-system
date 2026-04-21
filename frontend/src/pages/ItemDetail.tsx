@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Tab } from '@headlessui/react';
 import { format } from 'date-fns';
 import { CameraIcon } from '@heroicons/react/24/outline';
 
@@ -10,10 +11,13 @@ import CustomFields from '../components/CustomFields';
 import CameraCapture from '../components/CameraCapture';
 import ImageGallery from '../components/ImageGallery';
 import EbayFields, { EbayFieldsData } from '../components/EbayFields';
-import { items, images, ebay } from '../api/client';
+import FacebookFields from '../components/FacebookFields';
+import FacebookCopyPasteDialog from '../components/FacebookCopyPasteDialog';
+import { items, images, ebay, facebook } from '../api/client';
 import { apiErrorMessage } from '../api/errors';
 import { queryKeys } from '../api/queryKeys';
-import type { EbayCategoryResponse, Item } from '../api/client';
+import type { EbayCategoryResponse } from '../api/client';
+import type { FbFieldsData } from '../types/facebook';
 import {
   type AddItemFormValues,
   type AddItemSubmitValues,
@@ -43,6 +47,14 @@ export default function ItemDetail() {
     queryKey: queryKeys.items.locations(),
     queryFn: items.getLocations,
   });
+
+  const { data: fbCategoriesData } = useQuery({
+    queryKey: queryKeys.facebook.categories(),
+    queryFn: facebook.getCategories,
+  });
+  const fbCategories = fbCategoriesData?.categories ?? [];
+
+  const [showFbDialog, setShowFbDialog] = useState(false);
 
   const {
     register,
@@ -131,6 +143,16 @@ export default function ItemDetail() {
     },
   });
 
+  const updateFbFieldsMutation = useMutation({
+    mutationFn: async (fields: FbFieldsData) => facebook.updateFields(id!, fields),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.items.detail(id!) });
+    },
+    onError: (err) => {
+      setServerError(apiErrorMessage(err, 'Failed to update Facebook fields'));
+    },
+  });
+
   const lookupEbayCategoryMutation = useMutation({
     mutationFn: async () => ebay.getCategories(id),
     onSuccess: (data: EbayCategoryResponse) => {
@@ -184,6 +206,12 @@ export default function ItemDetail() {
     updateEbayFieldsMutation.mutate(fields);
   };
 
+  const handleFbFieldsChange = (fields: FbFieldsData) => {
+    const current = (watch('custom_fields') ?? {}) as Record<string, unknown>;
+    setValue('custom_fields', { ...current, facebook: fields });
+    updateFbFieldsMutation.mutate(fields);
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -195,6 +223,8 @@ export default function ItemDetail() {
   const customFieldsValue = watch('custom_fields') ?? {};
   const ebayFieldsValue = (customFieldsValue as Record<string, unknown>)
     .ebay as EbayFieldsData | undefined;
+  const fbFieldsValue = (customFieldsValue as Record<string, unknown>)
+    .facebook as FbFieldsData | undefined;
 
   return (
     <div>
@@ -468,16 +498,61 @@ export default function ItemDetail() {
 
             <div className="sm:col-span-6 pt-8">
               <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">
-                eBay Listing Details
+                Marketplace Integrations
               </h3>
-              <EbayFields
-                fields={ebayFieldsValue ?? {}}
-                onChange={handleEbayFieldsChange}
-                onCategoryLookup={() => lookupEbayCategoryMutation.mutate()}
-              />
+              <Tab.Group>
+                <Tab.List className="flex gap-2 border-b border-gray-200">
+                  {['eBay', 'Facebook Marketplace'].map((label) => (
+                    <Tab
+                      key={label}
+                      className={({ selected }) =>
+                        `px-4 py-2 text-sm font-medium border-b-2 focus:outline-none ${
+                          selected
+                            ? 'border-primary-600 text-primary-700'
+                            : 'border-transparent text-gray-500 hover:text-gray-700'
+                        }`
+                      }
+                    >
+                      {label}
+                    </Tab>
+                  ))}
+                </Tab.List>
+                <Tab.Panels className="mt-6">
+                  <Tab.Panel>
+                    <EbayFields
+                      fields={ebayFieldsValue ?? {}}
+                      onChange={handleEbayFieldsChange}
+                      onCategoryLookup={() => lookupEbayCategoryMutation.mutate()}
+                    />
+                  </Tab.Panel>
+                  <Tab.Panel>
+                    <FacebookFields
+                      fields={fbFieldsValue ?? {}}
+                      categories={fbCategories}
+                      onChange={handleFbFieldsChange}
+                    />
+                    <div className="mt-4 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setShowFbDialog(true)}
+                        className="rounded-md border border-transparent bg-primary-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-primary-700"
+                      >
+                        Generate copy-paste block
+                      </button>
+                    </div>
+                  </Tab.Panel>
+                </Tab.Panels>
+              </Tab.Group>
             </div>
           </div>
         </div>
+
+        {showFbDialog && id && (
+          <FacebookCopyPasteDialog
+            itemId={id}
+            onClose={() => setShowFbDialog(false)}
+          />
+        )}
 
         <div className="pt-5">
           <div className="flex justify-end">
