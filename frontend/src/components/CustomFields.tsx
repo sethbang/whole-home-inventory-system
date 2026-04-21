@@ -9,27 +9,34 @@ interface CustomField {
   value: string | number | boolean;
 }
 
+type CustomFieldValue = string | number | boolean;
+
 interface CustomFieldsProps {
-  fields: Record<string, any>;
-  onChange: (fields: Record<string, any>) => void;
+  fields: Record<string, unknown>;
+  onChange: (fields: Record<string, unknown>) => void;
 }
 
 export default function CustomFields({ fields, onChange }: CustomFieldsProps) {
   const [newFieldKey, setNewFieldKey] = React.useState('');
   const [newFieldType, setNewFieldType] = React.useState<FieldType>('string');
 
-  const customFields = React.useMemo(() => {
-    return Object.entries(fields).map(([key, value]) => ({
-      key,
-      type: typeof value as FieldType,
-      value,
-    }));
+  const customFields: CustomField[] = React.useMemo(() => {
+    return Object.entries(fields)
+      .filter(([, value]) => {
+        const t = typeof value;
+        return t === 'string' || t === 'number' || t === 'boolean';
+      })
+      .map(([key, value]) => ({
+        key,
+        type: typeof value as FieldType,
+        value: value as string | number | boolean,
+      }));
   }, [fields]);
 
   const handleAddField = () => {
     if (!newFieldKey.trim()) return;
 
-    const defaultValues: Record<FieldType, any> = {
+    const defaultValues: Record<FieldType, CustomFieldValue> = {
       string: '',
       number: 0,
       boolean: false,

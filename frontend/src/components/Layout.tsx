@@ -3,8 +3,8 @@
 import { Link, useLocation } from 'react-router-dom';
 import { Disclosure, Menu, Transition } from '@headlessui/react';
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
-import { useAuth } from '../contexts/AuthContext';
-import { useDevMode } from '../contexts/DevModeContext';
+import { useAuth } from '../contexts/useAuth';
+import { useDevMode } from '../contexts/useDevMode';
 
 const navigation = [
   { name: 'Dashboard', href: '/' },

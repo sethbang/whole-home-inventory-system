@@ -8,7 +8,7 @@ import { ApiError } from '../../api/errors';
 
 const mockRegister = vi.fn();
 
-vi.mock('../../contexts/AuthContext', () => ({
+vi.mock('../../contexts/useAuth', () => ({
   useAuth: () => ({ register: mockRegister }),
 }));
 

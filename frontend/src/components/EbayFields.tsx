@@ -1,5 +1,7 @@
 import React from 'react';
 
+export type EbayPaymentMethod = 'PAYPAL' | 'CREDIT_CARD' | 'BANK_TRANSFER';
+
 export interface EbayFieldsData {
   category_id?: string;
   condition?: 'NEW' | 'LIKE_NEW' | 'VERY_GOOD' | 'GOOD' | 'ACCEPTABLE' | 'FOR_PARTS';
@@ -9,7 +11,7 @@ export interface EbayFieldsData {
   shipping_cost?: number;
   returns_accepted?: boolean;
   return_period?: 'DAYS_30' | 'DAYS_60' | 'NO_RETURNS';
-  payment_methods?: Array<'PAYPAL' | 'CREDIT_CARD' | 'BANK_TRANSFER'>;
+  payment_methods?: EbayPaymentMethod[];
   starting_price?: number;
   reserve_price?: number;
   buy_it_now_price?: number;
@@ -70,7 +72,10 @@ const PAYMENT_METHODS = [
 ];
 
 export default function EbayFields({ fields, onChange, onCategoryLookup }: EbayFieldsProps) {
-  const updateField = (field: keyof EbayFieldsData, value: any) => {
+  const updateField = (
+    field: keyof EbayFieldsData,
+    value: EbayFieldsData[keyof EbayFieldsData],
+  ) => {
     onChange({ ...fields, [field]: value });
   };
 
@@ -324,13 +329,19 @@ export default function EbayFields({ fields, onChange, onCategoryLookup }: EbayF
                 <input
                   type="checkbox"
                   id={`payment_${value}`}
-                  checked={(fields.payment_methods || []).includes(value as any)}
+                  checked={(fields.payment_methods || []).includes(value as EbayPaymentMethod)}
                   onChange={(e) => {
                     const methods = fields.payment_methods || [];
                     if (e.target.checked) {
-                      updateField('payment_methods', [...methods, value]);
+                      updateField('payment_methods', [
+                        ...methods,
+                        value as EbayPaymentMethod,
+                      ]);
                     } else {
-                      updateField('payment_methods', methods.filter(m => m !== value));
+                      updateField(
+                        'payment_methods',
+                        methods.filter((m) => m !== value),
+                      );
                     }
                   }}
                   className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"

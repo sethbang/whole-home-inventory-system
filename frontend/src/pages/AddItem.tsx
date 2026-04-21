@@ -6,7 +6,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { CameraIcon, QrCodeIcon } from '@heroicons/react/24/outline';
 
 import CustomFields from '../components/CustomFields';
-import { useDevMode } from '../contexts/DevModeContext';
+import { useDevMode } from '../contexts/useDevMode';
 import { items, images } from '../api/client';
 import { apiErrorMessage } from '../api/errors';
 import { queryKeys } from '../api/queryKeys';

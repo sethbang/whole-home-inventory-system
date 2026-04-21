@@ -16,12 +16,16 @@ export default function BarcodeScanner({ onCapture, onBarcodeScan, onClose }: Ba
   const [isScanning, setIsScanning] = useState(true);
   const [lastScanned, setLastScanned] = useState<string | null>(null);
   const readerRef = useRef<BrowserMultiFormatReader | null>(null);
+  // Keep the stream in a ref so stopCamera has stable identity and the
+  // unmount cleanup isn't recreated every time `stream` state changes.
+  const streamRef = useRef<MediaStream | null>(null);
 
-  const startCamera = async () => {
+  const startCamera = useCallback(async () => {
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment' },
       });
+      streamRef.current = mediaStream;
       setStream(mediaStream);
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
@@ -31,17 +35,18 @@ export default function BarcodeScanner({ onCapture, onBarcodeScan, onClose }: Ba
         'Unable to access camera. Please make sure you have granted camera permissions.',
       );
     }
-  };
+  }, []);
 
-  const stopCamera = () => {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
+  const stopCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
       setStream(null);
     }
     if (readerRef.current) {
       readerRef.current.reset();
     }
-  };
+  }, []);
 
   const handleCapture = () => {
     if (videoRef.current && canvasRef.current) {
@@ -99,7 +104,7 @@ export default function BarcodeScanner({ onCapture, onBarcodeScan, onClose }: Ba
     return () => {
       stopCamera();
     };
-  }, []);
+  }, [startCamera, stopCamera]);
 
   useEffect(() => {
     if (stream && videoRef.current && isScanning) {

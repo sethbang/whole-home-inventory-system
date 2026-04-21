@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useEffect, useState } from 'react';
 import { User, auth } from '../api/client';
 import { useNavigate } from 'react-router-dom';
-import { useDevMode } from './DevModeContext';
+import { useAuth } from './useAuth';
+import { useDevMode } from './useDevMode';
 import { isDevBypassAllowed } from '../lib/devBypass';
 import { logger } from '../lib/logger';
 
@@ -38,7 +39,7 @@ function resolveBypass(isDevMode: boolean): boolean {
   return allowed;
 }
 
-interface AuthContextType {
+export interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   login: (username: string, password: string) => Promise<void>;
@@ -46,7 +47,7 @@ interface AuthContextType {
   logout: () => void;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -115,14 +116,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       {children}
     </AuthContext.Provider>
   );
-}
-
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
 }
 
 export function RequireAuth({ children }: { children: React.ReactNode }) {

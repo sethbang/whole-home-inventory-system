@@ -32,10 +32,11 @@ const DataMigration: React.FC = () => {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-    } catch (error: any) {
-      if (error?.response?.data) {
-        console.error('Export failed:', error.response.data);
-        setImportError(`Export failed: ${error.response.data.detail || 'Please try again.'}`);
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { detail?: string } } };
+      if (err.response?.data) {
+        console.error('Export failed:', err.response.data);
+        setImportError(`Export failed: ${err.response.data.detail || 'Please try again.'}`);
       } else {
         console.error('Export failed:', error);
         setImportError('Export failed. Please try again.');

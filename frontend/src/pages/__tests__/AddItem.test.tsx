@@ -20,7 +20,7 @@ vi.mock('../../api/client', () => ({
   },
 }));
 
-vi.mock('../../contexts/DevModeContext', () => ({
+vi.mock('../../contexts/useDevMode', () => ({
   useDevMode: () => ({ isDevMode: false }),
 }));
 

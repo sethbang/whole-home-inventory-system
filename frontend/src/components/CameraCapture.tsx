@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { XMarkIcon, CameraIcon } from '@heroicons/react/24/outline';
 
 interface CameraCaptureProps {
@@ -6,21 +6,40 @@ interface CameraCaptureProps {
   onClose: () => void;
 }
 
+// Safari's non-standard ``navigator.standalone`` isn't in the DOM typedef;
+// narrow the feature test without reaching for `any`.
+interface SafariStandaloneNavigator {
+  standalone?: boolean;
+}
+
 export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [stream, setStream] = useState<MediaStream | null>(null);
+  // Hold the stream in a ref so stopCamera has stable identity and the
+  // unmount cleanup doesn't re-run every time `stream` changes.
+  const streamRef = useRef<MediaStream | null>(null);
+  const [, setStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const isIOSPWA = () => {
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
-                        (window.navigator as any).standalone ||
-                        document.referrer.includes('ios-app://');
+    const nav = window.navigator as Navigator & SafariStandaloneNavigator;
+    const isStandalone =
+      window.matchMedia('(display-mode: standalone)').matches ||
+      nav.standalone === true ||
+      document.referrer.includes('ios-app://');
     return isIOS && isStandalone;
   };
 
-  const startCamera = async () => {
+  const stopCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+      setStream(null);
+    }
+  }, []);
+
+  const startCamera = useCallback(async () => {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       setError('Camera access is not supported in this browser.');
       return;
@@ -40,6 +59,7 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
 
       // Try to get camera access
       const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+      streamRef.current = mediaStream;
       setStream(mediaStream);
       // Wait for video element to be ready
       const waitForVideo = async () => {
@@ -89,14 +109,7 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
         setError('Unable to access camera. Please make sure your device has a working camera.');
       }
     }
-  };
-
-  const stopCamera = () => {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
-      setStream(null);
-    }
-  };
+  }, []);
 
   const handleCapture = () => {
     if (videoRef.current && canvasRef.current) {
@@ -127,7 +140,7 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
     }
   };
 
-  const requestCameraPermission = async () => {
+  const requestCameraPermission = useCallback(async () => {
     // For iOS PWA, we need to request permissions differently
     if (isIOSPWA()) {
       try {
@@ -151,14 +164,14 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
       // For non-PWA, start camera normally
       await startCamera();
     }
-  };
+  }, [startCamera]);
 
   React.useEffect(() => {
     requestCameraPermission();
     return () => {
       stopCamera();
     };
-  }, []);
+  }, [requestCameraPermission, stopCamera]);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4">
