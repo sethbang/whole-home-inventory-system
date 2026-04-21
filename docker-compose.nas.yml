@@ -2,25 +2,28 @@
 #
 # Usage: create a sibling `.env` file (or export vars) with at minimum:
 #   SECRET_KEY=<result of: python -c "import secrets; print(secrets.token_urlsafe(64))">
+# optional:
+#   WHIS_DOMAIN=inventory.example.com      # public DNS → Let's Encrypt cert
+#   WHIS_DOMAIN=whis.local                  # default → Caddy internal CA
+#   CADDY_ACME_EMAIL=you@example.com
 # then:
 #   docker compose -f docker-compose.nas.yml up --build -d
 #
-# This file intentionally never sets BYPASS_AUTH=true: a NAS deployment is a
-# shared environment, and the backend's fail-fast check on SECRET_KEY would
-# also need to pass — so real auth is mandatory here.
+# Frontend traffic terminates at Caddy on ports 80/443. When WHIS_DOMAIN
+# resolves publicly, Caddy auto-provisions a Let's Encrypt cert on first
+# request; otherwise it serves via its internal CA (install the root cert
+# from /data/caddy/pki/authorities/local/root.crt on each household
+# device). See DEPLOYMENT.md for the step-by-step.
 #
-# The frontend is a static build served by nginx on port 80 which proxies
-# `/api` to the backend on the internal docker network. If you want HTTPS,
-# terminate TLS at Synology DSM's reverse proxy (or Caddy/Traefik) and point
-# it at host port 5173.
+# This file intentionally never sets BYPASS_AUTH=true: a NAS deployment is
+# a shared environment, and the backend's fail-fast check on SECRET_KEY
+# would also need to pass — so real auth is mandatory here.
 
 services:
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    ports:
-      - "27182:27182"
     environment:
       BYPASS_AUTH: "false"
       SECRET_KEY: ${SECRET_KEY:?SECRET_KEY must be set in the environment or .env file}
@@ -28,10 +31,11 @@ services:
       DATABASE_URL: "sqlite:////app/database/whis.db"
       UPLOAD_DIR: "/app/backend/uploads"
       BACKUP_DIR: "/app/backend/backups"
-      # Same-origin setup through nginx means the browser never issues
-      # cross-origin requests, so this list is belt-and-suspenders. Override
-      # via the NAS_ORIGINS env var if you add a reverse proxy on another host.
-      CORS_ORIGINS: "${NAS_ORIGINS:-https://localhost,http://localhost}"
+      # Caddy fronts the backend same-origin (WHIS_DOMAIN → backend on the
+      # internal network), so the browser never issues cross-origin
+      # requests. NAS_ORIGINS is kept as a belt-and-suspenders override for
+      # operators who deploy behind an upstream TLS terminator.
+      CORS_ORIGINS: "${NAS_ORIGINS:-https://${WHIS_DOMAIN:-whis.local}}"
       CORS_ALLOW_METHODS: "GET,POST,PUT,DELETE,OPTIONS,HEAD,PATCH"
       CORS_ALLOW_HEADERS: "Content-Type,Authorization,Accept,Origin,X-Requested-With"
       LOG_LEVEL: "${LOG_LEVEL:-INFO}"
@@ -40,9 +44,9 @@ services:
       - /volume1/docker/whole-home-inventory-system/database:/app/database
       - /volume1/docker/whole-home-inventory-system/uploads:/app/backend/uploads
       - /volume1/docker/whole-home-inventory-system/backups:/app/backend/backups
-      # Shared certs volume (written by the frontend build's generate-certs
-      # output in Part B's Caddy flow, or prepared out-of-band on first
-      # deploy).
+      # Shared certs volume. Generate once on a workstation with mkcert
+      # installed via `cd frontend && node scripts/generate-certs.js`, then
+      # copy the `certs/` directory into the path below.
       - /volume1/docker/whole-home-inventory-system/certs:/app/certs:ro
     healthcheck:
       test: ["CMD", "curl", "-kfsS", "https://localhost:27182/api/health"]
@@ -54,17 +58,32 @@ services:
       - whole-home-inventory-system-network
     restart: unless-stopped
 
-  frontend:
+  caddy:
     build:
-      context: ./frontend
-      dockerfile: Dockerfile.prod
+      # Context must be the repo root so the build can COPY the top-level
+      # Caddyfile into the runtime stage.
+      context: .
+      dockerfile: frontend/Dockerfile.prod
     ports:
-      - "5173:80"
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"  # HTTP/3
+    environment:
+      WHIS_DOMAIN: "${WHIS_DOMAIN:-whis.local}"
+      CADDY_ACME_EMAIL: "${CADDY_ACME_EMAIL:-admin@whis.local}"
     depends_on:
       backend:
         condition: service_healthy
+    volumes:
+      # Persist Caddy's TLS state across restarts — ACME account keys, LE
+      # certs, and the internal CA used when WHIS_DOMAIN isn't publicly
+      # routable.
+      - /volume1/docker/whole-home-inventory-system/caddy-data:/data
+      - /volume1/docker/whole-home-inventory-system/caddy-config:/config
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost/"]
+      test:
+        - "CMD-SHELL"
+        - "wget -q -O /dev/null --no-check-certificate https://localhost/ || wget -q -O /dev/null http://localhost/"
       interval: 30s
       timeout: 5s
       start_period: 15s

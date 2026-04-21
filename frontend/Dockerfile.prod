@@ -1,18 +1,32 @@
-FROM node:20-slim as build
+# syntax=docker/dockerfile:1.6
+# Production image for NAS deployments (docker-compose.nas.yml).
+# Build context is the repo root so this stage can COPY the repo-level
+# Caddyfile. See docker-compose.nas.yml for the `context: .` +
+# `dockerfile: frontend/Dockerfile.prod` combo that wires it up.
+#
+# Stage 1 — build the SPA.
+FROM node:20-slim AS build
 
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm install
+COPY frontend/package*.json ./
+RUN npm ci
 
-COPY . .
+COPY frontend/. .
 RUN npm run build
 
-FROM nginx:alpine
+# Stage 2 — Caddy serves the SPA and reverse-proxies /api + /uploads.
+FROM caddy:2-alpine AS runtime
 
-COPY --from=build /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/dist /srv/frontend
+COPY Caddyfile /etc/caddy/Caddyfile
 
-EXPOSE 80
+# caddy:2-alpine ships wget via BusyBox. The -k flag isn't available, but
+# --no-check-certificate is — we accept Caddy's internal CA (or its LE cert)
+# without trying to pre-trust it from the compose network.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD wget -q -O /dev/null --no-check-certificate https://localhost/ \
+        || wget -q -O /dev/null http://localhost/ \
+        || exit 1
 
-CMD ["nginx", "-g", "daemon off;"]
+EXPOSE 80 443
