@@ -3,7 +3,12 @@
  *
  * The goal: prove that info/debug are silent in production, while warn/error
  * still surface (they represent actionable signals operators need to see).
+ *
+ * Uses ``require('../logger')`` on purpose so ``jest.resetModules()`` in
+ * ``beforeEach`` can hand each test a fresh module instance (the logger
+ * caches the isDev flag at import time).
  */
+/* eslint-disable @typescript-eslint/no-require-imports */
 
 describe('logger', () => {
   const originalConsole = { ...console };

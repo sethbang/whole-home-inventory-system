@@ -28,8 +28,6 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
 
     try {
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-      const isChrome = /CriOS/.test(navigator.userAgent);
-      const isPWA = isIOSPWA();
 
       // For iOS PWA, we need to ensure we're using the right constraints
       const constraints = {

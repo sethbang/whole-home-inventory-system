@@ -26,8 +26,10 @@ export default function BarcodeScanner({ onCapture, onBarcodeScan, onClose }: Ba
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
       }
-    } catch (err) {
-      setError('Unable to access camera. Please make sure you have granted camera permissions.');
+    } catch {
+      setError(
+        'Unable to access camera. Please make sure you have granted camera permissions.',
+      );
     }
   };
 

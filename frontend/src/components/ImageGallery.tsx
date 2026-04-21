@@ -13,11 +13,6 @@ export default function ImageGallery({ images, onDelete }: ImageGalleryProps) {
     }
   };
 
-  const handleDownload = async (imageId: string) => {
-    // Download functionality will be implemented later
-    console.log('Download image:', imageId);
-  };
-
   return (
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
       {images.map((image) => (

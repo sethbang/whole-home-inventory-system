@@ -4,7 +4,7 @@ import '@testing-library/jest-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import ItemDetail from '../ItemDetail';
-import { items, images, ebay } from '../../api/client';
+import { items, ebay } from '../../api/client';
 import type { Item, EbayCategoryResponse } from '../../api/client';
 
 // Mock the API client modules
