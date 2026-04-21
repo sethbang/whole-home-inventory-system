@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import { execSync } from 'child_process';
-import { mkdirSync, existsSync, writeFileSync, chmodSync } from 'fs';
+import { mkdirSync, existsSync, writeFileSync, chmodSync, copyFileSync } from 'fs';
 import { join } from 'path';
+import { networkInterfaces } from 'os';
 
 // Use environment variable for output directory or default to ./certs
 const outputDir = process.env.CERT_OUTPUT_DIR || join(process.cwd(), 'certs');
@@ -13,6 +14,81 @@ const certsDir = join(process.cwd(), 'certs');
     mkdirSync(dir, { recursive: true });
   }
 });
+
+// SAN list shared by both the mkcert and OpenSSL paths. Keep in sync
+// with the [alt_names] block in the OpenSSL server config below.
+const SAN_LIST = [
+  'localhost',
+  '*.localhost',
+  'whis.local',
+  '*.whis.local',
+  'nas.local',
+  '*.nas.local',
+  '127.0.0.1',
+  '::1',
+  '192.168.1.15',
+  '172.17.0.1',
+  '172.18.0.1',
+];
+
+// v2.4: prefer mkcert when it's on PATH. mkcert generates certs trusted
+// by the system root store automatically — no manual CA install step per
+// device. Falls back to the OpenSSL CA flow below when mkcert isn't
+// available (CI, slim containers, fresh VMs).
+const isMkcertAvailable = () => {
+  try {
+    execSync('which mkcert', { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const generateWithMkcert = () => {
+  console.log('Found mkcert — using it instead of the OpenSSL CA flow.');
+  const certPath = join(certsDir, 'cert.pem');
+  const keyPath = join(certsDir, 'key.pem');
+
+  // Install the mkcert CA into the system trust store (idempotent —
+  // safe to run even if already installed). Skip inside containers
+  // where there's no host trust store to touch.
+  const isInContainer = existsSync('/.dockerenv');
+  if (!isInContainer) {
+    try {
+      execSync('mkcert -install', { stdio: 'inherit' });
+    } catch (err) {
+      console.warn(
+        'mkcert -install failed — continuing anyway, but you may need to trust the CA manually.',
+      );
+    }
+  }
+
+  // Generate the cert pair covering every SAN we care about.
+  execSync(
+    `mkcert -cert-file "${certPath}" -key-file "${keyPath}" ${SAN_LIST.map((s) => `"${s}"`).join(' ')}`,
+    { stdio: 'inherit' },
+  );
+  chmodSync(keyPath, 0o600);
+  chmodSync(certPath, 0o644);
+
+  // Copy mkcert's CA cert into the distribution dir so the existing
+  // "install on this device" docs still work for any browsers that
+  // skipped the system root store (iOS, Android).
+  try {
+    const caroot = execSync('mkcert -CAROOT', { encoding: 'utf-8' }).trim();
+    const mkcertCaCert = join(caroot, 'rootCA.pem');
+    if (existsSync(mkcertCaCert)) {
+      const outCa = join(outputDir, 'whis-dev-ca.crt');
+      copyFileSync(mkcertCaCert, outCa);
+      chmodSync(outCa, 0o644);
+      console.log(`mkcert root CA copied to ${outCa} for device installs.`);
+    }
+  } catch {
+    // Non-fatal — the device docs still make sense without the CA copy.
+  }
+
+  console.log('\nmkcert certificates generated successfully.');
+};
 
 // Create OpenSSL config for CA
 const caConfig = `
@@ -259,8 +335,13 @@ const generateServerCertificate = () => {
 
 // Main execution
 console.log('Setting up development certificates...\n');
-ensureCA();
-generateServerCertificate();
+if (isMkcertAvailable()) {
+  generateWithMkcert();
+} else {
+  console.log('mkcert not on PATH — falling back to the OpenSSL CA flow.');
+  ensureCA();
+  generateServerCertificate();
+}
 
 // Show network information
 try {

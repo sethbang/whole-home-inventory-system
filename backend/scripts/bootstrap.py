@@ -49,7 +49,34 @@ def reconcile_alembic_state() -> None:
             conn.execute(text("DELETE FROM alembic_version"))
 
 
+def assert_certs_present() -> None:
+    """Fail-fast when TLS certs aren't where uvicorn expects them.
+
+    v2.4 stopped baking cert generation into the backend image — certs
+    now come from a shared volume (frontend's mkcert/OpenSSL flow in
+    dev, Caddy's ACME storage in prod). Catch the missing-volume case
+    early so the error is obvious instead of cascading into a cryptic
+    SSL handshake failure in uvicorn.
+    """
+    key = ROOT / "certs" / "key.pem"
+    cert = ROOT / "certs" / "cert.pem"
+    missing = [p for p in (key, cert) if not p.exists()]
+    if missing:
+        print(
+            f"[bootstrap] ERROR: expected TLS certs at {key} and {cert}; "
+            f"missing: {', '.join(str(m) for m in missing)}",
+            file=sys.stderr,
+        )
+        print(
+            "[bootstrap] Run `cd frontend && node scripts/generate-certs.js` "
+            "on the host to produce them, or mount the shared certs volume.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+
 def main() -> None:
+    assert_certs_present()
     reconcile_alembic_state()
 
     cfg = Config(str(ROOT / "alembic.ini"))
