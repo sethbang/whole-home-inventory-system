@@ -1,0 +1,3 @@
+# Global ownership — single maintainer today. Add additional owners or
+# path-scoped rules (e.g. `backend/ @...`) when the project grows.
+* @sethbang
