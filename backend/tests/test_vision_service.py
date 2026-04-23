@@ -7,6 +7,7 @@ guard. No network.
 
 from __future__ import annotations
 
+import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -181,3 +182,34 @@ def test_identify_surfaces_schema_violation_as_502(db_session, user):
     with pytest.raises(HTTPException) as exc:
         service.identify([_png()], client=client)
     assert exc.value.status_code == 502
+
+
+def test_identify_async_awaitable_inside_running_loop(db_session, user):
+    """Regression for F8 (pre-push validation pass).
+
+    ``VisionService.identify`` used to call :func:`asyncio.run` internally,
+    which raises ``asyncio.run() cannot be called from a running event loop``
+    when the caller is already inside one — i.e. FastAPI's async route
+    handler or an ARQ worker task. Ensure ``identify_async`` can be awaited
+    from a running loop without nesting ``asyncio.run``.
+    """
+    client = _fake_client(
+        {
+            "name": "Test",
+            "brand": None,
+            "category": None,
+            "confidence": 0.5,
+            "warnings": [],
+            "suggested_tags": [],
+            "ebay_item_specifics": {},
+            "fb_item_specifics": {},
+        }
+    )
+
+    async def inner():
+        service = VisionService(db_session, user)
+        return await service.identify_async([_png()], client=client)
+
+    result = asyncio.run(inner())
+    assert isinstance(result, VisionResult)
+    assert result.suggestion.name == "Test"

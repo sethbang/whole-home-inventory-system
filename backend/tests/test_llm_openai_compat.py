@@ -94,10 +94,16 @@ def test_structured_completion_builds_json_schema_request():
     assert kwargs["response_format"]["type"] == "json_schema"
     assert kwargs["response_format"]["json_schema"]["strict"] is True
     assert kwargs["response_format"]["json_schema"]["name"] == "VisionSuggestion"
-    # Response-healing plugin is attached by default.
-    assert kwargs["plugins"] == [{"id": "response-healing"}]
+    # Response-healing plugin is attached by default, nested under
+    # extra_body so the OpenAI SDK doesn't reject the OpenRouter-only
+    # kwarg. (F9 — pre-push validation regression.)
+    extra_body = kwargs.get("extra_body", {})
+    assert extra_body.get("plugins") == [{"id": "response-healing"}]
+    # plugins must NEVER be a top-level kwarg — SDK raises TypeError.
+    assert "plugins" not in kwargs
     # No web_search tool unless explicitly requested.
     assert "tools" not in kwargs
+    assert "tools" not in extra_body
 
 
 def test_structured_completion_respects_response_healing_flag(monkeypatch):
@@ -115,6 +121,7 @@ def test_structured_completion_respects_response_healing_flag(monkeypatch):
     )
     kwargs = create.await_args.kwargs
     assert "plugins" not in kwargs
+    assert "plugins" not in kwargs.get("extra_body", {})
 
 
 def test_structured_completion_attaches_web_search_tool():
@@ -135,7 +142,10 @@ def test_structured_completion_attaches_web_search_tool():
         )
     )
 
-    tools = create.await_args.kwargs["tools"]
+    # OpenRouter-type tools live under extra_body (F9), not top-level.
+    kwargs = create.await_args.kwargs
+    assert "tools" not in kwargs
+    tools = kwargs["extra_body"]["tools"]
     assert len(tools) == 1
     assert tools[0]["type"] == "openrouter:web_search"
     # max_results override from extra_search_params wins over settings default.

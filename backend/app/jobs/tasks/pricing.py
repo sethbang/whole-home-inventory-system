@@ -39,7 +39,9 @@ async def pricing_refresh(
         if user is None:
             return {"ok": False, "error": "user_not_found"}
         service = PricingService(db=db, user=user)
-        envelope = service.estimate(
+        # See jobs/tasks/vision.py — await the async variant directly
+        # since the ARQ worker runs inside an active asyncio loop.
+        envelope = await service.estimate_async(
             item_id=item_id,
             metadata=metadata,
             force_refresh=force_refresh,

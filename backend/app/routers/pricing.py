@@ -198,8 +198,11 @@ async def _enqueue_or_run(
             if job is not None:
                 return schemas.JobReference(job_id=job.job_id)
 
-    # Sync fallback.
-    return service.estimate(
+    # Sync-code-path fallback (no worker pool). Use the async variant
+    # directly since `_enqueue_or_run` itself is an async handler —
+    # service.estimate() wraps the coroutine in asyncio.run() which
+    # would crash inside the already-running event loop.
+    return await service.estimate_async(
         item_id=item_id, metadata=metadata, force_refresh=force_refresh
     )
 

@@ -35,12 +35,17 @@ logger = logging.getLogger(__name__)
 
 
 class VisionService:
-    """Synchronous façade over the async OpenAI-compatible client.
+    """Façade over the async OpenAI-compatible client.
 
-    The request path (ARQ worker) is synchronous by convention so it
-    shares the session factory and transaction boundaries with the
-    other services. We call the async LLM client via
-    :func:`asyncio.run` inside the sync method.
+    Exposes both sync and async entry points:
+
+    * :meth:`identify_async` — the canonical coroutine, awaited directly
+      by FastAPI's async handlers and the ARQ worker task.
+    * :meth:`identify` — sync shim that wraps the coroutine with
+      :func:`asyncio.run`. Used by tests and any future non-async
+      caller (CLI scripts, one-off jobs). Must NOT be called from
+      within a running event loop — it will raise "asyncio.run()
+      cannot be called from a running event loop".
     """
 
     def __init__(self, db: Session, user: models.User) -> None:
@@ -54,7 +59,19 @@ class VisionService:
         hints: Optional[Dict[str, Any]] = None,
         client: Optional[OpenAICompatibleClient] = None,
     ) -> VisionResult:
-        """Run vision identification end-to-end.
+        """Synchronous entry point. Wraps :meth:`identify_async`."""
+        return asyncio.run(
+            self.identify_async(images, hints=hints, client=client)
+        )
+
+    async def identify_async(
+        self,
+        images: Iterable[bytes],
+        *,
+        hints: Optional[Dict[str, Any]] = None,
+        client: Optional[OpenAICompatibleClient] = None,
+    ) -> VisionResult:
+        """Run vision identification end-to-end (async).
 
         Preflight:
           1. Feature flag + config (settings.VISION_ENABLED, LLM_BASE_URL, LLM_API_KEY).
@@ -90,13 +107,11 @@ class VisionService:
         client = client or OpenAICompatibleClient()
 
         try:
-            response = asyncio.run(
-                client.vision_completion(
-                    system_prompt=VISION_SYSTEM_PROMPT,
-                    images=image_list,
-                    hints=hints,
-                    schema=VISION_SUGGESTION_SCHEMA,
-                )
+            response = await client.vision_completion(
+                system_prompt=VISION_SYSTEM_PROMPT,
+                images=image_list,
+                hints=hints,
+                schema=VISION_SUGGESTION_SCHEMA,
             )
         except LLMProviderError:
             # Pre-parse error — the content was garbage. Record a

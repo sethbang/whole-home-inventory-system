@@ -126,10 +126,11 @@ def test_estimate_enqueues_when_pool_active(
 def test_estimate_sync_fallback_runs_service(
     client, auth_headers, user, db_session
 ):
-    """Without a pool, the router calls PricingService.estimate directly."""
+    """Without a pool, the router awaits PricingService.estimate_async directly."""
     app.state.arq = None
     with patch(
-        "app.routers.pricing.PricingService.estimate",
+        "app.routers.pricing.PricingService.estimate_async",
+        new_callable=AsyncMock,
         return_value=_fake_envelope(),
     ) as mock_estimate:
         resp = client.post(

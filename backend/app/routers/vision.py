@@ -103,5 +103,8 @@ async def identify_item(
 
     # Sync fallback — runs the vision pipeline on the request thread.
     # Acceptable for dev; production should enable the worker profile.
+    # Use the async variant directly (awaited in this handler's event
+    # loop); service.identify() wraps it in asyncio.run() which would
+    # blow up here since we're already inside a running loop.
     service = VisionService(db=db, user=current_user)
-    return service.identify(image_bytes, hints=hints_obj)
+    return await service.identify_async(image_bytes, hints=hints_obj)

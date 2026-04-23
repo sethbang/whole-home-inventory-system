@@ -117,7 +117,8 @@ def test_sync_fallback_runs_service_inline(client, auth_headers, _enabled, user,
     from app.schemas_llm import VisionResult
 
     with patch(
-        "app.routers.vision.VisionService.identify",
+        "app.routers.vision.VisionService.identify_async",
+        new_callable=AsyncMock,
         return_value=VisionResult.model_validate(fake_result_data),
     ) as mock_identify:
         resp = client.post(
@@ -158,7 +159,8 @@ def test_enqueue_failure_falls_back_to_sync(client, auth_headers, _enabled, user
 
     try:
         with patch(
-            "app.routers.vision.VisionService.identify",
+            "app.routers.vision.VisionService.identify_async",
+            new_callable=AsyncMock,
             return_value=VisionResult.model_validate(fake_result_data),
         ):
             resp = client.post(

@@ -1,8 +1,11 @@
 """PricingService — orchestrates cache + providers + item update.
 
-Sync-API by convention (matches the rest of the service layer). The
-request handler or ARQ task calls into it; all async LLM/HTTP I/O
-is wrapped via ``asyncio.run`` at the provider boundary.
+Exposes both sync and async entry points. The async variants
+(``estimate_async`` / ``_run_provider_async``) are the canonical
+ones and are awaited directly by the async request handlers and
+the ARQ worker task. The sync variants wrap them in
+:func:`asyncio.run` for tests and any future non-async callers;
+they must NOT be used from within a running event loop.
 
 High-level flow:
 
@@ -81,11 +84,27 @@ class PricingService:
         metadata: Optional[Mapping[str, Any]] = None,
         force_refresh: bool = False,
     ) -> PriceEstimateEnvelope:
-        """Resolve an estimate synchronously. Caller handles enqueue logic.
+        """Synchronous entry point. Wraps :meth:`estimate_async`."""
+        return asyncio.run(
+            self.estimate_async(
+                item_id=item_id,
+                metadata=metadata,
+                force_refresh=force_refresh,
+            )
+        )
 
-        The router chooses between calling this directly (sync
+    async def estimate_async(
+        self,
+        *,
+        item_id: Optional[str] = None,
+        metadata: Optional[Mapping[str, Any]] = None,
+        force_refresh: bool = False,
+    ) -> PriceEstimateEnvelope:
+        """Resolve an estimate (async). Caller handles enqueue logic.
+
+        The router chooses between awaiting this directly (sync
         fallback) and enqueueing a ``pricing_refresh`` ARQ task that
-        eventually calls this same method from the worker process.
+        eventually awaits this same method from the worker process.
         """
         if not settings.PRICING_ENABLED:
             raise HTTPException(
@@ -118,7 +137,7 @@ class PricingService:
 
         for provider in self._resolve_providers():
             try:
-                estimate = self._run_provider(provider, identity)
+                estimate = await self._run_provider_async(provider, identity)
             except PriceProviderNoResult as exc:
                 logger.info(
                     "pricing provider %s returned no result: %s",
@@ -223,7 +242,13 @@ class PricingService:
     def _run_provider(
         self, provider: PriceProvider, identity: ItemIdentity
     ) -> PriceEstimate:
-        """Invoke the async provider from our sync context.
+        """Sync shim around :meth:`_run_provider_async`."""
+        return asyncio.run(self._run_provider_async(provider, identity))
+
+    async def _run_provider_async(
+        self, provider: PriceProvider, identity: ItemIdentity
+    ) -> PriceEstimate:
+        """Invoke the async provider (async path).
 
         The LLM provider touches the budget guard (we check before,
         record after). The eBay provider doesn't — it's a free-tier
@@ -234,7 +259,7 @@ class PricingService:
             guard = DailyBudgetGuard(self.db, self.user)
             guard.check_or_raise("pricing")
 
-        estimate = asyncio.run(provider.lookup(identity))
+        estimate = await provider.lookup(identity)
 
         # TODO(v3.1): thread usage tokens back from the provider so we
         # can record real numbers here. For now the LLM provider

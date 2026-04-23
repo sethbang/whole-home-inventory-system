@@ -71,11 +71,65 @@ any Postgres deployment takes real traffic.
   backend so fail-fast guards and feature-flagged tasks behave
   identically on both sides.
 
+- **Vision and pricing await their async LLM calls instead of
+  wrapping them in `asyncio.run`** (`app/vision/service.py`,
+  `app/pricing/service.py`, routers, ARQ tasks). The previous code
+  wrapped the async OpenAI client calls in `asyncio.run()` inside
+  sync service methods, then called those from async FastAPI
+  handlers / async ARQ tasks — both of which are already inside a
+  running event loop. `asyncio.run()` raises "cannot be called from
+  a running event loop", so `POST /api/vision/identify` and
+  `POST /api/pricing/estimate` both crashed 500 the instant they
+  actually tried to reach a provider. Now each service exposes
+  `identify_async` / `estimate_async` as the canonical coroutine
+  (awaited directly by the async callers), with sync `identify` /
+  `estimate` kept as `asyncio.run`-backed shims for tests and
+  future non-async call sites. Two new regression tests
+  (`test_identify_async_awaitable_inside_running_loop`,
+  `test_estimate_async_awaitable_inside_running_loop`) drive the
+  async methods from inside a live loop to keep the bug from
+  coming back. Bug was masked in production because of F7 (the
+  feature flag never reached the container), and masked in CI
+  because the existing tests mock the client with `AsyncMock`
+  values that don't actually exercise `asyncio.run`.
+- **OpenRouter-specific request knobs moved under `extra_body`**
+  (`app/llm/openai_compatible.py`). The OpenAI SDK raises
+  `TypeError: AsyncCompletions.create() got an unexpected keyword
+  argument 'plugins'` when handed any kwarg it doesn't recognize;
+  `plugins` (for Response Healing) and `tools: [{type:
+  openrouter:web_search}]` are both OR-only extensions and must be
+  nested under `extra_body` so the SDK forwards them opaquely
+  instead of rejecting them. The `test_llm_openai_compat` tests now
+  assert the new placement explicitly so a revert doesn't sneak
+  through.
+
 ### Security
 
 - **python-dotenv bumped to >=1.2.2,<2** to resolve
   **CVE-2026-28684** (previously pinned at 1.0.1). CI's
   `pip-audit --strict` leg would otherwise block the push.
+
+### Known issues (captured during v3.1 pre-push validation)
+
+- **Pricing LLM-provider path with OpenRouter `web_search`**
+  currently surfaces as `LLM provider returned an unparseable
+  response: LLM response content was null` — OpenRouter replies
+  200 but `choices[0].message.content` is null when the model
+  completes via the web_search tool. Vision works end-to-end; only
+  the LLM half of the pricing provider chain is affected. The eBay
+  Browse API provider (unimpacted by this bug) is the primary
+  pricing path in production; LLM pricing is a fallback.
+  Workaround for operators: set `PRICING_PROVIDERS=ebay` to skip
+  the LLM provider until this is fixed.
+- **ARQ `DeserializationError: unable to deserialize job result`**
+  fires on `GET /api/jobs/{id}` when the task raised an
+  `HTTPException` — the FastAPI/Starlette `HTTPException` class
+  uses kwargs-only init and doesn't round-trip through pickle
+  cleanly (`HTTPException.__init__() missing 1 required positional
+  argument: 'status_code'`). Affects the user-facing job-status
+  poll after any task that raised HTTPException. Fix plan: catch
+  HTTPException at the task boundary and return a serializable
+  dict instead.
 
 ## [3.1.0] - 2026-04-23
 

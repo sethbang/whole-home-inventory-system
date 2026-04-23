@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock
 
@@ -248,4 +249,28 @@ def test_force_refresh_bypasses_cache(db_session, user):
     )
     assert envelope.estimate.median == 500.0
     assert envelope.cache_hit is False
+    assert ebay.calls == 1
+
+
+def test_estimate_async_awaitable_inside_running_loop(db_session, user):
+    """Regression for F8 (pre-push validation pass).
+
+    ``PricingService.estimate`` used to call :func:`asyncio.run` internally
+    at the provider boundary, which raises ``asyncio.run() cannot be called
+    from a running event loop`` when the caller is already inside one —
+    i.e. FastAPI's async ``_enqueue_or_run`` fallback path or an ARQ worker
+    task. Ensure ``estimate_async`` can be awaited from a running loop
+    without nesting ``asyncio.run``.
+    """
+    ebay = _StubProvider("ebay", estimate=_estimate(median=250.0))
+    service = PricingService(db_session, user, providers=[ebay])
+
+    async def inner():
+        return await service.estimate_async(
+            metadata={"brand": "Sony", "model_number": "A7 IV"},
+        )
+
+    envelope = asyncio.run(inner())
+    assert envelope.estimate.median == 250.0
+    assert envelope.provider == "ebay"
     assert ebay.calls == 1

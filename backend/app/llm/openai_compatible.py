@@ -151,6 +151,15 @@ class OpenAICompatibleClient:
             },
         }
 
+        # OpenRouter-specific knobs go through the OpenAI SDK's
+        # ``extra_body`` escape hatch; the SDK raises a TypeError on
+        # any keyword argument it doesn't recognize
+        # (``AsyncCompletions.create() got an unexpected keyword
+        # argument 'plugins'``) so `plugins` / `tools` with the
+        # ``openrouter:`` type prefix must be nested under
+        # ``extra_body`` rather than lifted to top-level body keys.
+        extra_body: Dict[str, Any] = {}
+
         if use_web_search:
             search_params: Dict[str, Any] = {
                 "max_results": settings.PRICING_WEB_SEARCH_MAX_RESULTS,
@@ -162,12 +171,15 @@ class OpenAICompatibleClient:
                 )
             if extra_search_params:
                 search_params.update(extra_search_params)
-            body["tools"] = [
+            extra_body["tools"] = [
                 {"type": "openrouter:web_search", "parameters": search_params}
             ]
 
         if settings.LLM_RESPONSE_HEALING:
-            body["plugins"] = [{"id": "response-healing"}]
+            extra_body["plugins"] = [{"id": "response-healing"}]
+
+        if extra_body:
+            body["extra_body"] = extra_body
 
         response = await self._with_retry(body)
         return self._parse_response(response)

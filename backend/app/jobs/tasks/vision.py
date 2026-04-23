@@ -37,7 +37,11 @@ async def vision_identify(
             return {"ok": False, "error": "user_not_found"}
         image_bytes = [base64.b64decode(b) for b in images_b64]
         service = VisionService(db=db, user=user)
-        result = service.identify(image_bytes, hints=hints)
+        # The ARQ worker runs tasks in an active asyncio loop, so we
+        # await the async entry point directly. Calling service.identify
+        # here would wrap the coroutine in asyncio.run() and raise
+        # "asyncio.run() cannot be called from a running event loop".
+        result = await service.identify_async(image_bytes, hints=hints)
         return result.model_dump(mode="json")
     finally:
         db.close()
