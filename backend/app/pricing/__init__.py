@@ -15,15 +15,30 @@ Flow at the service level:
     → response ends up on GET /api/jobs/{id}
 """
 
-from .cache import PriceCache, CacheLookupResult
+from .aggregate import aggregate_prices
+from .cache import CacheLookupResult, PriceCache
 from .normalizer import ItemIdentity, normalize_identity
-from .provider_base import PriceProvider, PriceProviderError
+from .provider_base import (
+    PriceProvider,
+    PriceProviderError,
+    PriceProviderNoResult,
+    PriceProviderRateLimited,
+    PriceProviderUnavailable,
+)
+from .provider_ebay_browse import EbayBrowseProvider
+from .provider_llm import LLMPricingProvider
 
 __all__ = [
     "CacheLookupResult",
+    "EbayBrowseProvider",
     "ItemIdentity",
+    "LLMPricingProvider",
     "PriceCache",
     "PriceProvider",
     "PriceProviderError",
+    "PriceProviderNoResult",
+    "PriceProviderRateLimited",
+    "PriceProviderUnavailable",
+    "aggregate_prices",
     "normalize_identity",
 ]
