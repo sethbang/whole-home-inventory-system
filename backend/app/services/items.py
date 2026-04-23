@@ -21,12 +21,24 @@ from datetime import datetime
 from typing import Any
 
 from fastapi import HTTPException
-from sqlalchemy import delete, func, or_, select
+from sqlalchemy import delete, func, select, text
 from sqlalchemy.orm import Session
 
 from .. import models, schemas
 
 logger = logging.getLogger(__name__)
+
+
+# FTS5 reserves a handful of characters for query syntax. We're only
+# exposing plain-string search to the UI, so the safest thing is to
+# wrap the whole query in double quotes and escape any embedded
+# double quotes. This sidesteps the full MATCH grammar — no operators,
+# no column filters, no prefix searches from the user's perspective.
+def _sanitize_fts5(query: str) -> str:
+    escaped = query.replace('"', '""').strip()
+    if not escaped:
+        return '""'
+    return f'"{escaped}"'
 
 
 # Fields on Item that may be updated via the import endpoint. Keeps us from
@@ -117,16 +129,40 @@ class ItemService:
         base = select(models.Item).where(models.Item.owner_id == self.user.id)
 
         if search_filter.query:
-            like = f"%{search_filter.query}%"
-            base = base.where(
-                or_(
-                    models.Item.name.ilike(like),
-                    models.Item.category.ilike(like),
-                    models.Item.location.ilike(like),
-                    models.Item.brand.ilike(like),
-                    models.Item.notes.ilike(like),
+            dialect = self.db.get_bind().dialect.name
+            if dialect == "sqlite":
+                # FTS5 virtual table lookup. Scoped to the current owner
+                # via a subquery on items_fts.item_id.
+                fts_match = text(
+                    "items.id IN ("
+                    "SELECT item_id FROM items_fts WHERE items_fts MATCH :q"
+                    ")"
+                ).bindparams(q=_sanitize_fts5(search_filter.query))
+                base = base.where(fts_match)
+            elif dialect == "postgresql":
+                # Stored tsvector + GIN index. plainto_tsquery handles
+                # tokenization + stop-word removal for us.
+                pg_match = text(
+                    "search_tsv @@ plainto_tsquery('english', :q)"
+                ).bindparams(q=search_filter.query)
+                base = base.where(pg_match)
+            else:
+                # Every dialect we build for has an FTS path; fall back
+                # to the legacy ILIKE fan-out for completeness (raises
+                # a warning so the gap is visible).
+                logger.warning(
+                    "no FTS path for dialect %s; using legacy ILIKE fan-out",
+                    dialect,
                 )
-            )
+                like = f"%{search_filter.query}%"
+                base = base.where(
+                    models.Item.name.ilike(like)
+                    | models.Item.brand.ilike(like)
+                    | models.Item.model_number.ilike(like)
+                    | models.Item.notes.ilike(like)
+                    | models.Item.category.ilike(like)
+                    | models.Item.location.ilike(like)
+                )
         if search_filter.category:
             base = base.where(models.Item.category == search_filter.category)
         if search_filter.location:

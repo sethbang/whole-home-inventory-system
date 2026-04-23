@@ -37,6 +37,7 @@ from sqlalchemy.orm import sessionmaker  # noqa: E402
 from sqlalchemy.pool import StaticPool  # noqa: E402
 
 from app import database, models, security  # noqa: E402
+from app.fts import install_postgres_fts, install_sqlite_fts  # noqa: E402
 from app.main import app  # noqa: E402
 
 
@@ -63,6 +64,15 @@ def engine():
     # instance start clean. On SQLite's :memory: the drop is a no-op.
     models.Base.metadata.drop_all(bind=eng)
     models.Base.metadata.create_all(bind=eng)
+    # create_all() doesn't build the FTS scaffolding (virtual tables +
+    # triggers on SQLite, tsvector column + GIN + trigger on Postgres)
+    # — that's Alembic migration territory. Layer it on top so tests
+    # exercise the real FTS code path in ItemService.list().
+    with eng.begin() as conn:
+        if _is_sqlite():
+            install_sqlite_fts(conn)
+        elif _TEST_DATABASE_URL.startswith("postgresql"):
+            install_postgres_fts(conn)
     return eng
 
 
