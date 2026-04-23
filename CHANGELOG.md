@@ -120,6 +120,26 @@ any Postgres deployment takes real traffic.
   tests cover the happy path on both delete shapes plus the
   missing-disk-file edge case.
 
+- **ARQ tasks no longer poison the result blob with HTTPException**
+  (`app/jobs/tasks/{vision,pricing,backups}.py`,
+  `app/routers/jobs.py`). `GET /api/jobs/{job_id}` raised
+  `DeserializationError: unable to deserialize job result` whenever
+  a task surfaced an `HTTPException` because Starlette's
+  `HTTPException.__init__` is kwargs-only and doesn't survive ARQ's
+  pickle round-trip (`HTTPException.__init__() missing 1 required
+  positional argument: 'status_code'`). Each task now catches
+  `HTTPException` at its boundary and returns a serializable
+  `{"ok": false, "error": <detail>, "status_code": <code>}` envelope
+  instead of re-raising; the jobs router detects that shape and
+  surfaces it as a `failed` `JobDetail` with the status code
+  prefixed onto the error string so the polling client gets the
+  same surface as a real exception result. As defense in depth the
+  router also wraps `result_info()` in a `try/except
+  DeserializationError` so any future un-picklable exception type
+  surfaces as a failed job rather than crashing the polling
+  endpoint with a 500. Eight new regression tests cover the
+  per-task envelope translation plus the two new router branches.
+
 ### Security
 
 - **python-dotenv bumped to >=1.2.2,<2** to resolve
@@ -138,15 +158,6 @@ any Postgres deployment takes real traffic.
   pricing path in production; LLM pricing is a fallback.
   Workaround for operators: set `PRICING_PROVIDERS=ebay` to skip
   the LLM provider until this is fixed.
-- **ARQ `DeserializationError: unable to deserialize job result`**
-  fires on `GET /api/jobs/{id}` when the task raised an
-  `HTTPException` — the FastAPI/Starlette `HTTPException` class
-  uses kwargs-only init and doesn't round-trip through pickle
-  cleanly (`HTTPException.__init__() missing 1 required positional
-  argument: 'status_code'`). Affects the user-facing job-status
-  poll after any task that raised HTTPException. Fix plan: catch
-  HTTPException at the task boundary and return a serializable
-  dict instead.
 
 ## [3.1.0] - 2026-04-23
 

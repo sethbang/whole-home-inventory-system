@@ -14,7 +14,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from arq.jobs import JobStatus as ArqJobStatus
+from arq.jobs import DeserializationError, JobStatus as ArqJobStatus
 
 from app.jobs.client import _redis_settings_from_url
 from app.main import app
@@ -172,3 +172,73 @@ def test_jobs_endpoint_surfaces_failure(client, auth_headers, user, stub_arq_poo
     assert body["status"] == "failed"
     assert body["result"] is None
     assert "disk full" in body["error"]
+
+
+def test_jobs_endpoint_unwraps_http_exception_envelope(
+    client, auth_headers, user, stub_arq_pool
+):
+    """Tasks that catch HTTPException return ``{ok: False, status_code, error}``
+    instead of re-raising (F10b). The router promotes that shape into a
+    ``failed`` JobDetail with the status code prefixed onto the error string,
+    so the polling client gets the same surface as a real exception result.
+    """
+    with patch("app.routers.jobs.Job") as MockJob:
+        mock = MockJob.return_value
+        mock.status = AsyncMock(return_value=ArqJobStatus.complete)
+        mock.info = AsyncMock(
+            return_value=SimpleNamespace(
+                kwargs={"user_id": str(user.id)},
+                enqueue_time=None,
+                start_time=None,
+            )
+        )
+        mock.result_info = AsyncMock(
+            return_value=SimpleNamespace(
+                success=True,
+                result={
+                    "ok": False,
+                    "error": "Daily vision budget exceeded",
+                    "status_code": 402,
+                },
+                finish_time=datetime(2026, 4, 22, 10, 0, 35, tzinfo=timezone.utc),
+            )
+        )
+
+        resp = client.get("/api/jobs/budget", headers=auth_headers)
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "failed"
+    assert body["result"] is None
+    assert body["error"] == "402: Daily vision budget exceeded"
+
+
+def test_jobs_endpoint_handles_deserialization_error(
+    client, auth_headers, user, stub_arq_pool
+):
+    """If ARQ can't unpickle the task result, surface as a failed JobDetail
+    instead of crashing the polling endpoint with a 500. Defense in depth
+    for any future un-picklable exception type the task layer doesn't
+    explicitly catch.
+    """
+    with patch("app.routers.jobs.Job") as MockJob:
+        mock = MockJob.return_value
+        mock.status = AsyncMock(return_value=ArqJobStatus.complete)
+        mock.info = AsyncMock(
+            return_value=SimpleNamespace(
+                kwargs={"user_id": str(user.id)},
+                enqueue_time=None,
+                start_time=None,
+            )
+        )
+        mock.result_info = AsyncMock(
+            side_effect=DeserializationError("unable to deserialize job result")
+        )
+
+        resp = client.get("/api/jobs/poisoned", headers=auth_headers)
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "failed"
+    assert body["result"] is None
+    assert "un-deserializable" in body["error"]

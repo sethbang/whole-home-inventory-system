@@ -14,7 +14,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 
-from arq.jobs import Job, JobStatus as ArqJobStatus
+from arq.jobs import DeserializationError, Job, JobStatus as ArqJobStatus
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from .. import models, schemas
@@ -80,15 +80,39 @@ async def get_job(
     finished_at: float | None = None
 
     if status == ArqJobStatus.complete:
-        # ``result_info()`` is the zero-raise variant that returns both
-        # success and failure payloads without re-raising the worker
-        # exception on the request path.
-        result_info = await job.result_info()
+        try:
+            # ``result_info()`` is the zero-raise variant that returns both
+            # success and failure payloads without re-raising the worker
+            # exception on the request path.
+            result_info = await job.result_info()
+        except DeserializationError as exc:
+            # ARQ couldn't unpickle the stored result — usually because
+            # the task raised an exception type whose __init__ doesn't
+            # round-trip through pickle (Starlette's HTTPException is the
+            # canonical offender; the task layer now catches it before
+            # re-raise, but other exception types could trip this in
+            # the future). Surface as a generic failure rather than a
+            # 500 on the polling endpoint.
+            logger.warning("job %s result_info deserialization failed: %s", job_id, exc)
+            result_info = None
+            error = "Job completed with an un-deserializable result; check worker logs."
+
         if result_info is not None:
             finished_at = result_info.finish_time.timestamp() if result_info.finish_time else None
             if result_info.success:
                 payload = result_info.result
-                result = payload if isinstance(payload, dict) else {"value": payload}
+                # Tasks that catch HTTPException internally return a
+                # ``{ok: False, status_code, error}`` envelope so they
+                # don't poison the pickle. Promote that into the same
+                # ``failed`` shape callers expect from a real exception.
+                if (
+                    isinstance(payload, dict)
+                    and payload.get("ok") is False
+                    and "status_code" in payload
+                ):
+                    error = f"{payload['status_code']}: {payload.get('error') or 'Job failed'}"
+                else:
+                    result = payload if isinstance(payload, dict) else {"value": payload}
             else:
                 error = str(result_info.result)
 

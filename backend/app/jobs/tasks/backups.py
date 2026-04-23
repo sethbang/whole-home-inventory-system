@@ -14,6 +14,8 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, Optional
 
+from fastapi import HTTPException
+
 from ... import models
 from ...database import SessionLocal
 from ...services.backups import BackupService
@@ -40,7 +42,16 @@ async def backup_create(ctx: Dict[str, Any], *, user_id: str) -> Dict[str, Any]:
     logger.info("backup_create task start (user=%s)", user_id)
     service, db = _open_service(user_id)
     try:
-        backup = service.create()
+        try:
+            backup = service.create()
+        except HTTPException as exc:
+            # Starlette HTTPException doesn't pickle through ARQ — convert
+            # to a serializable error dict the jobs router can surface.
+            return {
+                "ok": False,
+                "error": str(exc.detail),
+                "status_code": exc.status_code,
+            }
         return {
             "backup_id": str(backup.id),
             "filename": backup.filename,
@@ -66,8 +77,16 @@ async def backup_restore(
     )
     service, db = _open_service(user_id)
     try:
-        # commit_restore returns a dict shaped like RestoreResponse —
-        # already JSON-serializable for ARQ to stash on the job row.
-        return service.commit_restore(backup_id, confirm_item_count)
+        try:
+            # commit_restore returns a dict shaped like RestoreResponse —
+            # already JSON-serializable for ARQ to stash on the job row.
+            return service.commit_restore(backup_id, confirm_item_count)
+        except HTTPException as exc:
+            # See backup_create above — same pickle-safety conversion.
+            return {
+                "ok": False,
+                "error": str(exc.detail),
+                "status_code": exc.status_code,
+            }
     finally:
         db.close()

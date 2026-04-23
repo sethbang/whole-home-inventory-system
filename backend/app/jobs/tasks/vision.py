@@ -12,6 +12,8 @@ import base64
 import logging
 from typing import Any, Dict, List, Optional
 
+from fastapi import HTTPException
+
 from ... import models
 from ...database import SessionLocal
 from ...vision import VisionService
@@ -34,14 +36,26 @@ async def vision_identify(
     try:
         user = db.query(models.User).filter(models.User.id == user_id).one_or_none()
         if user is None:
-            return {"ok": False, "error": "user_not_found"}
+            return {"ok": False, "error": "user_not_found", "status_code": 404}
         image_bytes = [base64.b64decode(b) for b in images_b64]
         service = VisionService(db=db, user=user)
-        # The ARQ worker runs tasks in an active asyncio loop, so we
-        # await the async entry point directly. Calling service.identify
-        # here would wrap the coroutine in asyncio.run() and raise
-        # "asyncio.run() cannot be called from a running event loop".
-        result = await service.identify_async(image_bytes, hints=hints)
+        try:
+            # The ARQ worker runs tasks in an active asyncio loop, so we
+            # await the async entry point directly. Calling service.identify
+            # here would wrap the coroutine in asyncio.run() and raise
+            # "asyncio.run() cannot be called from a running event loop".
+            result = await service.identify_async(image_bytes, hints=hints)
+        except HTTPException as exc:
+            # Starlette's HTTPException doesn't pickle cleanly through ARQ
+            # (kwargs-only init), so re-raising poisons the result blob and
+            # GET /api/jobs/{id} fails with DeserializationError. Catch it
+            # here and translate into a serializable dict; the jobs router
+            # detects this shape and surfaces it as a failed JobDetail.
+            return {
+                "ok": False,
+                "error": str(exc.detail),
+                "status_code": exc.status_code,
+            }
         return result.model_dump(mode="json")
     finally:
         db.close()
