@@ -75,4 +75,10 @@ export const queryKeys = {
     all: ['jobs'] as const,
     detail: (jobId: string) => [...queryKeys.jobs.all, 'detail', jobId] as const,
   },
+  pricing: {
+    // v3.1: item-value pricing.
+    all: ['pricing'] as const,
+    estimate: (itemId: string) =>
+      [...queryKeys.pricing.all, 'estimate', itemId] as const,
+  },
 } as const;

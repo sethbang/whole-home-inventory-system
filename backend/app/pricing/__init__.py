@@ -27,6 +27,7 @@ from .provider_base import (
 )
 from .provider_ebay_browse import EbayBrowseProvider
 from .provider_llm import LLMPricingProvider
+from .service import PricingService
 
 __all__ = [
     "CacheLookupResult",
@@ -39,6 +40,7 @@ __all__ = [
     "PriceProviderNoResult",
     "PriceProviderRateLimited",
     "PriceProviderUnavailable",
+    "PricingService",
     "aggregate_prices",
     "normalize_identity",
 ]

@@ -20,6 +20,7 @@ from typing import Any, Dict
 from .client import _redis_settings_from_url
 from .tasks.backups import backup_create, backup_restore
 from .tasks.images import thumbnail_generate
+from .tasks.pricing import pricing_refresh
 from .tasks.vision import vision_identify
 from ..logging_config import setup_logging
 from ..settings import settings
@@ -60,11 +61,13 @@ class WorkerSettings:
     # v3.0 Part D: backup_create, backup_restore.
     # v3.0 Part E: thumbnail_generate.
     # v3.1 Part C: vision_identify.
+    # v3.1 Part F: pricing_refresh.
     functions: list = [
         backup_create,
         backup_restore,
         thumbnail_generate,
         vision_identify,
+        pricing_refresh,
     ]
 
     on_startup = _on_startup

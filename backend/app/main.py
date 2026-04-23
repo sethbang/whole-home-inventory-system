@@ -23,6 +23,7 @@ from .routers import (
     images,
     items,
     jobs,
+    pricing,
     vision,
 )
 from .settings import settings
@@ -156,6 +157,7 @@ app.include_router(ebay.router, prefix="/api")
 app.include_router(facebook.router, prefix="/api")
 app.include_router(jobs.router, prefix="/api")
 app.include_router(vision.router, prefix="/api")
+app.include_router(pricing.router, prefix="/api")
 
 
 @app.get("/api/health")

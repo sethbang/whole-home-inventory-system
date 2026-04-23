@@ -637,6 +637,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/pricing/estimate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Estimate Price */
+        post: operations["estimate_price_api_pricing_estimate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/pricing/refresh/{item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Refresh Price */
+        post: operations["refresh_price_api_pricing_refresh__item_id__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/pricing/estimate/{item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Cached Estimate */
+        get: operations["get_cached_estimate_api_pricing_estimate__item_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -923,6 +974,25 @@ export interface components {
         Error: {
             /** Detail */
             detail: string;
+        };
+        /**
+         * EstimateRequest
+         * @description Body for ``POST /api/pricing/estimate``.
+         *
+         *     Exactly one of ``item_id`` or ``metadata`` must be set. Passing
+         *     both produces 422. Metadata is the shape the normalizer expects
+         *     — brand, model_number, name, condition, year.
+         */
+        EstimateRequest: {
+            /** Item Id */
+            item_id?: string | null;
+            /**
+             * Metadata
+             * @description Free-form item metadata for anonymous lookups (e.g. 'what would this be worth before I buy it?'). Must include at least a brand or model_number.
+             */
+            metadata?: {
+                [key: string]: unknown;
+            } | null;
         };
         /**
          * FbAvailability
@@ -1249,6 +1319,112 @@ export interface components {
          * @enum {string}
          */
         JobStatus: "queued" | "running" | "complete" | "failed" | "not_found";
+        /**
+         * PriceEstimate
+         * @description Structured resale estimate returned by a ``PriceProvider``.
+         */
+        PriceEstimate: {
+            /**
+             * Currency
+             * @description ISO 4217 currency code.
+             * @default USD
+             */
+            currency?: string;
+            /** Low */
+            low: number;
+            /** Median */
+            median: number;
+            /** High */
+            high: number;
+            /**
+             * Sample Count
+             * @description Number of comparables that contributed to the aggregate.
+             */
+            sample_count: number;
+            /**
+             * Sources
+             * @description Representative comparables (max ~10). Bigger samples are summarized in the aggregate.
+             */
+            sources?: components["schemas"]["PriceSource"][];
+            /**
+             * Confidence
+             * @description 0..1. Degrade when sample_count is low, comparables conflict, or staleness fallback fires.
+             */
+            confidence: number;
+        };
+        /**
+         * PriceEstimateEnvelope
+         * @description PriceEstimate + metadata returned by the pricing service.
+         *
+         *     The envelope adds provider / cache / cost bookkeeping that the LLM
+         *     doesn't need to produce — it's populated by ``PricingService`` as
+         *     the estimate flows through the layers.
+         */
+        PriceEstimateEnvelope: {
+            estimate: components["schemas"]["PriceEstimate"];
+            /**
+             * Provider
+             * @description Which provider produced this estimate.
+             */
+            provider: string;
+            /**
+             * Prompt Version
+             * @description PROMPT_VERSION when the LLM provider was used; empty for API-only providers.
+             * @default
+             */
+            prompt_version?: string;
+            /**
+             * Queried At
+             * Format: date-time
+             */
+            queried_at: string;
+            /**
+             * Cache Hit
+             * @default false
+             */
+            cache_hit?: boolean;
+            /**
+             * Cost Usd Estimate
+             * @default 0
+             */
+            cost_usd_estimate?: number;
+        };
+        /**
+         * PriceSource
+         * @description One comparable listing that contributes to a price estimate.
+         */
+        PriceSource: {
+            /**
+             * Title
+             * @description Listing title as shown at the source.
+             */
+            title: string;
+            /**
+             * Url
+             * @description Direct URL to the comparable listing. Must be canonical.
+             */
+            url: string;
+            /**
+             * Price
+             * @description Listed or sold price, in USD.
+             */
+            price: number;
+            /**
+             * Condition
+             * @description Condition label the source used (NEW / USED / etc.).
+             */
+            condition?: string | null;
+            /**
+             * Sold Date
+             * @description ISO date when the item sold (empty for active listings). Format YYYY-MM-DD.
+             */
+            sold_date?: string | null;
+            /**
+             * Source Site
+             * @description Short site name (e.g. 'ebay', 'mercari').
+             */
+            source_site?: string | null;
+        };
         /**
          * RestoreRequest
          * @description Body schema for POST /backups/{id}/restore when committing a restore.
@@ -2635,6 +2811,101 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobReference"] | components["schemas"]["VisionResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    estimate_price_api_pricing_estimate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EstimateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobReference"] | components["schemas"]["PriceEstimateEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refresh_price_api_pricing_refresh__item_id__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobReference"] | components["schemas"]["PriceEstimateEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_cached_estimate_api_pricing_estimate__item_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobReference"] | components["schemas"]["PriceEstimateEnvelope"];
                 };
             };
             /** @description Validation Error */

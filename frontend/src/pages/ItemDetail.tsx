@@ -13,11 +13,14 @@ import ImageGallery from '../components/ImageGallery';
 import EbayFields, { EbayFieldsData } from '../components/EbayFields';
 import FacebookFields from '../components/FacebookFields';
 import FacebookCopyPasteDialog from '../components/FacebookCopyPasteDialog';
+import PriceEstimateCard from '../components/PriceEstimateCard';
 import { items, images, ebay, facebook } from '../api/client';
 import { apiErrorMessage } from '../api/errors';
+import { isJobReference, useJobPoll } from '../api/jobs';
+import { pricing } from '../api/pricing';
 import { queryKeys } from '../api/queryKeys';
 import type { EbayCategoryResponse } from '../api/client';
-import type { FbFieldsData } from '../api/types';
+import type { FbFieldsData, PriceEstimateEnvelope } from '../api/types';
 import {
   type AddItemFormValues,
   type AddItemSubmitValues,
@@ -31,6 +34,9 @@ export default function ItemDetail() {
   const queryClient = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
   const [showCamera, setShowCamera] = useState(false);
+  const [priceEnvelope, setPriceEnvelope] =
+    useState<PriceEstimateEnvelope | null>(null);
+  const [priceJobId, setPriceJobId] = useState<string | null>(null);
 
   const { data: item, isLoading } = useQuery({
     queryKey: queryKeys.items.detail(id!),
@@ -55,6 +61,54 @@ export default function ItemDetail() {
   const fbCategories = fbCategoriesData?.categories ?? [];
 
   const [showFbDialog, setShowFbDialog] = useState(false);
+
+  // v3.1: pricing estimate + refresh. estimate() respects the cache;
+  // refresh() forces a fresh provider round-trip.
+  const estimatePrice = useMutation({
+    mutationFn: () => pricing.estimate({ item_id: id }),
+    onSuccess: (response) => {
+      setServerError(null);
+      if (isJobReference(response)) {
+        setPriceJobId(response.job_id);
+      } else {
+        setPriceEnvelope(response as PriceEstimateEnvelope);
+      }
+    },
+    onError: (err) => setServerError(apiErrorMessage(err, 'Pricing lookup failed')),
+  });
+
+  const refreshPrice = useMutation({
+    mutationFn: () => pricing.refresh(id!),
+    onSuccess: (response) => {
+      setServerError(null);
+      if (isJobReference(response)) {
+        setPriceJobId(response.job_id);
+      } else {
+        setPriceEnvelope(response as PriceEstimateEnvelope);
+      }
+    },
+    onError: (err) =>
+      setServerError(apiErrorMessage(err, 'Pricing refresh failed')),
+  });
+
+  const priceJob = useJobPoll(priceJobId);
+  useEffect(() => {
+    if (!priceJobId || !priceJob.data) return;
+    const { status, result, error } = priceJob.data;
+    if (status === 'complete' && result) {
+      setPriceJobId(null);
+      setPriceEnvelope(result as unknown as PriceEstimateEnvelope);
+      // Item pricing columns changed server-side — invalidate the item
+      // query so the parent re-fetches and re-renders.
+      queryClient.invalidateQueries({ queryKey: queryKeys.items.detail(id!) });
+    } else if (status === 'failed' || status === 'not_found') {
+      setPriceJobId(null);
+      setServerError(error ?? 'Pricing job failed');
+    }
+  }, [priceJob.data, priceJobId, id, queryClient]);
+
+  const pricingBusy =
+    estimatePrice.isPending || refreshPrice.isPending || priceJobId !== null;
 
   const {
     register,
@@ -418,6 +472,28 @@ export default function ItemDetail() {
                 <p className="mt-2 text-sm text-red-600">
                   {errors.current_value.message}
                 </p>
+              )}
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => estimatePrice.mutate()}
+                  disabled={pricingBusy}
+                  className="inline-flex items-center gap-2 rounded-md border border-primary bg-primary-subtle px-3 py-1 text-xs font-medium text-primary hover:bg-primary-subtle-hover disabled:opacity-60"
+                >
+                  {pricingBusy ? 'Checking…' : 'Estimate value with AI'}
+                </button>
+              </div>
+              {priceEnvelope && (
+                <div className="mt-3">
+                  <PriceEstimateCard
+                    envelope={priceEnvelope}
+                    refreshing={refreshPrice.isPending || priceJobId !== null}
+                    onRefresh={() => refreshPrice.mutate()}
+                    onApplyMedian={(median) => {
+                      setValue('current_value', String(median.toFixed(2)));
+                    }}
+                  />
+                </div>
               )}
             </div>
 
