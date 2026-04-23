@@ -49,6 +49,23 @@ any Postgres deployment takes real traffic.
   `condition: service_healthy`; the default compose file uses
   `required: false` (Compose v2.20+) so the dev stack still boots
   without those profiles.
+- **Compose env blocks now propagate every operator-visible setting**
+  to both `backend` and `worker` containers
+  (`docker-compose.yml`, `docker-compose.nas.yml`). The v3.1 release
+  documented `VISION_ENABLED=true` + LLM creds in `.env` as the way
+  to turn on vision/pricing, but neither compose file listed those
+  vars in its `environment:` block — so the vars were consumed only
+  for YAML substitution and never reached the container. The v3.1
+  intelligence layer was therefore **permanently off in any
+  docker-compose deployment** regardless of what the operator put
+  in `.env`. Same leak silenced `LLM_ALLOW_CLOUD`,
+  `VISION_DAILY_COST_CAP_USD`, `PRICING_DAILY_COST_CAP_USD`,
+  `EBAY_APP_ID`/`EBAY_CERT_ID`, plus `LOG_FORMAT`, `OTEL_*`,
+  `MAX_UPLOAD_BYTES`, `MAX_IMAGE_DIMENSION`, and the Postgres
+  `DB_POOL_*` knobs. Every one of these is now plumbed through.
+  The worker block is kept in lockstep with the backend's so
+  fail-fast guards and feature-flagged tasks behave identically
+  on both sides.
 
 ### Security
 
