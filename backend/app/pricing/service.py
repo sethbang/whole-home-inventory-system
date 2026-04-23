@@ -261,15 +261,17 @@ class PricingService:
 
         estimate = await provider.lookup(identity)
 
-        # TODO(v3.1): thread usage tokens back from the provider so we
-        # can record real numbers here. For now the LLM provider
-        # returns only the estimate — we stamp a nominal request
-        # count so the rate limit logic still trips.
         if guard is not None:
+            # The LLM provider stashes merged usage across its two
+            # calls (research + extraction) on ``last_usage``.
+            provider_usage = getattr(provider, "last_usage", None) or {
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+            }
             guard.record_usage(
                 "pricing",
                 model=settings.pricing_model(),
-                usage={"prompt_tokens": 0, "completion_tokens": 0},
+                usage=provider_usage,
             )
         return estimate
 

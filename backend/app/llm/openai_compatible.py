@@ -11,11 +11,19 @@ name. Works with:
 * Raw OpenAI (``https://api.openai.com/v1``) — structured outputs
   supported since gpt-4o; no OR-specific plugins.
 
-The two public methods are:
+The three public methods are:
 
-* :meth:`structured_completion` — text-only chat with
-  ``response_format: json_schema`` strict mode. Optional
-  ``use_web_search=True`` attaches OR's server tool. Returns a dict.
+* :meth:`structured_completion` — chat with ``response_format:
+  json_schema`` strict mode. Does NOT accept web_search — see
+  ``chat_completion`` for why. Returns ``{"data", "usage", ...}``.
+* :meth:`chat_completion` — natural-language chat, optionally with
+  the ``openrouter:web_search`` server tool. Returns ``{"text",
+  "usage", ...}``. Callers that want grounded structured output must
+  orchestrate a two-call flow (web_search here → structured extract
+  via ``structured_completion``), because OR's web_search middleware
+  mangles nested objects in structured-output responses by wrapping
+  them in a stringified ``{completionState, entries, type}``
+  envelope. Splitting the calls sidesteps the middleware path.
 * :meth:`vision_completion` — multipart messages carrying image parts
   (base64 data URLs). Same structured-output guarantees.
 
@@ -60,6 +68,46 @@ class LLMProviderError(LLMError):
     def __init__(self, message: str, *, raw: Any = None) -> None:
         super().__init__(message)
         self.raw = raw
+
+
+# JSON-schema numeric / string constraints that some providers (notably
+# Anthropic via Azure) reject with 400 "For 'number' type, property
+# 'minimum' is not supported". Pydantic emits these from Field(ge=...,
+# le=..., min_length=..., pattern=...). The strictness still applies on
+# our side at .model_validate() time, so hiding them from the provider
+# costs nothing.
+_SCHEMA_STRIP_KEYS = frozenset(
+    {
+        "minimum",
+        "maximum",
+        "exclusiveMinimum",
+        "exclusiveMaximum",
+        "minLength",
+        "maxLength",
+        "minItems",
+        "maxItems",
+        "pattern",
+        "format",
+        "multipleOf",
+    }
+)
+
+
+def _strip_schema_constraints(node: Any) -> Any:
+    """Recursively drop provider-unsupported constraint keys.
+
+    See ``_SCHEMA_STRIP_KEYS`` for the rationale. Returns a new
+    structure; the input is not mutated.
+    """
+    if isinstance(node, dict):
+        return {
+            k: _strip_schema_constraints(v)
+            for k, v in node.items()
+            if k not in _SCHEMA_STRIP_KEYS
+        }
+    if isinstance(node, list):
+        return [_strip_schema_constraints(v) for v in node]
+    return node
 
 
 def _derive_provider_name(base_url: str) -> str:
@@ -128,26 +176,33 @@ class OpenAICompatibleClient:
         messages: List[Dict[str, Any]],
         schema: Dict[str, Any],
         model: Optional[str] = None,
-        use_web_search: bool = False,
-        extra_search_params: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Ask the model for a schema-valid JSON object.
 
         ``schema`` is the dict shape OpenRouter's ``response_format``
         expects — ``{"name", "strict", "schema"}``. See
-        :mod:`app.schemas_llm` for the canonical constants.
+        :mod:`app.schemas_llm` for the canonical constants. The
+        embedded JSON schema is run through
+        :func:`_strip_schema_constraints` before being sent so
+        provider-side strictness about ``minimum`` / ``maxLength``
+        / ``pattern`` etc. doesn't trip 400s; the constraints are
+        still enforced on our side at ``model_validate`` time.
 
         Returns ``{"data": <parsed JSON>, "usage": {...}}``. Raises
         :class:`LLMProviderError` when the response can't be parsed
         even after the response-healing plugin has its turn.
         """
         model_name = model or settings.LLM_MODEL
+        sanitized_schema = {
+            **schema,
+            "schema": _strip_schema_constraints(schema.get("schema", {})),
+        }
         body: Dict[str, Any] = {
             "model": model_name,
             "messages": messages,
             "response_format": {
                 "type": "json_schema",
-                "json_schema": schema,
+                "json_schema": sanitized_schema,
             },
         }
 
@@ -155,9 +210,46 @@ class OpenAICompatibleClient:
         # ``extra_body`` escape hatch; the SDK raises a TypeError on
         # any keyword argument it doesn't recognize
         # (``AsyncCompletions.create() got an unexpected keyword
-        # argument 'plugins'``) so `plugins` / `tools` with the
-        # ``openrouter:`` type prefix must be nested under
-        # ``extra_body`` rather than lifted to top-level body keys.
+        # argument 'plugins'``) so `plugins` with the ``openrouter:``
+        # type prefix must be nested under ``extra_body`` rather than
+        # lifted to top-level body keys.
+        if settings.LLM_RESPONSE_HEALING:
+            body["extra_body"] = {"plugins": [{"id": "response-healing"}]}
+
+        response = await self._with_retry(body)
+        return self._parse_response(response)
+
+    async def chat_completion(
+        self,
+        *,
+        messages: List[Dict[str, Any]],
+        model: Optional[str] = None,
+        use_web_search: bool = False,
+        extra_search_params: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Natural-language chat completion, optionally web-grounded.
+
+        Used by :class:`LLMPricingProvider` as the first leg of its
+        two-call flow — ``web_search=True`` attaches OR's server tool
+        and the model returns grounded analysis as plain text. A
+        second call to :meth:`structured_completion` then converts
+        that text into a strict schema. The split is necessary
+        because OR's ``openrouter:web_search`` middleware mangles
+        nested objects in structured-output responses (every nested
+        object gets wrapped in a stringified ``{completionState,
+        entries, type}`` envelope). Confirmed across Anthropic /
+        OpenAI / Google models — it's an OR middleware issue.
+
+        Returns ``{"text": <content>, "usage": {...}, "provider":
+        ..., "queried_at": ..., "raw": <SDK response>}``. The raw
+        response is included so callers can introspect citations
+        (``response.choices[0].message.annotations``).
+        """
+        model_name = model or settings.LLM_MODEL
+        body: Dict[str, Any] = {
+            "model": model_name,
+            "messages": messages,
+        }
         extra_body: Dict[str, Any] = {}
 
         if use_web_search:
@@ -175,14 +267,26 @@ class OpenAICompatibleClient:
                 {"type": "openrouter:web_search", "parameters": search_params}
             ]
 
-        if settings.LLM_RESPONSE_HEALING:
-            extra_body["plugins"] = [{"id": "response-healing"}]
-
         if extra_body:
             body["extra_body"] = extra_body
 
         response = await self._with_retry(body)
-        return self._parse_response(response)
+        try:
+            text = response.choices[0].message.content
+        except (AttributeError, IndexError) as exc:
+            raise LLMProviderError(
+                "LLM response had no choices/message", raw=response
+            ) from exc
+        if text is None:
+            raise LLMProviderError("LLM response content was null", raw=response)
+        usage = _usage_dict(getattr(response, "usage", None))
+        return {
+            "text": text,
+            "usage": usage,
+            "provider": self.provider,
+            "queried_at": datetime.now(timezone.utc),
+            "raw": response,
+        }
 
     async def vision_completion(
         self,

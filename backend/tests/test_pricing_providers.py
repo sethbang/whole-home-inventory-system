@@ -281,16 +281,34 @@ def _llm_env(monkeypatch):
 
 
 def _stub_llm_client(estimate_payload: dict, *, web_search_count: int = 2):
-    """Build a minimal OpenAICompatibleClient stand-in."""
+    """Build a minimal OpenAICompatibleClient stand-in.
+
+    The provider uses a two-call flow (F10a fix): chat_completion with
+    web_search ON returns grounded text; structured_completion with
+    schema ON extracts the strict estimate. This stub wires both.
+    """
     client = MagicMock()
+    client.chat_completion = AsyncMock(
+        return_value={
+            "text": "Grounded analysis: low $1 median $2 high $3 etc.",
+            "usage": {
+                "prompt_tokens": 800,
+                "completion_tokens": 400,
+                "total_tokens": 1200,
+                "server_tool_use": {"web_search_requests": web_search_count},
+            },
+            "provider": "openrouter",
+            "queried_at": None,
+            "raw": None,
+        }
+    )
     client.structured_completion = AsyncMock(
         return_value={
             "data": estimate_payload,
             "usage": {
-                "prompt_tokens": 1000,
-                "completion_tokens": 800,
-                "total_tokens": 1800,
-                "server_tool_use": {"web_search_requests": web_search_count},
+                "prompt_tokens": 500,
+                "completion_tokens": 200,
+                "total_tokens": 700,
             },
             "provider": "openrouter",
             "queried_at": None,
@@ -299,7 +317,7 @@ def _stub_llm_client(estimate_payload: dict, *, web_search_count: int = 2):
     return client
 
 
-def test_llm_provider_happy_path_includes_web_search():
+def test_llm_provider_happy_path_runs_two_call_flow():
     payload = {
         "currency": "USD",
         "low": 2300.0,
@@ -327,10 +345,26 @@ def test_llm_provider_happy_path_includes_web_search():
     assert estimate.median == 2500.0
     assert estimate.confidence == 0.82
 
-    # The model was asked to use web_search.
-    call = client.structured_completion.await_args
-    assert call.kwargs["use_web_search"] is True
-    assert call.kwargs["model"] == "anthropic/claude-sonnet-4.6"
+    # Call 1: chat_completion with web_search=True, correct model.
+    client.chat_completion.assert_awaited_once()
+    call1 = client.chat_completion.await_args
+    assert call1.kwargs["use_web_search"] is True
+    assert call1.kwargs["model"] == "anthropic/claude-sonnet-4.6"
+
+    # Call 2: structured_completion (no web_search kwarg at all) with the
+    # strict schema.
+    client.structured_completion.assert_awaited_once()
+    call2 = client.structured_completion.await_args
+    assert "use_web_search" not in call2.kwargs
+    assert call2.kwargs["model"] == "anthropic/claude-sonnet-4.6"
+    # Extraction prompt must carry the research text into the user turn.
+    user_turn = [m for m in call2.kwargs["messages"] if m["role"] == "user"][0]
+    assert "Grounded analysis" in user_turn["content"]
+
+    # Merged usage from both calls is stashed for the service to read.
+    assert provider.last_usage["prompt_tokens"] == 800 + 500
+    assert provider.last_usage["completion_tokens"] == 400 + 200
+    assert provider.last_usage["server_tool_use"]["web_search_requests"] == 2
 
 
 def test_llm_provider_requires_llm_config(monkeypatch):

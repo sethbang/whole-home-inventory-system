@@ -124,24 +124,43 @@ def test_structured_completion_respects_response_healing_flag(monkeypatch):
     assert "plugins" not in kwargs.get("extra_body", {})
 
 
-def test_structured_completion_attaches_web_search_tool():
+def test_chat_completion_attaches_web_search_tool():
+    """The ``chat_completion`` method is the web_search entry point.
+
+    ``structured_completion`` no longer accepts web_search — see the
+    F10a fix: OR's web_search middleware mangles nested objects in
+    structured-output responses, so pricing uses a two-call flow
+    (web_search chat_completion → schema-only structured_completion).
+    """
     client = OpenAICompatibleClient()
-    create = _install_stub(
-        client,
-        {"low": 1.0, "median": 2.0, "high": 3.0, "sample_count": 0, "sources": [], "confidence": 0.5, "currency": "USD"},
+    # chat_completion returns text, not JSON — install a text stub.
+    from unittest.mock import AsyncMock
+
+    resp = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(content="some grounded analysis text"),
+                finish_reason="stop",
+            )
+        ],
+        usage=SimpleNamespace(
+            prompt_tokens=100, completion_tokens=50, total_tokens=150
+        ),
     )
+    create = AsyncMock(return_value=resp)
+    client._client.chat = SimpleNamespace(completions=SimpleNamespace(create=create))
 
     import asyncio
 
-    asyncio.run(
-        client.structured_completion(
+    result = asyncio.run(
+        client.chat_completion(
             messages=[{"role": "user", "content": "price it"}],
-            schema=PRICE_ESTIMATE_SCHEMA,
             use_web_search=True,
             extra_search_params={"max_results": 2},
         )
     )
 
+    assert result["text"] == "some grounded analysis text"
     # OpenRouter-type tools live under extra_body (F9), not top-level.
     kwargs = create.await_args.kwargs
     assert "tools" not in kwargs
@@ -152,6 +171,57 @@ def test_structured_completion_attaches_web_search_tool():
     assert tools[0]["parameters"]["max_results"] == 2
     # max_total_results from settings applies.
     assert "max_total_results" in tools[0]["parameters"]
+    # chat_completion never sends response_format — that's the whole point
+    # of the two-call split (F10a).
+    assert "response_format" not in kwargs
+
+
+def test_structured_completion_strips_provider_unsupported_constraints():
+    """Pydantic emits ``minimum``/``maximum``/``pattern`` constraints that
+    Anthropic-via-Azure (and possibly others) reject with 400. The client
+    strips these from the json_schema before sending; strictness still
+    applies on our side at ``model_validate`` time.
+    """
+    client = OpenAICompatibleClient()
+    create = _install_stub(
+        client,
+        {"low": 1.0, "median": 2.0, "high": 3.0, "sample_count": 0,
+         "sources": [], "confidence": 0.5, "currency": "USD"},
+    )
+
+    import asyncio
+
+    asyncio.run(
+        client.structured_completion(
+            messages=[{"role": "user", "content": "x"}],
+            schema=PRICE_ESTIMATE_SCHEMA,
+        )
+    )
+
+    sent_schema = create.await_args.kwargs["response_format"]["json_schema"]["schema"]
+
+    def _walk(node):
+        if isinstance(node, dict):
+            for k, v in node.items():
+                assert k not in {
+                    "minimum",
+                    "maximum",
+                    "exclusiveMinimum",
+                    "exclusiveMaximum",
+                    "minLength",
+                    "maxLength",
+                    "minItems",
+                    "maxItems",
+                    "pattern",
+                    "format",
+                    "multipleOf",
+                }, f"found forbidden schema key {k!r} in outgoing payload"
+                _walk(v)
+        elif isinstance(node, list):
+            for v in node:
+                _walk(v)
+
+    _walk(sent_schema)
 
 
 def test_vision_completion_attaches_base64_data_urls():

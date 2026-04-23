@@ -200,7 +200,7 @@ class PriceEstimateEnvelope(BaseModel):
 # Bumped whenever the system prompt or target schema changes materially.
 # Persisted on every suggestion / estimate row so we can A/B future
 # prompt variants.
-PROMPT_VERSION = "v3.1.0"
+PROMPT_VERSION = "v3.1.1"
 
 
 # ---------------------------------------------------------------------------

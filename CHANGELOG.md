@@ -140,24 +140,41 @@ any Postgres deployment takes real traffic.
   endpoint with a 500. Eight new regression tests cover the
   per-task envelope translation plus the two new router branches.
 
+- **LLM pricing provider now uses a two-call flow** to sidestep an
+  OpenRouter middleware bug (`app/pricing/provider_llm.py`,
+  `app/llm/openai_compatible.py`, `app/llm/prompts.py`,
+  `app/pricing/service.py`). When `openrouter:web_search` was
+  combined with `response_format: json_schema strict` in a single
+  request, OR mangled every nested object in the response into a
+  stringified `{completionState, entries, type}` envelope —
+  confirmed across Anthropic, OpenAI, AND Google models, so it's
+  an OR middleware issue rather than a model-specific quirk. The
+  fix splits pricing into two calls: (1) `chat_completion` with
+  `web_search` ON and no schema returns grounded analysis as
+  natural text; (2) `structured_completion` with the strict
+  `PRICE_ESTIMATE_SCHEMA` (no web_search) extracts that text into
+  a validated `PriceEstimate`. End-to-end cost on Sonnet 4.6 lands
+  at ~$0.20-0.25 per pricing lookup (cheaper than the broken
+  single-call shape was when it occasionally succeeded). Two new
+  prompts (`PRICING_RESEARCH_PROMPT`, `PRICING_EXTRACTION_PROMPT`)
+  carry the per-call instructions; `PROMPT_VERSION` bumps to
+  `v3.1.1`. The provider stashes merged token / cost / web_search
+  counters across both calls on `last_usage` so the daily budget
+  guard sees real numbers (closes the v3.1.0 TODO that stamped
+  zero-token usage entries for LLM provider calls). The
+  `structured_completion` path also strips
+  `minimum`/`maximum`/`pattern`/etc. constraints from the JSON
+  schema before sending — Anthropic via Azure rejects these with
+  `For 'number' type, property 'minimum' is not supported`;
+  Pydantic's own validation still enforces them at
+  `model_validate` time so nothing is lost.
+
 ### Security
 
 - **python-dotenv bumped to >=1.2.2,<2** to resolve
   **CVE-2026-28684** (previously pinned at 1.0.1). CI's
   `pip-audit --strict` leg would otherwise block the push.
 
-### Known issues (captured during v3.1 pre-push validation)
-
-- **Pricing LLM-provider path with OpenRouter `web_search`**
-  currently surfaces as `LLM provider returned an unparseable
-  response: LLM response content was null` — OpenRouter replies
-  200 but `choices[0].message.content` is null when the model
-  completes via the web_search tool. Vision works end-to-end; only
-  the LLM half of the pricing provider chain is affected. The eBay
-  Browse API provider (unimpacted by this bug) is the primary
-  pricing path in production; LLM pricing is a fallback.
-  Workaround for operators: set `PRICING_PROVIDERS=ebay` to skip
-  the LLM provider until this is fixed.
 
 ## [3.1.0] - 2026-04-23
 
