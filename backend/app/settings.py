@@ -33,6 +33,13 @@ class Settings(BaseSettings):
     BACKUP_DIR: str = "./backups"
     DATABASE_URL: str = ""
 
+    # Database connection tuning — only Postgres honors pool_size /
+    # max_overflow / pool_recycle. SQLite ignores them (single-file,
+    # single-writer).
+    DB_POOL_SIZE: int = 5
+    DB_MAX_OVERFLOW: int = 10
+    DB_POOL_RECYCLE_SECONDS: int = 1800
+
     # CORS — NoDecode prevents pydantic-settings from JSON-decoding before
     # our validator splits the comma-separated env form.
     CORS_ORIGINS: Annotated[List[str], NoDecode] = Field(

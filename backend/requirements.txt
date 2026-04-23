@@ -35,6 +35,14 @@ opentelemetry-exporter-otlp>=1.28,<2
 opentelemetry-instrumentation-fastapi>=0.49b0,<1
 opentelemetry-instrumentation-sqlalchemy>=0.49b0,<1
 
+# --- v3.0 additions -----------------------------------------------------------
+# psycopg (v3) is the Postgres driver. [binary] pulls the precompiled wheel
+# so the image doesn't need libpq-dev. Ships by default even on SQLite
+# deployments — the 5MB overhead is acceptable to keep one image for both
+# dialects. Operators opt into Postgres by setting DATABASE_URL to
+# postgresql+psycopg://...
+psycopg[binary]>=3.2,<4
+
 # --- Pre-wired for v3.1 -------------------------------------------------------
 # httpx and tenacity are deps of the Vision + Pricing providers. Pinning them
 # here keeps the feature PRs focused on logic rather than plumbing.
