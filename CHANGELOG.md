@@ -62,10 +62,14 @@ any Postgres deployment takes real traffic.
   `VISION_DAILY_COST_CAP_USD`, `PRICING_DAILY_COST_CAP_USD`,
   `EBAY_APP_ID`/`EBAY_CERT_ID`, plus `LOG_FORMAT`, `OTEL_*`,
   `MAX_UPLOAD_BYTES`, `MAX_IMAGE_DIMENSION`, and the Postgres
-  `DB_POOL_*` knobs. Every one of these is now plumbed through.
-  The worker block is kept in lockstep with the backend's so
-  fail-fast guards and feature-flagged tasks behave identically
-  on both sides.
+  `DB_POOL_*` knobs. Fix uses `env_file: [.env]` on both the backend
+  and worker services so the full `.env` flows into each container
+  without hand-listing each var; the `environment:` block is reserved
+  for compose-specific overrides (mount paths, CORS dev-LAN defaults,
+  required secrets). Pydantic settings falls back to its own defaults
+  for any var absent from `.env`. Worker is kept in lockstep with
+  backend so fail-fast guards and feature-flagged tasks behave
+  identically on both sides.
 
 ### Security
 
