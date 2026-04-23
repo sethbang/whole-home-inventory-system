@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -6,13 +6,21 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { CameraIcon, QrCodeIcon } from '@heroicons/react/24/outline';
 
 import CustomFields from '../components/CustomFields';
+import { SectionErrorBoundary } from '../components/ErrorBoundary';
+import PriceEstimateCard from '../components/PriceEstimateCard';
 import VisionIdentifyButton from '../components/VisionIdentifyButton';
 import VisionSuggestionPanel from '../components/VisionSuggestionPanel';
 import { useDevMode } from '../contexts/useDevMode';
 import { items, images } from '../api/client';
 import { apiErrorMessage } from '../api/errors';
+import { isJobReference, useJobPoll } from '../api/jobs';
+import { pricing } from '../api/pricing';
 import { queryKeys } from '../api/queryKeys';
-import type { VisionResult, VisionSuggestion } from '../api/types';
+import type {
+  PriceEstimateEnvelope,
+  VisionResult,
+  VisionSuggestion,
+} from '../api/types';
 import {
   type AddItemFormValues,
   type AddItemSubmitValues,
@@ -32,6 +40,17 @@ export default function AddItem() {
   const [showScanner, setShowScanner] = useState(false);
   const [scanningStatus, setScanningStatus] = useState<string | null>(null);
   const [visionResult, setVisionResult] = useState<VisionResult | null>(null);
+  // Track which form fields were populated by vision so we can render
+  // "AI" chips until the user edits them. The set is keyed by the
+  // RHF field name (not the vision suggestion key) — same string on
+  // both sides thanks to the 1:1 mapping in the accept handler.
+  const [aiFields, setAiFields] = useState<Set<string>>(() => new Set());
+  // Vision → pricing chain. After the user applies suggestions we
+  // fire a metadata-based pricing lookup so the "current value"
+  // input gets a suggested value too.
+  const [priceEnvelope, setPriceEnvelope] =
+    useState<PriceEstimateEnvelope | null>(null);
+  const [priceJobId, setPriceJobId] = useState<string | null>(null);
 
   // Warm the autocomplete caches on mount — loader also preloads them but
   // these hooks give React Query a live subscription.
@@ -49,16 +68,60 @@ export default function AddItem() {
     handleSubmit,
     setValue,
     control,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<AddItemFormValues, unknown, AddItemSubmitValues>({
     resolver: zodResolver(addItemSchema),
     defaultValues: addItemDefaults,
   });
 
+  // Clear the "AI" chip on any field the user manually edits —
+  // keeps the badge honest. ``watch(callback)`` fires once per
+  // user-initiated change without re-rendering.
+  useEffect(() => {
+    const subscription = watch((_, { name, type }) => {
+      if (type !== 'change' || !name) return;
+      setAiFields((prev) => {
+        if (!prev.has(name)) return prev;
+        const next = new Set(prev);
+        next.delete(name);
+        return next;
+      });
+    });
+    return () => subscription.unsubscribe();
+  }, [watch]);
+
   const uploadImageMutation = useMutation({
     mutationFn: async ({ itemId, file }: { itemId: string; file: File }) =>
       images.upload(itemId, file),
   });
+
+  // v3.1: pricing chain. Triggered from the vision "Apply selected"
+  // handler with the just-applied metadata — no item yet, so we
+  // send metadata (not item_id).
+  const estimatePriceFromMetadata = useMutation({
+    mutationFn: (metadata: Record<string, unknown>) =>
+      pricing.estimate({ metadata }),
+    onSuccess: (response) => {
+      if (isJobReference(response)) {
+        setPriceJobId(response.job_id);
+        return;
+      }
+      setPriceEnvelope(response as PriceEstimateEnvelope);
+    },
+  });
+
+  const priceJob = useJobPoll(priceJobId);
+  useEffect(() => {
+    if (!priceJobId || !priceJob.data) return;
+    const { status, result } = priceJob.data;
+    if (status === 'complete' && result) {
+      setPriceJobId(null);
+      setPriceEnvelope(result as unknown as PriceEstimateEnvelope);
+    } else if (status === 'failed' || status === 'not_found') {
+      setPriceJobId(null);
+    }
+  }, [priceJob.data, priceJobId]);
 
   const createItemMutation = useMutation({
     mutationFn: async (params: {
@@ -363,36 +426,107 @@ export default function AddItem() {
                       <QrCodeIcon className="h-5 w-5 mr-2" />
                       Scan Barcode
                     </button>
-                    <VisionIdentifyButton
-                      onResult={setVisionResult}
-                      maxFiles={4}
-                    />
+                    <SectionErrorBoundary label="vision identify">
+                      <VisionIdentifyButton
+                        onResult={setVisionResult}
+                        maxFiles={4}
+                      />
+                    </SectionErrorBoundary>
                   </div>
                 </div>
               </div>
 
               {visionResult && (
-                <div className="mt-4">
-                  <VisionSuggestionPanel
+                <SectionErrorBoundary
+                  label="vision suggestion panel"
+                  resetKey={visionResult.queried_at}
+                >
+                  <div className="mt-4">
+                    <VisionSuggestionPanel
                     suggestion={visionResult.suggestion}
                     provider={visionResult.provider}
                     model={visionResult.model}
                     onApply={(accepted: Partial<VisionSuggestion>) => {
-                      // Map vision fields onto form fields. Only keys that
-                      // line up exactly get applied; the rest (suggested_tags,
-                      // item_specifics) land in custom_fields.user_defined.
-                      if (accepted.name) setValue('name', accepted.name);
-                      if (accepted.brand) setValue('brand', accepted.brand);
-                      if (accepted.model_number)
-                        setValue('model_number', accepted.model_number);
-                      if (accepted.category) setValue('category', accepted.category);
-                      if (accepted.serial_number)
-                        setValue('serial_number', accepted.serial_number);
-                      if (accepted.description)
-                        setValue('notes', accepted.description);
+                      // Map vision fields onto form fields. Only keys
+                      // that line up exactly get applied; the rest
+                      // (suggested_tags, item_specifics) land in
+                      // custom_fields.user_defined in a later
+                      // iteration.
+                      const touched = new Set<string>(aiFields);
+                      const apply = (formField: string, value: unknown) => {
+                        if (value === null || value === undefined || value === '') return;
+                        setValue(formField as keyof AddItemFormValues, value as never);
+                        touched.add(formField);
+                      };
+                      apply('name', accepted.name);
+                      apply('brand', accepted.brand);
+                      apply('model_number', accepted.model_number);
+                      apply('category', accepted.category);
+                      apply('serial_number', accepted.serial_number);
+                      apply('notes', accepted.description);
+                      setAiFields(touched);
                       setVisionResult(null);
+                      // Chain into pricing. If the accepted payload
+                      // doesn't have enough identity (brand +
+                      // model_number), skip — pricing needs them.
+                      if (accepted.brand && accepted.model_number) {
+                        estimatePriceFromMetadata.mutate({
+                          brand: accepted.brand,
+                          model_number: accepted.model_number,
+                          name: accepted.name ?? undefined,
+                          condition: accepted.condition ?? undefined,
+                          year: accepted.year ?? undefined,
+                        });
+                      }
                     }}
-                    onDismiss={() => setVisionResult(null)}
+                      onDismiss={() => setVisionResult(null)}
+                    />
+                  </div>
+                </SectionErrorBoundary>
+              )}
+
+              {aiFields.size > 0 && (
+                <div
+                  className="mt-3 flex flex-wrap items-center gap-2 rounded-md bg-primary-subtle px-3 py-2 text-xs text-primary"
+                  role="status"
+                  aria-live="polite"
+                >
+                  <span className="font-semibold">AI filled:</span>
+                  {Array.from(aiFields).map((field) => (
+                    <span
+                      key={field}
+                      className="rounded bg-primary px-1.5 py-0.5 text-white"
+                    >
+                      {field}
+                    </span>
+                  ))}
+                  <span className="text-[11px] text-primary">
+                    (chips clear as you edit each field)
+                  </span>
+                </div>
+              )}
+
+              {(estimatePriceFromMetadata.isPending || priceJobId) && !priceEnvelope && (
+                <p className="mt-3 text-xs text-gray-600">
+                  Looking up resale value from vision metadata…
+                </p>
+              )}
+
+              {priceEnvelope && (
+                <div className="mt-4">
+                  <PriceEstimateCard
+                    envelope={priceEnvelope}
+                    refreshing={
+                      estimatePriceFromMetadata.isPending || priceJobId !== null
+                    }
+                    onApplyMedian={(median) => {
+                      setValue('current_value', String(median.toFixed(2)));
+                      setAiFields((prev) => {
+                        const next = new Set(prev);
+                        next.add('current_value');
+                        return next;
+                      });
+                    }}
                   />
                 </div>
               )}
