@@ -152,18 +152,23 @@ class Backup(Base):
 
 
 class PriceCache(Base):
-    """Cached resale-price estimates keyed by a normalized identity hash.
+    """Cached resale-price estimates keyed by (identity_hash, provider).
 
-    Populated by v3.1's PricingService. Stored alongside ``items`` so the
-    same DB backup captures the warmed cache, which is operationally nice
-    for self-hosted deployments that don't want to burn through their eBay
-    quota after every migration.
+    Populated by v3.1's PricingService. Stored alongside ``items`` so
+    the same DB backup captures the warmed cache — operationally nice
+    for self-hosted deployments that don't want to burn through their
+    eBay quota after every migration.
+
+    v2.2 provisioned this with only ``identity_hash`` as the PK; v3.1's
+    ``20260422_0007_price_cache_composite_pk`` migration promotes it
+    to the composite ``(identity_hash, provider)`` form so the same
+    hash can host one entry per provider.
     """
 
     __tablename__ = "price_cache"
 
     identity_hash = Column(String(64), primary_key=True)
-    provider = Column(String(32), nullable=False)
+    provider = Column(String(32), primary_key=True)
     payload = Column(JSON, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     expires_at = Column(DateTime, nullable=False, index=True)
