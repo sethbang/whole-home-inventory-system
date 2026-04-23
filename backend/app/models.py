@@ -120,7 +120,7 @@ class ItemImage(Base):
     __tablename__ = "item_images"
 
     id = Column(UUID, primary_key=True, default=uuid.uuid4)
-    item_id = Column(UUID, ForeignKey("items.id"))
+    item_id = Column(UUID, ForeignKey("items.id", ondelete="CASCADE"))
     filename = Column(String)
     file_path = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)

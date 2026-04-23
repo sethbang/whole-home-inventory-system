@@ -10,7 +10,7 @@ python-multipart>=0.0.26,<1
 pyjwt[crypto]>=2.12.0,<3
 passlib[bcrypt]==1.7.4
 bcrypt>=3.2,<4
-python-dotenv==1.0.1
+python-dotenv>=1.2.2,<2
 # Widened from <12 so 12.2.0+ (CVE-2026-25990 + CVE-2026-40192 fixes) can
 # resolve. The minor bump hasn't introduced breaking API usage in WHIS's
 # image pipeline.

@@ -164,20 +164,37 @@ class BackupService:
             images_dir = os.path.join(temp_dir, "images")
             os.makedirs(images_dir, exist_ok=True)
 
+            # Images on disk live at ``settings.upload_path / filename``
+            # (absolute, e.g. ``/app/backend/uploads/foo.jpg``). The
+            # ``ItemImage.file_path`` column stores a *relative* URL-style
+            # path ``uploads/foo.jpg`` for the frontend to consume via the
+            # ``/uploads`` static mount — it isn't directly resolvable from
+            # the backend's CWD. Resolving via ``settings.upload_path`` here
+            # is what actually copies the bytes into the zip.
+            upload_dir = str(settings.upload_path)
             image_count = 0
             for item in items:
                 item_data = _serialize_item(item)
                 for image in item.images:
                     image_count += 1
-                    if os.path.exists(image.file_path):
+                    on_disk = os.path.join(upload_dir, image.filename)
+                    if os.path.exists(on_disk):
                         backup_image_path = os.path.join(images_dir, image.filename)
-                        shutil.copy2(image.file_path, backup_image_path)
+                        shutil.copy2(on_disk, backup_image_path)
                         item_data["images"].append(
                             {
                                 "id": str(image.id),
                                 "filename": image.filename,
                                 "created_at": image.created_at.isoformat(),
                             }
+                        )
+                    else:
+                        logger.warning(
+                            "image file missing on disk, skipping from backup: "
+                            "item=%s image=%s expected_at=%s",
+                            item.id,
+                            image.id,
+                            on_disk,
                         )
                 backup_data["items"].append(item_data)
 
@@ -315,6 +332,21 @@ class BackupService:
             with zipfile.ZipFile(backup.file_path, "r") as zip_ref:
                 zip_ref.extractall(temp_dir)
 
+            # Delete child ``item_images`` rows before the parent ``items``
+            # rows. The 20260423_0008 migration promoted the FK to
+            # ``ON DELETE CASCADE`` at the DB level so this is defensive —
+            # but it also means the delete path no longer depends on
+            # SQLite's by-default FK-disabled behavior to hide a bug, and
+            # stays correct on Postgres even if a future revert of the
+            # migration lands.
+            item_id_subq = (
+                select(models.Item.id)
+                .where(models.Item.owner_id == self.user.id)
+                .scalar_subquery()
+            )
+            self.db.query(models.ItemImage).filter(
+                models.ItemImage.item_id.in_(item_id_subq)
+            ).delete(synchronize_session=False)
             self.db.query(models.Item).filter(
                 models.Item.owner_id == self.user.id
             ).delete(synchronize_session=False)

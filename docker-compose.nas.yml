@@ -58,6 +58,13 @@ services:
       timeout: 5s
       start_period: 15s
       retries: 3
+    # NAS stacks always run Redis (no profile gating), so the backend must
+    # wait for it to be healthy before trying to create the ARQ pool on
+    # startup. Otherwise a slow Redis boot can leave the backend in the
+    # synchronous-fallback path for the first ~30s after startup.
+    depends_on:
+      redis:
+        condition: service_healthy
     networks:
       - whole-home-inventory-system-network
     restart: unless-stopped

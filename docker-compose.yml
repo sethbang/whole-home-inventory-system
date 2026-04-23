@@ -40,6 +40,19 @@ services:
       timeout: 5s
       start_period: 15s
       retries: 3
+    # Profile-aware optional dependencies. `required: false` (Compose v2.20+)
+    # lets the backend boot without postgres/redis when those profiles aren't
+    # active (default dev stack). When `--profile postgres` or `--profile worker`
+    # is passed, the backend waits for the dependency's healthcheck before
+    # trying to connect — fixes the race where backend crashed on startup
+    # before postgres finished initializing.
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
+      redis:
+        condition: service_healthy
+        required: false
     networks:
       - whole-home-inventory-system-network
 

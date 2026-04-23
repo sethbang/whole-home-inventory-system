@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Four fixes surfaced by the v3.1 pre-push validation pass. All four ship
+together — the restore path fix is a data-loss guard that must land before
+any Postgres deployment takes real traffic.
+
+### Fixed
+
+- **Postgres backup restore no longer crashes on users with images**
+  (`services/backups.py::commit_restore`). The bulk
+  `DELETE FROM items WHERE owner_id=...` (`synchronize_session=False`)
+  bypasses SQLAlchemy's ORM cascade, and the `item_images.item_id`
+  foreign key had no `ON DELETE CASCADE` — so Postgres correctly
+  rejected the delete with `ForeignKeyViolation` the instant any user
+  had one image. SQLite masked it because SQLite doesn't enforce FKs
+  unless `PRAGMA foreign_keys=ON`. Fix is two-layer: (1) new Alembic
+  migration `20260423_0008_item_images_cascade` that promotes the FK
+  to `ON DELETE CASCADE` on both dialects, and (2) service-layer
+  delete now removes `item_images` rows before `items` rows as
+  belt-and-suspenders. The ORM's `ForeignKey("items.id")` declaration
+  in `models.py` carries `ondelete="CASCADE"` for autogenerate
+  fidelity.
+- **Backup archives actually contain uploaded images again**
+  (`services/backups.py::_write_backup_file`). The file-existence check
+  was resolving `ItemImage.file_path` (a relative URL-style
+  `uploads/<filename>`) directly from CWD instead of joining with
+  `settings.upload_path`. The check always missed, so every backup
+  silently shipped with zero images and restores had nothing to copy
+  back. New backups contain the images; old 670-byte backups should be
+  recreated.
+- **New regression test** `test_backup_create_and_restore_round_trip_with_images`
+  writes a real JPEG to disk, creates a backup, verifies the zip
+  contains the bytes, wipes state, restores, and verifies both the DB
+  rows and the file content round-trip. Fills the gap in
+  `test_restore_commit_with_correct_confirm_proceeds` which used
+  `images: []` and missed both bugs.
+- **Backend compose service now waits for Postgres/Redis health**
+  (`docker-compose.yml`, `docker-compose.nas.yml`). Booting the dev
+  stack with `--profile postgres` or `--profile worker` used to race
+  the DB/Redis startup — backend crashed on `connection refused` if
+  its dependency was still initializing. Added `depends_on` with
+  `condition: service_healthy`; the default compose file uses
+  `required: false` (Compose v2.20+) so the dev stack still boots
+  without those profiles.
+
+### Security
+
+- **python-dotenv bumped to >=1.2.2,<2** to resolve
+  **CVE-2026-28684** (previously pinned at 1.0.1). CI's
+  `pip-audit --strict` leg would otherwise block the push.
+
 ## [3.1.0] - 2026-04-23
 
 Vision auto-fill + item-value pricing. Two feature-flagged

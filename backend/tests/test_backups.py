@@ -350,6 +350,117 @@ def test_restore_commit_with_correct_confirm_proceeds(
     assert remaining == ["fresh"]
 
 
+def test_backup_create_and_restore_round_trip_with_images(
+    client, auth_headers, user, db_session
+):
+    """End-to-end regression guard for two linked bugs caught in the v3.1 validation pass:
+
+    * Backup create used to resolve ``ItemImage.file_path`` (a relative
+      URL-style path like ``uploads/foo.jpg``) directly from CWD instead
+      of ``settings.upload_path`` — so images were silently dropped from
+      archives. Round-trip zips came out 670 bytes regardless of content.
+    * Commit-restore used bulk ``DELETE FROM items`` with
+      ``synchronize_session=False`` which bypasses ORM cascade; on
+      Postgres (where FKs are enforced) the DELETE raised
+      ``ForeignKeyViolation`` as long as any ``item_images`` row
+      referenced the item. SQLite hid it because its FKs are off by
+      default.
+
+    This test exercises the full create → verify zip contents → wipe →
+    restore → verify round trip with real files on disk.
+    """
+    upload_dir = os.environ["UPLOAD_DIR"]
+
+    # Seed 2 items, 1 with an image on disk, 1 without.
+    item_with_image = models.Item(
+        owner_id=user.id, name="with-image", category="C", location="L"
+    )
+    item_blank = models.Item(
+        owner_id=user.id, name="blank", category="C", location="L"
+    )
+    db_session.add_all([item_with_image, item_blank])
+    db_session.flush()
+
+    # Minimal JPEG — real magic-byte prefix so any validation layer is happy.
+    jpeg_bytes = b"\xff\xd8\xff\xe0\x00\x10JFIF\x00" + (b"\x00" * 64) + b"\xff\xd9"
+    image_filename = f"roundtrip_{item_with_image.id}.jpg"
+    on_disk_path = os.path.join(upload_dir, image_filename)
+    with open(on_disk_path, "wb") as fh:
+        fh.write(jpeg_bytes)
+
+    db_session.add(
+        models.ItemImage(
+            item_id=item_with_image.id,
+            filename=image_filename,
+            # file_path mirrors what the live upload handler stamps — a
+            # relative URL for the frontend, not an on-disk locator.
+            file_path=f"uploads/{image_filename}",
+        )
+    )
+    db_session.commit()
+
+    # Step 1 — create backup.
+    resp = client.post("/api/backups", headers=auth_headers)
+    assert resp.status_code == 200, resp.text
+    backup = resp.json()
+    backup_id = backup["id"]
+    backup_path = backup["file_path"]
+    assert backup["item_count"] == 2
+    assert backup["image_count"] == 1, "DB-side image count should include the one image"
+
+    # Step 2 — verify the zip actually contains the image bytes. This is
+    # the F5 regression guard — a pre-fix backup archive was <1 KB for any
+    # item set because the image was silently skipped.
+    with zipfile.ZipFile(backup_path, "r") as zf:
+        names = zf.namelist()
+        assert f"images/{image_filename}" in names, (
+            f"image not packaged into backup; names={names}"
+        )
+        with zf.open(f"images/{image_filename}") as fh:
+            assert fh.read() == jpeg_bytes
+        with zf.open("data.json") as fh:
+            data = json.loads(fh.read().decode())
+    packaged_image_count = sum(len(it.get("images") or []) for it in data["items"])
+    assert packaged_image_count == 1, (
+        f"item_data.images lost its image reference; data={data}"
+    )
+
+    # Step 3 — wipe the image file from disk + wipe DB via commit_restore.
+    # Restore should cleanly delete the old rows (item_images first, then
+    # items — F3 regression guard) and repopulate from the archive.
+    os.remove(on_disk_path)
+    resp = client.post(
+        f"/api/backups/{backup_id}/restore?dry_run=false",
+        headers=auth_headers,
+        json={"confirm_item_count": 2},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["items_restored"] == 2
+    assert body["images_restored"] == 1
+
+    # Step 4 — verify state: 2 restored items, 1 restored image row + file.
+    db_session.expire_all()
+    restored_items = (
+        db_session.query(models.Item).filter(models.Item.owner_id == user.id).all()
+    )
+    assert {i.name for i in restored_items} == {"with-image", "blank"}
+
+    restored_image_count = (
+        db_session.query(models.ItemImage)
+        .join(models.Item, models.Item.id == models.ItemImage.item_id)
+        .filter(models.Item.owner_id == user.id)
+        .count()
+    )
+    assert restored_image_count == 1
+
+    assert os.path.exists(on_disk_path), (
+        "restored image file should be back on disk at the original location"
+    )
+    with open(on_disk_path, "rb") as fh:
+        assert fh.read() == jpeg_bytes
+
+
 # ---------------------------------------------------------------------------
 # N+1 elimination
 # ---------------------------------------------------------------------------
