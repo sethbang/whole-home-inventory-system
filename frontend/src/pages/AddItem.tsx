@@ -6,10 +6,13 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { CameraIcon, QrCodeIcon } from '@heroicons/react/24/outline';
 
 import CustomFields from '../components/CustomFields';
+import VisionIdentifyButton from '../components/VisionIdentifyButton';
+import VisionSuggestionPanel from '../components/VisionSuggestionPanel';
 import { useDevMode } from '../contexts/useDevMode';
 import { items, images } from '../api/client';
 import { apiErrorMessage } from '../api/errors';
 import { queryKeys } from '../api/queryKeys';
+import type { VisionResult, VisionSuggestion } from '../api/types';
 import {
   type AddItemFormValues,
   type AddItemSubmitValues,
@@ -28,6 +31,7 @@ export default function AddItem() {
   const [serverError, setServerError] = useState<string | null>(null);
   const [showScanner, setShowScanner] = useState(false);
   const [scanningStatus, setScanningStatus] = useState<string | null>(null);
+  const [visionResult, setVisionResult] = useState<VisionResult | null>(null);
 
   // Warm the autocomplete caches on mount — loader also preloads them but
   // these hooks give React Query a live subscription.
@@ -342,7 +346,7 @@ export default function AddItem() {
                     onChange={handleFileChange}
                     className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary-subtle file:text-primary-hover hover:file:bg-primary-subtle-hover"
                   />
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
                       onClick={() => setShowScanner(true)}
@@ -359,9 +363,39 @@ export default function AddItem() {
                       <QrCodeIcon className="h-5 w-5 mr-2" />
                       Scan Barcode
                     </button>
+                    <VisionIdentifyButton
+                      onResult={setVisionResult}
+                      maxFiles={4}
+                    />
                   </div>
                 </div>
               </div>
+
+              {visionResult && (
+                <div className="mt-4">
+                  <VisionSuggestionPanel
+                    suggestion={visionResult.suggestion}
+                    provider={visionResult.provider}
+                    model={visionResult.model}
+                    onApply={(accepted: Partial<VisionSuggestion>) => {
+                      // Map vision fields onto form fields. Only keys that
+                      // line up exactly get applied; the rest (suggested_tags,
+                      // item_specifics) land in custom_fields.user_defined.
+                      if (accepted.name) setValue('name', accepted.name);
+                      if (accepted.brand) setValue('brand', accepted.brand);
+                      if (accepted.model_number)
+                        setValue('model_number', accepted.model_number);
+                      if (accepted.category) setValue('category', accepted.category);
+                      if (accepted.serial_number)
+                        setValue('serial_number', accepted.serial_number);
+                      if (accepted.description)
+                        setValue('notes', accepted.description);
+                      setVisionResult(null);
+                    }}
+                    onDismiss={() => setVisionResult(null)}
+                  />
+                </div>
+              )}
 
               {scanningStatus && (
                 <div className="mt-2 rounded-md bg-blue-50 p-4">

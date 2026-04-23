@@ -41,6 +41,14 @@ export type JobStatus = Schemas['JobStatus'];
 export type JobDetail = Schemas['JobDetail'];
 export type JobReference = Schemas['JobReference'];
 
+// --- Vision (v3.1 Part C) --------------------------------------------------
+// Pricing schemas (PriceEstimate, PriceSource, PriceEstimateEnvelope) land
+// in Part F when the /api/pricing router is wired — OpenAPI only emits
+// component schemas reachable from a route, and the pricing router doesn't
+// exist yet.
+export type VisionSuggestion = Schemas['VisionSuggestion'];
+export type VisionResult = Schemas['VisionResult'];
+
 // --- eBay -------------------------------------------------------------------
 export type EbayFields = Schemas['EbayFields'];
 export type EbayCategory = Schemas['EbayCategory'];

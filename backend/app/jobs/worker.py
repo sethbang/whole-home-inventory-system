@@ -20,6 +20,7 @@ from typing import Any, Dict
 from .client import _redis_settings_from_url
 from .tasks.backups import backup_create, backup_restore
 from .tasks.images import thumbnail_generate
+from .tasks.vision import vision_identify
 from ..logging_config import setup_logging
 from ..settings import settings
 
@@ -55,9 +56,16 @@ def _redis_settings_or_default():
 class WorkerSettings:
     """ARQ WorkerSettings — discovered by the ``arq`` CLI."""
 
-    # v3.0 task registry. Part D landed backup_create + backup_restore,
-    # Part E appended thumbnail_generate.
-    functions: list = [backup_create, backup_restore, thumbnail_generate]
+    # Task registry.
+    # v3.0 Part D: backup_create, backup_restore.
+    # v3.0 Part E: thumbnail_generate.
+    # v3.1 Part C: vision_identify.
+    functions: list = [
+        backup_create,
+        backup_restore,
+        thumbnail_generate,
+        vision_identify,
+    ]
 
     on_startup = _on_startup
     on_shutdown = _on_shutdown

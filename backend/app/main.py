@@ -14,7 +14,17 @@ from .jobs import get_arq_pool
 from .logging_config import setup_logging
 from .middleware.request_id import RequestIdMiddleware
 from .rate_limit import limiter, rate_limit_exceeded_handler
-from .routers import analytics, auth, backups, ebay, facebook, images, items, jobs
+from .routers import (
+    analytics,
+    auth,
+    backups,
+    ebay,
+    facebook,
+    images,
+    items,
+    jobs,
+    vision,
+)
 from .settings import settings
 from .telemetry import setup_telemetry
 
@@ -145,6 +155,7 @@ app.include_router(backups.router, prefix="/api")
 app.include_router(ebay.router, prefix="/api")
 app.include_router(facebook.router, prefix="/api")
 app.include_router(jobs.router, prefix="/api")
+app.include_router(vision.router, prefix="/api")
 
 
 @app.get("/api/health")

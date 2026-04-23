@@ -620,6 +620,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/vision/identify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Identify Item */
+        post: operations["identify_item_api_vision_identify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -677,6 +694,19 @@ export interface components {
         BackupList: {
             /** Backups */
             backups: components["schemas"]["Backup"][];
+        };
+        /** Body_identify_item_api_vision_identify_post */
+        Body_identify_item_api_vision_identify_post: {
+            /**
+             * Files
+             * @description 1..VISION_MAX_IMAGES_PER_REQUEST photos
+             */
+            files: string[];
+            /**
+             * Hints
+             * @description Optional JSON blob with user-supplied hints (brand, model, etc.).
+             */
+            hints?: string | null;
         };
         /** Body_import_items_api_items_import_post */
         Body_import_items_api_items_import_post: {
@@ -1310,6 +1340,145 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /**
+         * VisionResult
+         * @description Full wrapper returned by ``VisionService.identify``.
+         *
+         *     Carries the raw suggestion plus the bookkeeping the UI + billing
+         *     layer need (provider, model, prompt version, token usage, cost).
+         *     The frontend polls ``GET /api/jobs/{id}`` and receives this
+         *     shape under ``result`` once the task is complete.
+         */
+        VisionResult: {
+            suggestion: components["schemas"]["VisionSuggestion"];
+            /**
+             * Provider
+             * @description Configured LLM provider identifier (derived from base URL).
+             */
+            provider: string;
+            /**
+             * Model
+             * @description Model name used for the vision call.
+             */
+            model: string;
+            /**
+             * Prompt Version
+             * @description PROMPT_VERSION at call time, for A/B tracking.
+             */
+            prompt_version: string;
+            /**
+             * Tokens In
+             * @default 0
+             */
+            tokens_in?: number;
+            /**
+             * Tokens Out
+             * @default 0
+             */
+            tokens_out?: number;
+            /**
+             * Cost Usd Estimate
+             * @default 0
+             */
+            cost_usd_estimate?: number;
+            /**
+             * Queried At
+             * Format: date-time
+             */
+            queried_at: string;
+        };
+        /**
+         * VisionSuggestion
+         * @description Structured metadata inferred from one or more photos of an item.
+         *
+         *     Every field is ``Optional`` so the model can leave a slot blank
+         *     when it's genuinely uncertain — forcing it to hallucinate a
+         *     serial number when it can't read the label is exactly the
+         *     failure mode this feature should avoid. The UI surfaces
+         *     ``confidence`` + ``warnings`` so the user can decide what to
+         *     accept.
+         */
+        VisionSuggestion: {
+            /**
+             * Name
+             * @description Short, search-friendly item name. Prefer canonical names over marketing slogans.
+             */
+            name?: string | null;
+            /**
+             * Category
+             * @description High-level category (Electronics, Tools, Kitchen, etc.). One noun or phrase.
+             */
+            category?: string | null;
+            /**
+             * Description
+             * @description One or two sentences describing the item. Factual; no purple prose.
+             */
+            description?: string | null;
+            /**
+             * Brand
+             * @description Manufacturer brand name as printed on the item.
+             */
+            brand?: string | null;
+            /**
+             * Model Number
+             * @description Model / part number when visible on the item or label.
+             */
+            model_number?: string | null;
+            /**
+             * Serial Number
+             * @description Serial number only when clearly visible. NEVER guess.
+             */
+            serial_number?: string | null;
+            /**
+             * Condition
+             * @description Physical condition: NEW, LIKE_NEW, GOOD, ACCEPTABLE, FOR_PARTS.
+             */
+            condition?: string | null;
+            /**
+             * Year
+             * @description Model / release year when inferable from the item.
+             */
+            year?: number | null;
+            /**
+             * Color
+             * @description Dominant color.
+             */
+            color?: string | null;
+            /**
+             * Dimensions
+             * @description Rough dimensions in the form 'WxDxH in cm' or 'diameter X cm'. Omit if not visible.
+             */
+            dimensions?: string | null;
+            /**
+             * Suggested Tags
+             * @description Short keyword tags (≤5 words each) to aid later search.
+             */
+            suggested_tags?: string[];
+            /**
+             * Ebay Item Specifics
+             * @description Flat key→value map aligned to eBay's Item Specifics fields for this category.
+             */
+            ebay_item_specifics?: {
+                [key: string]: string;
+            };
+            /**
+             * Fb Item Specifics
+             * @description Flat key→value map aligned to Facebook Marketplace's item attributes.
+             */
+            fb_item_specifics?: {
+                [key: string]: string;
+            };
+            /**
+             * Confidence
+             * @description Overall confidence in the suggestion, 0..1. Lower when photo quality is poor or the item is unrecognized.
+             */
+            confidence: number;
+            /**
+             * Warnings
+             * @description Human-readable notes about uncertainty (e.g. 'Serial obscured', 'Multiple items in frame').
+             */
+            warnings?: string[];
         };
     };
     responses: never;
@@ -2433,6 +2602,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    identify_item_api_vision_identify_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_identify_item_api_vision_identify_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobReference"] | components["schemas"]["VisionResult"];
                 };
             };
             /** @description Validation Error */

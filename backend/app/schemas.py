@@ -7,6 +7,26 @@ from pydantic import UUID4, BaseModel, ConfigDict, EmailStr, Field
 from .ebay.schemas import EbayFields
 from .facebook.schemas import FbFields
 
+# Re-export the LLM-facing schemas so OpenAPI picks them up under the
+# same ``components/schemas/<Name>`` namespace. Frontend call sites
+# will import them from the generated `api/types.ts` without needing
+# to know they originated in app.schemas_llm.
+from .schemas_llm import (
+    PriceEstimate,
+    PriceEstimateEnvelope,
+    PriceSource,
+    VisionResult,
+    VisionSuggestion,
+)
+
+__schemas_llm_exports__ = [
+    "PriceEstimate",
+    "PriceEstimateEnvelope",
+    "PriceSource",
+    "VisionResult",
+    "VisionSuggestion",
+]
+
 
 class CustomFieldsSchema(BaseModel):
     """Structured shape of ``Item.custom_fields``.
