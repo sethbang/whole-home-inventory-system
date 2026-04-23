@@ -51,8 +51,15 @@ psycopg[binary]>=3.2,<4
 arq>=0.26,<1
 redis>=5.0,<6
 
-# --- Pre-wired for v3.1 -------------------------------------------------------
-# httpx and tenacity are deps of the Vision + Pricing providers. Pinning them
-# here keeps the feature PRs focused on logic rather than plumbing.
+# --- v3.1 additions -----------------------------------------------------------
+# httpx + tenacity underpin the LLM + pricing HTTP layers.
 httpx>=0.27,<1
 tenacity>=9,<10
+
+# OpenAI Python SDK — used as the client for any OpenAI-compatible
+# endpoint (OpenRouter, Venice.ai, LocalAI, Ollama's /v1). When
+# LLM_BASE_URL is unset, nothing imports it at runtime; the vision /
+# pricing features return 503 via the VISION_ENABLED / PRICING_ENABLED
+# gates. Ships by default so switching on the features is just a
+# config change.
+openai>=1.57,<2
