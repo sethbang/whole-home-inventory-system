@@ -6,10 +6,13 @@ through ``OpenAICompatibleClient``. Features gate on
 are off, nothing in this package runs.
 """
 
-from .openai_compatible import OpenAICompatibleClient, LLMError, LLMProviderError
+from .budget import DailyBudgetGuard, estimate_cost_usd
+from .openai_compatible import LLMError, LLMProviderError, OpenAICompatibleClient
 
 __all__ = [
-    "OpenAICompatibleClient",
+    "DailyBudgetGuard",
     "LLMError",
     "LLMProviderError",
+    "OpenAICompatibleClient",
+    "estimate_cost_usd",
 ]

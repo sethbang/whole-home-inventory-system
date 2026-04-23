@@ -167,3 +167,30 @@ class PriceCache(Base):
     payload = Column(JSON, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     expires_at = Column(DateTime, nullable=False, index=True)
+
+
+class LLMUsage(Base):
+    """Per-(user, date, feature) usage rollup for the v3.1 LLM layer.
+
+    One row per (user_id, usage_date, feature) tuple — the budget
+    guard reads this to enforce VISION_DAILY_COST_CAP_USD /
+    PRICING_DAILY_COST_CAP_USD without a full table scan. We upsert
+    into the row on every call: accumulate token counts, increment
+    request_count, add cost_usd. Date is stored as a plain DateTime
+    (naive UTC midnight) so the unique constraint works cross-dialect.
+    """
+
+    __tablename__ = "llm_usage"
+
+    id = Column(UUID, primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID, ForeignKey("users.id"), nullable=False, index=True)
+    # Floor to the UTC calendar day. The service layer computes this
+    # once per request so the upsert key is deterministic.
+    usage_date = Column(DateTime, nullable=False, index=True)
+    # 'vision' | 'pricing'. Not an enum — we want to extend without
+    # a migration when v3.2 adds a new feature.
+    feature = Column(String(32), nullable=False)
+    tokens_in = Column(Integer, nullable=False, default=0)
+    tokens_out = Column(Integer, nullable=False, default=0)
+    cost_usd = Column(Float, nullable=False, default=0.0)
+    request_count = Column(Integer, nullable=False, default=0)
