@@ -26,7 +26,7 @@ cd whole-home-inventory-system
 ### 2. Create persistent data directories
 
 ```bash
-mkdir -p /volume1/docker/whole-home-inventory-system/{database,uploads,backups,certs,caddy-data,caddy-config}
+mkdir -p /volume1/docker/whole-home-inventory-system/{database,uploads,backups,certs,caddy-data,caddy-config,redis-data}
 ```
 
 The volume mount paths in `docker-compose.nas.yml` expect this layout:
@@ -34,6 +34,7 @@ The volume mount paths in `docker-compose.nas.yml` expect this layout:
 - `database`, `uploads`, `backups` — SQLite DB, user images, in-app backup zips
 - `certs` — TLS material the backend uses for its internal HTTPS listener (see step 4)
 - `caddy-data`, `caddy-config` — persist Caddy's ACME account keys, Let's Encrypt certs, and the internal CA across restarts
+- `redis-data` — v3.0 ARQ job queue state. Survives container restarts so in-flight jobs don't get lost.
 
 ### 3. Generate a `SECRET_KEY`
 
@@ -51,6 +52,8 @@ Optional env vars you can set in the same `.env`:
 - `NAS_ORIGINS` — override the default CORS origins when fronting the stack with an *additional* upstream reverse proxy. The default (`https://${WHIS_DOMAIN}`) already covers the common case.
 - `LOG_LEVEL` — defaults to `INFO`; set to `DEBUG` temporarily for troubleshooting.
 - `ACCESS_TOKEN_EXPIRE_MINUTES` — defaults to 30.
+- `DATABASE_URL` — defaults to `sqlite:////app/database/whis.db`. Set to `postgresql+psycopg://whis:whis@postgres:5432/whis` if you want to run Postgres alongside (requires adding a `postgres` service to this compose file; see the main `docker-compose.yml` for the reference shape).
+- `REDIS_URL` — defaults to `redis://redis:6379/0`. NAS deployments run Redis + the ARQ worker by default so 15-45s backup operations don't block uvicorn. Set to empty to force synchronous fallback.
 
 The compose file refuses to start without `SECRET_KEY`; this is intentional (prevents shipping a placeholder secret in production).
 

@@ -1,7 +1,7 @@
 {
   "name": "frontend",
   "private": true,
-  "version": "2.4.0",
+  "version": "3.0.0",
   "type": "module",
   "scripts": {
     "dev": "node scripts/generate-certs.js && vite",

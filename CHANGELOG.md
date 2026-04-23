@@ -7,6 +7,136 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-04-22
+
+Platform leap. No new product surface — v3.0 builds the substrate that
+v3.1's Vision + Pricing features will ride on: an optional Postgres
+path alongside the SQLite default, full-text search replacing the
+5-column ILIKE fan-out, an ARQ job queue that moves 15-45s blocking
+operations off the request thread, a thumbnail pipeline, and a shared
+OpenAPI → TypeScript type contract so schema changes can't silently
+break the frontend.
+
+### Added
+
+- **Postgres as an opt-in database** (`DATABASE_URL=postgresql+psycopg://...`).
+  SQLite stays the default — operators graduate by setting
+  `DATABASE_URL` and running `docker compose --profile postgres up`.
+  The backend image ships `psycopg[binary]>=3.2,<4` for both
+  dialects (~5MB overhead).
+- **Postgres compat migration** (`20260422_0003_postgres_compat.py`).
+  On Postgres, promotes `items.custom_fields` + `price_cache.payload`
+  to JSONB and adds a GIN index on `items.custom_fields`. No-op on
+  SQLite.
+- **Full-text search** — `20260422_0004_items_fts.py` +
+  `app/fts.py`. SQLite gets an FTS5 virtual table `items_fts` fed by
+  three triggers; Postgres gets a `search_tsv` tsvector column with
+  a GIN index and a BEFORE-INSERT-OR-UPDATE trigger.
+  `ItemService.list()` dispatches on dialect at query time. User
+  input sanitized via `_sanitize_fts5` (FTS5 phrase quoting) on the
+  SQLite path; `plainto_tsquery('english', ...)` on Postgres.
+- **ARQ job queue** (`app/jobs/` package) —
+  [arq](https://github.com/python-arq/arq)-backed async worker,
+  profile-gated so the default dev stack stays unchanged:
+  - `docker compose up` — SQLite + synchronous, as before.
+  - `docker compose --profile worker up` — Redis + ARQ worker boot
+    alongside; heavy endpoints enqueue instead of blocking.
+  - `docker compose --profile postgres --profile worker up` — full
+    v3.0 stack.
+  NAS (`docker-compose.nas.yml`) runs Redis + worker unconditionally.
+- **`GET /api/jobs/{job_id}`** router with ownership guard (cross-
+  user reads return 404, not 403, to avoid leaking existence).
+  Lifecycle states: `queued / running / complete / failed /
+  not_found`. Returns 503 when no pool is configured.
+- **Backup create + restore as ARQ tasks**. `POST /api/backups` and
+  `POST /api/backups/{id}/restore` (commit) return
+  `Union[JobReference, Backup|RestoreResponse]` — the frontend
+  branches on a `kind: "job"` discriminator and polls
+  `GET /api/jobs/{id}` until the status is terminal. Falls back to
+  synchronous execution when the pool isn't active.
+- **Thumbnail pipeline** (`20260422_0005_image_thumbnails.py`).
+  `ItemImage` gains `thumbnail_path` + `thumbnail_generated_at`.
+  Upload handler enqueues a `thumbnail_generate` ARQ task
+  (fire-and-forget); the worker generates a 512×512 WebP at
+  quality 82, respects EXIF rotation, saves as `thumb_<stem>.webp`.
+  Frontend `ImageGallery` prefers the thumbnail when populated.
+  Without the worker profile the same helper runs inline.
+- **OpenAPI → TypeScript codegen**. `backend/scripts/dump_openapi.py`
+  emits the schema; `frontend/scripts/generate-api-types.mjs` pipes
+  it through `openapi-typescript` to produce
+  `frontend/src/api/openapi.d.ts` (committed).
+  `frontend/src/api/types.ts` re-exports the schemas as ergonomic
+  shorthands. `hand-written frontend/src/types/` was deleted — 16
+  call sites migrated to `../api/types`.
+- **CI contract-check job** — regenerates `openapi.d.ts` on every PR
+  and fails the build if the committed file is out of sync with
+  `schemas.py`.
+- **CI Postgres matrix leg** — backend job now runs
+  `python-version: [3.11, 3.12] × database: [sqlite, postgres]` =
+  four green legs. Postgres 16-alpine runs as a GitHub Actions
+  service.
+
+### Changed
+
+- `backend/app/main.py` — FastAPI `lifespan` context manager creates
+  the ARQ pool at startup, stashes on `app.state.arq`, closes on
+  shutdown. Same hook point v3.1's Vision + Pricing features will
+  use.
+- `backend/app/services/backups.py` — factored restore preflight
+  (ownership + confirm_item_count match) into
+  `validate_restore_request` so the router can reject bad requests
+  synchronously instead of burying failures inside a worker job.
+- `backend/app/services/images.py` — added `generate_thumbnail` +
+  delete-cleanup for the companion thumbnail file.
+- `backend/app/database.py` — engine construction is dialect-aware;
+  Postgres gets `pool_pre_ping + pool_size + max_overflow +
+  pool_recycle` tuning. Guards the common `postgresql://` (psycopg2,
+  not installed) vs `postgresql+psycopg://` mistake with an
+  actionable error.
+- `backend/alembic/versions/20260420_0001_baseline.py` — swapped
+  the `sqlite.JSON()` import/usage for `sa.JSON()` so baseline
+  applies cleanly on Postgres.
+- `backend/tests/conftest.py` — `TEST_DATABASE_URL` env var drives
+  the test engine. Default stays in-memory SQLite with StaticPool;
+  set to a `postgresql+psycopg://` URL to exercise the PG leg
+  locally.
+- Frontend `Backups.tsx` — create + restore flows detect
+  `JobReference` responses, show a progress banner, and poll via
+  the new `useJobPoll` hook.
+- `frontend/src/api/queryKeys.ts` — new `jobs` branch.
+
+### Removed
+
+- `frontend/src/types/` directory. All TS types that mirror a
+  backend Pydantic schema now come from the generated
+  `frontend/src/api/openapi.d.ts`.
+
+### Test counts
+
+- Backend: **200 tests** passing on both SQLite and Postgres 16
+  (up from 161 in v2.4). New coverage: FTS (11), DB compat (4),
+  jobs endpoint (10), async backups (7), thumbnails (7).
+- Frontend: **95 tests** passing (up from 90). 5 new tests cover
+  the `isJobReference` type guard.
+
+### Settings added
+
+- `DB_POOL_SIZE` (default 5), `DB_MAX_OVERFLOW` (10),
+  `DB_POOL_RECYCLE_SECONDS` (1800) — honored on Postgres, ignored
+  on SQLite.
+- `REDIS_URL` (default empty). When unset, service-layer enqueuers
+  fall back to synchronous execution.
+
+### Migration notes
+
+- `alembic upgrade head` applies 0003-0005 in sequence. Safe to run
+  on an existing SQLite DB with data (all migrations are idempotent
+  and use `batch_alter_table` where needed). Safe to run on a fresh
+  Postgres DB.
+- Operators wanting the async job queue must generate a new
+  `SECRET_KEY` (unchanged) and add `REDIS_URL=redis://redis:6379/0`
+  to their `.env`, then restart with `--profile worker`.
+
 ## [2.4.0] - 2026-04-21
 
 Ops + style release. No new product surface — this release hardens the
