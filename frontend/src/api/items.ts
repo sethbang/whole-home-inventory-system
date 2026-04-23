@@ -1,4 +1,4 @@
-import type { Item, ItemListResponse, SearchFilters } from '../types/items';
+import type { Item, ItemListResponse, SearchFilters } from './types';
 import { apiClient } from './http';
 
 /** Dev helper for the "random item" button on AddItem. Isolated so

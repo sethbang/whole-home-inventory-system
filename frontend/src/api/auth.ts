@@ -3,7 +3,7 @@ import type {
   LoginCredentials,
   RegisterData,
   User,
-} from '../types/auth';
+} from './types';
 import { apiClient } from './http';
 import { logger } from '../lib/logger';
 

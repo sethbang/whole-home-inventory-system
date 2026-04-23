@@ -7,7 +7,7 @@
 
 import type { ChangeEvent } from 'react';
 
-import type { FbCondition, FbFieldsData } from '../types/facebook';
+import type { FbCondition, FbFieldsData } from '../api/types';
 
 interface FacebookFieldsProps {
   fields: FbFieldsData;

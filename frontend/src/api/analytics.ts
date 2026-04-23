@@ -4,7 +4,7 @@ import type {
   ValueByLocation,
   ValueTrends,
   WarrantyStatus,
-} from '../types/analytics';
+} from './types';
 import { apiClient } from './http';
 
 export const analytics = {

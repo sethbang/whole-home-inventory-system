@@ -17,7 +17,7 @@ import { items, images, ebay, facebook } from '../api/client';
 import { apiErrorMessage } from '../api/errors';
 import { queryKeys } from '../api/queryKeys';
 import type { EbayCategoryResponse } from '../api/client';
-import type { FbFieldsData } from '../types/facebook';
+import type { FbFieldsData } from '../api/types';
 import {
   type AddItemFormValues,
   type AddItemSubmitValues,

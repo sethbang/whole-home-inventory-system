@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
 import FacebookFields from '../FacebookFields';
-import type { FbFieldsData } from '../../types/facebook';
+import type { FbFieldsData } from '../../api/types';
 
 describe('FacebookFields', () => {
   const renderComponent = (overrides: Partial<FbFieldsData> = {}) => {

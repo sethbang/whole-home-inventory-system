@@ -18,7 +18,7 @@ import { analytics } from '../api/analytics';
 import { backups } from '../api/backups';
 import { items } from '../api/items';
 import { queryKeys } from '../api/queryKeys';
-import type { SearchFilters } from '../types/items';
+import type { SearchFilters } from '../api/types';
 import { queryClient } from '../queryClient';
 
 const DEFAULT_LIST_FILTERS: SearchFilters = {

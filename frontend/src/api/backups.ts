@@ -1,4 +1,4 @@
-import type { Backup, BackupList, RestoreResult } from '../types/backups';
+import type { Backup, BackupList, RestoreResult } from './types';
 import { apiClient } from './http';
 import type { JobReference } from './jobs';
 

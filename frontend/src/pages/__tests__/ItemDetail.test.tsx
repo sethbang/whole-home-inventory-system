@@ -36,6 +36,7 @@ vi.mock('../../api/client', () => ({
 
 const mockItem: Item = {
   id: '123',
+  owner_id: 'owner-1',
   name: 'Test Item',
   category: 'Electronics',
   location: 'Office',

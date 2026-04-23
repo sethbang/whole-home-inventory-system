@@ -1,6 +1,10 @@
 import { ebay } from '../ebay';
 import { apiClient } from '../http';
-import type { EbayFields, EbayCategoryResponse } from '../ebay';
+import type {
+  EbayFields,
+  EbayCategoryResponse,
+  EbayExportRequest,
+} from '../ebay';
 
 vi.mock('../http', () => ({
   apiClient: {
@@ -84,7 +88,7 @@ describe('ebay API', () => {
   });
 
   describe('exportItems (streams CSV via blob download)', () => {
-    const mockRequest = {
+    const mockRequest: EbayExportRequest = {
       item_ids: ['1', '2'],
       default_fields: {
         condition: 'NEW',

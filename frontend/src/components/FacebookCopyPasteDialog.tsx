@@ -18,7 +18,7 @@ import { useEffect, useRef, useState } from 'react';
 import { facebook } from '../api/facebook';
 import { apiErrorMessage } from '../api/errors';
 import { logger } from '../lib/logger';
-import type { FbCopyPasteBlock } from '../types/facebook';
+import type { FbCopyPasteBlock } from '../api/types';
 
 interface FacebookCopyPasteDialogProps {
   itemId: string;

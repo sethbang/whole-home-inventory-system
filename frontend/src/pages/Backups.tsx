@@ -9,7 +9,7 @@ import { backups } from '../api/backups';
 import { apiErrorMessage } from '../api/errors';
 import { isJobReference, useJobPoll } from '../api/jobs';
 import { queryKeys } from '../api/queryKeys';
-import type { Backup, RestoreResult } from '../types/backups';
+import type { Backup, RestoreResult } from '../api/types';
 
 // ---------------------------------------------------------------------------
 // Restore dialog — two-phase, matches the v2.1 server contract.
@@ -403,7 +403,10 @@ export default function Backups() {
                     </>
                   )}
                   {backup.status === 'failed' && (
-                    <span className="text-red-600" title={backup.error_message}>
+                    <span
+                      className="text-red-600"
+                      title={backup.error_message ?? undefined}
+                    >
                       Failed: {backup.error_message}
                     </span>
                   )}

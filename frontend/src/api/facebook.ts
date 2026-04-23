@@ -3,7 +3,7 @@ import type {
   FbCategoriesResponse,
   FbCopyPasteBlock,
   FbFieldsData,
-} from '../types/facebook';
+} from './types';
 import { downloadGet, downloadPost } from './download';
 import { apiClient } from './http';
 
@@ -49,4 +49,4 @@ export type {
   FbCondition,
   FbCopyPasteBlock,
   FbFieldsData,
-} from '../types/facebook';
+} from './types';

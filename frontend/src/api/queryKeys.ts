@@ -21,7 +21,7 @@
  * Pattern adapted from tkdodo's "Effective React Query Keys".
  */
 
-import type { SearchFilters } from '../types/items';
+import type { SearchFilters } from './types';
 
 export const queryKeys = {
   items: {

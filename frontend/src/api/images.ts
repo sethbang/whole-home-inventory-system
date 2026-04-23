@@ -1,4 +1,4 @@
-import type { ItemImage } from '../types/items';
+import type { ItemImage } from './types';
 import { apiClient } from './http';
 
 export const images = {

@@ -25,27 +25,21 @@ export { ebay } from './ebay';
 export { facebook } from './facebook';
 
 // Type re-exports so ``import type { Item } from '../api/client'`` keeps
-// working. New code should prefer importing from ``types/``.
+// working. New code should prefer importing from ``./types`` directly —
+// that module re-exports the generated OpenAPI types.
 export type {
   AuthResponse,
   LoginCredentials,
   RegisterData,
   User,
-} from '../types/auth';
-export type {
   Item,
   ItemImage,
   ItemListResponse,
   SearchFilters,
-} from '../types/items';
-// Legacy alias — some tests import ``SearchFilters`` using an older name.
-export type { SearchFilters as SearchFilter } from '../types/items';
-export type {
+  SearchFilter,
   Backup,
   BackupList,
   RestoreResult,
-} from '../types/backups';
-export type {
   AgeAnalysis,
   AgeBucket,
   ValueByCategory,
@@ -53,19 +47,15 @@ export type {
   ValueTrends,
   WarrantyItem,
   WarrantyStatus,
-} from '../types/analytics';
-export type {
   EbayCategory,
   EbayCategoryResponse,
   EbayExportRequest,
   EbayExportResponse,
   EbayFields,
-} from '../types/ebay';
-export type {
   FbAvailability,
   FbCatalogExportRequest,
   FbCategoriesResponse,
   FbCondition,
   FbCopyPasteBlock,
   FbFieldsData,
-} from '../types/facebook';
+} from './types';

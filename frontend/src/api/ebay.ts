@@ -2,7 +2,7 @@ import type {
   EbayCategoryResponse,
   EbayExportRequest,
   EbayFields,
-} from '../types/ebay';
+} from './types';
 import { downloadPost } from './download';
 import { apiClient } from './http';
 
@@ -43,4 +43,4 @@ export type {
   EbayExportRequest,
   EbayExportResponse,
   EbayFields,
-} from '../types/ebay';
+} from './types';
