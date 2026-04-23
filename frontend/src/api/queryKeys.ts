@@ -69,4 +69,10 @@ export const queryKeys = {
     all: ['facebook'] as const,
     categories: () => [...queryKeys.facebook.all, 'categories'] as const,
   },
+  jobs: {
+    // v3.0: background job polling. Scoped by job_id so two in-flight
+    // operations don't step on each other's cache entries.
+    all: ['jobs'] as const,
+    detail: (jobId: string) => [...queryKeys.jobs.all, 'detail', jobId] as const,
+  },
 } as const;

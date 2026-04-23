@@ -1,6 +1,7 @@
 import logging
 import os
 import traceback
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,10 +10,11 @@ from fastapi.staticfiles import StaticFiles
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
+from .jobs import get_arq_pool
 from .logging_config import setup_logging
 from .middleware.request_id import RequestIdMiddleware
 from .rate_limit import limiter, rate_limit_exceeded_handler
-from .routers import analytics, auth, backups, ebay, facebook, images, items
+from .routers import analytics, auth, backups, ebay, facebook, images, items, jobs
 from .settings import settings
 from .telemetry import setup_telemetry
 
@@ -25,11 +27,37 @@ UPLOAD_DIR = str(settings.upload_path)
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 logger.info("upload directory: %s", UPLOAD_DIR)
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """App-wide startup/shutdown hooks.
+
+    Today this is the ARQ Redis pool. When ``settings.REDIS_URL`` is
+    unset ``get_arq_pool`` returns ``None`` and every enqueuer in the
+    service layer falls back to its synchronous path — so the default
+    dev stack (no Redis) still works end-to-end.
+    """
+    app.state.arq = await get_arq_pool()
+    if app.state.arq is None:
+        logger.info(
+            "ARQ pool not configured (REDIS_URL unset); "
+            "service-layer enqueuers will run synchronously in-request"
+        )
+    else:
+        logger.info("ARQ pool connected")
+    try:
+        yield
+    finally:
+        if app.state.arq is not None:
+            await app.state.arq.close(close_connection_pool=True)
+            logger.info("ARQ pool closed")
+
+
 app = FastAPI(
     title="WHIS - Whole-Home Inventory System",
     description="A self-hosted platform for managing household inventories",
     version="2.4.0",
     redirect_slashes=False,
+    lifespan=lifespan,
 )
 
 # OpenTelemetry setup is a no-op unless OTEL_ENABLED=true. When enabled
@@ -116,6 +144,7 @@ app.include_router(analytics.router, prefix="/api")
 app.include_router(backups.router, prefix="/api")
 app.include_router(ebay.router, prefix="/api")
 app.include_router(facebook.router, prefix="/api")
+app.include_router(jobs.router, prefix="/api")
 
 
 @app.get("/api/health")

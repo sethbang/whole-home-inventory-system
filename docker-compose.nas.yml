@@ -28,7 +28,11 @@ services:
       BYPASS_AUTH: "false"
       SECRET_KEY: ${SECRET_KEY:?SECRET_KEY must be set in the environment or .env file}
       ACCESS_TOKEN_EXPIRE_MINUTES: "${ACCESS_TOKEN_EXPIRE_MINUTES:-30}"
-      DATABASE_URL: "sqlite:////app/database/whis.db"
+      DATABASE_URL: "${DATABASE_URL:-sqlite:////app/database/whis.db}"
+      # NAS deployments get the async job queue by default — the worker
+      # service below is always on (no profile gating). Operators who
+      # don't want it can override REDIS_URL to empty.
+      REDIS_URL: "${REDIS_URL:-redis://redis:6379/0}"
       UPLOAD_DIR: "/app/backend/uploads"
       BACKUP_DIR: "/app/backend/backups"
       # Caddy fronts the backend same-origin (WHIS_DOMAIN → backend on the
@@ -88,6 +92,54 @@ services:
       timeout: 5s
       start_period: 15s
       retries: 3
+    networks:
+      - whole-home-inventory-system-network
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # v3.0: always-on Redis + ARQ worker for the NAS deploy. No profile
+  # gating here — NAS stacks get the async job queue by default so backup
+  # create/restore and thumbnail generation run off the request thread.
+  # ---------------------------------------------------------------------------
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "60", "1", "--appendonly", "yes"]
+    volumes:
+      - /volume1/docker/whole-home-inventory-system/redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - whole-home-inventory-system-network
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: ["arq", "app.jobs.worker.WorkerSettings"]
+    environment:
+      BYPASS_AUTH: "false"
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY must be set in the environment or .env file}
+      DATABASE_URL: "${DATABASE_URL:-sqlite:////app/database/whis.db}"
+      REDIS_URL: "${REDIS_URL:-redis://redis:6379/0}"
+      UPLOAD_DIR: "/app/backend/uploads"
+      BACKUP_DIR: "/app/backend/backups"
+      LOG_LEVEL: "${LOG_LEVEL:-INFO}"
+      DEBUG: "false"
+    volumes:
+      - /volume1/docker/whole-home-inventory-system/database:/app/database
+      - /volume1/docker/whole-home-inventory-system/uploads:/app/backend/uploads
+      - /volume1/docker/whole-home-inventory-system/backups:/app/backend/backups
+      - /volume1/docker/whole-home-inventory-system/certs:/app/certs:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
     networks:
       - whole-home-inventory-system-network
     restart: unless-stopped

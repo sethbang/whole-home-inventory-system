@@ -1,5 +1,6 @@
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from enum import Enum
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import UUID4, BaseModel, ConfigDict, EmailStr, Field
 
@@ -239,3 +240,48 @@ class RestoreResponse(BaseModel):
     current_item_count: Optional[int] = None
     backup_item_count: Optional[int] = None
     backup_image_count: Optional[int] = None
+
+
+# --- Background-job contracts (v3.0) -----------------------------------------
+
+
+class JobStatus(str, Enum):
+    """Finite state machine for an ARQ job as the frontend sees it.
+
+    Maps roughly onto ARQ's internal states (``deferred`` / ``queued``
+    collapse to ``queued``; ``in_progress`` is ``running``;
+    ``complete``/``failed`` are terminal).
+    """
+
+    queued = "queued"
+    running = "running"
+    complete = "complete"
+    failed = "failed"
+    not_found = "not_found"
+
+
+class JobReference(BaseModel):
+    """Discriminator body returned when an endpoint enqueues a job.
+
+    The ``kind`` literal lets endpoints return a union type like
+    ``JobReference | Backup`` and have the frontend branch on one
+    field. When the sync-fallback path fires, the endpoint returns
+    the full resource instead and the ``kind`` discriminator is
+    missing.
+    """
+
+    kind: Literal["job"] = "job"
+    job_id: str
+
+
+class JobDetail(BaseModel):
+    """Response shape of GET /api/jobs/{job_id}."""
+
+    job_id: str
+    status: JobStatus
+    # Populated only on terminal states.
+    result: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
+    queued_at: Optional[datetime] = None
+    started_at: Optional[datetime] = None
+    finished_at: Optional[datetime] = None

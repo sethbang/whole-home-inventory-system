@@ -43,6 +43,14 @@ opentelemetry-instrumentation-sqlalchemy>=0.49b0,<1
 # postgresql+psycopg://...
 psycopg[binary]>=3.2,<4
 
+# ARQ — Redis-backed async job queue. Ships by default; the enqueuer in
+# the service layer no-ops when REDIS_URL is unset, so SQLite-only
+# deployments pay only the import cost. `redis` is ARQ's runtime dep
+# (async client); pinned explicitly so npm-audit-style CVE tracking can
+# see it.
+arq>=0.26,<1
+redis>=5.0,<6
+
 # --- Pre-wired for v3.1 -------------------------------------------------------
 # httpx and tenacity are deps of the Vision + Pricing providers. Pinning them
 # here keeps the feature PRs focused on logic rather than plumbing.

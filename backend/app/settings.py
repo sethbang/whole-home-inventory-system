@@ -40,6 +40,12 @@ class Settings(BaseSettings):
     DB_MAX_OVERFLOW: int = 10
     DB_POOL_RECYCLE_SECONDS: int = 1800
 
+    # Background job queue (ARQ). When unset, enqueuers fall back to
+    # synchronous execution so the default `docker compose up` (no
+    # Redis) still works end-to-end. Set to ``redis://redis:6379/0`` in
+    # compose to activate the worker profile.
+    REDIS_URL: str = ""
+
     # CORS — NoDecode prevents pydantic-settings from JSON-decoding before
     # our validator splits the comma-separated env form.
     CORS_ORIGINS: Annotated[List[str], NoDecode] = Field(
