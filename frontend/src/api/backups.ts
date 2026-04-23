@@ -1,13 +1,22 @@
 import type { Backup, BackupList, RestoreResult } from '../types/backups';
 import { apiClient } from './http';
+import type { JobReference } from './jobs';
+
+/**
+ * v3.0: create/commit responses are discriminated unions. When the ARQ
+ * worker is active the backend returns a JobReference and the UI polls
+ * via useJobPoll; otherwise it returns the completed resource inline.
+ */
+export type BackupCreateResponse = JobReference | Backup;
+export type RestoreCommitResponse = JobReference | RestoreResult;
 
 export const backups = {
   list: async (): Promise<BackupList> => {
     const response = await apiClient.get<BackupList>('/api/backups');
     return response.data;
   },
-  create: async (): Promise<Backup> => {
-    const response = await apiClient.post<Backup>('/api/backups');
+  create: async (): Promise<BackupCreateResponse> => {
+    const response = await apiClient.post<BackupCreateResponse>('/api/backups');
     return response.data;
   },
   /**
@@ -27,12 +36,17 @@ export const backups = {
    * Destructive commit. ``confirmItemCount`` must match the server-side
    * item count (which the preview returned). A mismatch is rejected with
    * 409 rather than proceeding — guards against stale-UI races.
+   *
+   * Response is a discriminated union: on deployments with the worker
+   * profile active the server returns a JobReference and the caller
+   * should poll. Otherwise it returns the completed RestoreResult
+   * inline (sync fallback).
    */
   commitRestore: async (
     backupId: string,
     confirmItemCount: number,
-  ): Promise<RestoreResult> => {
-    const response = await apiClient.post<RestoreResult>(
+  ): Promise<RestoreCommitResponse> => {
+    const response = await apiClient.post<RestoreCommitResponse>(
       `/api/backups/${backupId}/restore`,
       { confirm_item_count: confirmItemCount },
       { params: { dry_run: false } },

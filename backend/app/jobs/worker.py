@@ -18,6 +18,7 @@ import logging
 from typing import Any, Dict
 
 from .client import _redis_settings_from_url
+from .tasks.backups import backup_create, backup_restore
 from ..logging_config import setup_logging
 from ..settings import settings
 
@@ -53,9 +54,9 @@ def _redis_settings_or_default():
 class WorkerSettings:
     """ARQ WorkerSettings — discovered by the ``arq`` CLI."""
 
-    # Filled in by Parts D + E. Keeping it as a list (not a tuple) so
-    # later modules can append without rewriting this file.
-    functions: list = []
+    # Part D registered backup_create + backup_restore; Part E will
+    # append thumbnail_generate.
+    functions: list = [backup_create, backup_restore]
 
     on_startup = _on_startup
     on_shutdown = _on_shutdown

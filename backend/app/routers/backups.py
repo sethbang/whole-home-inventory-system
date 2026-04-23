@@ -16,7 +16,7 @@ resolution fail at request time.
 import logging
 import os
 import shutil
-from typing import Optional
+from typing import Optional, Union
 
 from fastapi import (
     APIRouter,
@@ -46,13 +46,36 @@ def _service(db: Session, user: models.User) -> BackupService:
     return BackupService(db=db, user=user)
 
 
-@router.post("/backups", response_model=schemas.Backup)
+@router.post(
+    "/backups",
+    response_model=Union[schemas.JobReference, schemas.Backup],
+)
 @limiter.limit("5/hour")
 async def create_backup(
     request: Request,  # required by slowapi
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_active_user),
 ):
+    """Enqueue a backup when the ARQ worker is active, otherwise run inline.
+
+    The response shape is discriminated:
+    * ``{ kind: "job", job_id }`` → caller should poll
+      ``GET /api/jobs/{job_id}`` until the status is ``complete``.
+    * ``Backup`` (the full resource) → sync path; the backup row is
+      already persisted and listed.
+    """
+    pool = getattr(request.app.state, "arq", None)
+    if pool is not None:
+        try:
+            job = await pool.enqueue_job(
+                "backup_create", user_id=str(current_user.id)
+            )
+        except Exception:
+            logger.exception("backup_create enqueue failed; falling back to sync path")
+        else:
+            if job is not None:
+                return schemas.JobReference(job_id=job.job_id)
+
     try:
         return _service(db, current_user).create()
     except HTTPException:
@@ -70,7 +93,10 @@ async def list_backups(
     return {"backups": _service(db, current_user).list()}
 
 
-@router.post("/backups/{backup_id}/restore", response_model=schemas.RestoreResponse)
+@router.post(
+    "/backups/{backup_id}/restore",
+    response_model=Union[schemas.JobReference, schemas.RestoreResponse],
+)
 @limiter.limit("3/hour")
 async def restore_backup(
     request: Request,  # required by slowapi
@@ -89,8 +115,33 @@ async def restore_backup(
 ):
     svc = _service(db, current_user)
     try:
+        # Dry-run preview is cheap (<1s) — always run it inline so the
+        # UI doesn't spin up polling for a synchronous answer.
         if dry_run:
             return svc.preview_restore(backup_id)
+
+        # Ownership gate + confirm_item_count validation: run them
+        # up-front so a bad request fails fast instead of inside a
+        # worker job the caller would then need to poll.
+        svc.validate_restore_request(
+            backup_id, body.confirm_item_count if body else None
+        )
+
+        pool = getattr(request.app.state, "arq", None)
+        if pool is not None:
+            try:
+                job = await pool.enqueue_job(
+                    "backup_restore",
+                    user_id=str(current_user.id),
+                    backup_id=backup_id,
+                    confirm_item_count=body.confirm_item_count if body else None,
+                )
+            except Exception:
+                logger.exception("backup_restore enqueue failed; falling back to sync")
+            else:
+                if job is not None:
+                    return schemas.JobReference(job_id=job.job_id)
+
         return svc.commit_restore(backup_id, body.confirm_item_count if body else None)
     except HTTPException:
         raise

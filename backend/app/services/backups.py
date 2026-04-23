@@ -261,11 +261,17 @@ class BackupService:
             "backup_image_count": backup_image_count,
         }
 
-    def commit_restore(
+    def validate_restore_request(
         self, backup_id: str, confirm_item_count: int | None
-    ) -> dict[str, Any]:
-        """Destructive: wipe the user's items and restore from the backup."""
-        backup, backup_data = self._prepare_restore(backup_id)
+    ) -> None:
+        """Fail-fast preflight checks for a commit_restore call.
+
+        Runs cheaply (ownership lookup + a SELECT COUNT) so the router
+        can reject bad requests before enqueueing a worker job. The
+        same checks still run inside ``commit_restore`` in case anyone
+        calls the service directly — ARQ task, test fixture, etc.
+        """
+        self._owned_backup(backup_id)  # 404 if not found / not owned
         current_item_count = self._current_item_count()
 
         if confirm_item_count is None:
@@ -287,6 +293,16 @@ class BackupService:
                     "fetch a fresh preview and try again."
                 ),
             )
+
+    def commit_restore(
+        self, backup_id: str, confirm_item_count: int | None
+    ) -> dict[str, Any]:
+        """Destructive: wipe the user's items and restore from the backup."""
+        # Validation runs up-front in the router too, but re-checking here
+        # keeps the service safe against direct callers (worker tasks, tests).
+        self.validate_restore_request(backup_id, confirm_item_count)
+        current_item_count = self._current_item_count()
+        backup, backup_data = self._prepare_restore(backup_id)
 
         backup_dir = _backup_dir()
         temp_dir = os.path.join(backup_dir, f"restore_{self.user.id}")

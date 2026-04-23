@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -7,6 +7,7 @@ import { z } from 'zod';
 
 import { backups } from '../api/backups';
 import { apiErrorMessage } from '../api/errors';
+import { isJobReference, useJobPoll } from '../api/jobs';
 import { queryKeys } from '../api/queryKeys';
 import type { Backup, RestoreResult } from '../types/backups';
 
@@ -54,12 +55,37 @@ function RestoreDialog({
     defaultValues: { confirm: '' },
   });
 
+  const [pendingJobId, setPendingJobId] = useState<string | null>(null);
+  const jobPoll = useJobPoll(pendingJobId);
+
+  useEffect(() => {
+    if (!pendingJobId || !jobPoll.data) return;
+    const { status, result, error } = jobPoll.data;
+    if (status === 'complete' && result) {
+      setPendingJobId(null);
+      onCommitted(result as unknown as RestoreResult);
+    } else if (status === 'failed') {
+      setPendingJobId(null);
+      setServerError(error ?? 'Restore job failed');
+    }
+  }, [jobPoll.data, pendingJobId, onCommitted]);
+
   const commit = useMutation({
     mutationFn: (values: ConfirmValues) =>
       backups.commitRestore(backupId, values.confirm),
-    onSuccess: (result) => onCommitted(result),
+    onSuccess: (response) => {
+      if (isJobReference(response)) {
+        // Async path — start polling; the effect above resolves once the
+        // worker reports complete/failed.
+        setPendingJobId(response.job_id);
+        return;
+      }
+      onCommitted(response);
+    },
     onError: (err) => setServerError(apiErrorMessage(err, 'Restore failed')),
   });
+
+  const isWorking = commit.isPending || pendingJobId !== null;
 
   return (
     <div
@@ -118,10 +144,10 @@ function RestoreDialog({
             </button>
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isWorking}
               className="rounded-md border border-transparent bg-red-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-red-700 disabled:opacity-60"
             >
-              {isSubmitting ? 'Restoring…' : 'Restore'}
+              {isSubmitting || isWorking ? 'Restoring…' : 'Restore'}
             </button>
           </div>
         </form>
@@ -150,9 +176,33 @@ export default function Backups() {
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: queryKeys.backups.list() });
 
+  const [createJobId, setCreateJobId] = useState<string | null>(null);
+  const createJobPoll = useJobPoll(createJobId);
+
+  useEffect(() => {
+    if (!createJobId || !createJobPoll.data) return;
+    const { status, error } = createJobPoll.data;
+    if (status === 'complete') {
+      setCreateJobId(null);
+      invalidate();
+    } else if (status === 'failed') {
+      setCreateJobId(null);
+      setServerError(error ?? 'Backup job failed');
+    }
+    // invalidate is stable across renders (created inline) — include in deps
+    // to satisfy exhaustive-deps without behavior change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [createJobPoll.data, createJobId]);
+
   const createBackup = useMutation({
     mutationFn: () => backups.create(),
-    onSuccess: () => invalidate(),
+    onSuccess: (response) => {
+      if (isJobReference(response)) {
+        setCreateJobId(response.job_id);
+        return;
+      }
+      invalidate();
+    },
     onError: (err) => setServerError(apiErrorMessage(err, 'Failed to create backup')),
   });
 
@@ -210,7 +260,8 @@ export default function Backups() {
     createBackup.isPending ||
     uploadBackup.isPending ||
     deleteBackup.isPending ||
-    previewRestore.isPending;
+    previewRestore.isPending ||
+    createJobId !== null;
 
   return (
     <div className="p-6">
@@ -252,6 +303,21 @@ export default function Backups() {
           className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4"
         >
           {serverError}
+        </div>
+      )}
+
+      {createJobId && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="mb-4 flex items-center gap-3 rounded border border-primary-subtle bg-primary-subtle px-4 py-3 text-sm text-primary"
+        >
+          <span
+            aria-hidden="true"
+            className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent"
+          />
+          Backup in progress in the background — this page will refresh
+          when it finishes.
         </div>
       )}
 
