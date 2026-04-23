@@ -73,10 +73,23 @@ def test_update_fb_fields_persists_under_custom_fields(
 def test_update_fb_fields_cross_user_is_404(
     client, auth_headers, seeded_item, db_session, user
 ):
-    import uuid
+    from app import models, security
 
-    # Swap ownership so the request is now cross-user.
-    seeded_item.owner_id = uuid.uuid4()
+    # Create a real second user and reassign the item to them. Using a
+    # real user id (vs. a dangling uuid4) keeps the test compatible with
+    # dialects that enforce foreign keys — SQLite doesn't by default,
+    # Postgres always does.
+    other = models.User(
+        email="bob@example.com",
+        username="bob",
+        hashed_password=security.get_password_hash("nunya"),
+        is_active=True,
+    )
+    db_session.add(other)
+    db_session.commit()
+    db_session.refresh(other)
+
+    seeded_item.owner_id = other.id
     db_session.commit()
     resp = client.post(
         f"/api/facebook/items/{seeded_item.id}/fb-fields",

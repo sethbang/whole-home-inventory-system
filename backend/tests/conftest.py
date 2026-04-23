@@ -3,17 +3,21 @@
 Test env:
 - Forces BYPASS_AUTH=false so the real auth paths are exercised.
 - Forces a deterministic SECRET_KEY so JWTs round-trip.
-- Points DATABASE_URL at an in-memory SQLite with a StaticPool so every
-  dependency-overridden session sees the same tables.
+- DATABASE_URL is driven by ``TEST_DATABASE_URL``; defaults to an
+  in-memory SQLite with a StaticPool so every dependency-overridden
+  session sees the same tables. Set ``TEST_DATABASE_URL`` to a
+  Postgres URL (``postgresql+psycopg://...``) to exercise the PG leg.
 """
 
 from __future__ import annotations
 
 import os
 
+_TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "sqlite:///:memory:")
+
 os.environ.setdefault("BYPASS_AUTH", "false")
 os.environ.setdefault("SECRET_KEY", "pytest-secret-key-not-a-placeholder-00000000")
-os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
+os.environ["DATABASE_URL"] = _TEST_DATABASE_URL
 os.environ.setdefault("UPLOAD_DIR", "")
 os.environ.setdefault("BACKUP_DIR", "")
 os.environ.setdefault("MAX_UPLOAD_BYTES", "5242880")
@@ -36,13 +40,28 @@ from app import database, models, security  # noqa: E402
 from app.main import app  # noqa: E402
 
 
+def _is_sqlite() -> bool:
+    return _TEST_DATABASE_URL.startswith("sqlite")
+
+
 @pytest.fixture(scope="session")
 def engine():
-    eng = create_engine(
-        "sqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
+    if _is_sqlite():
+        # StaticPool keeps the in-memory DB alive across connections, and
+        # check_same_thread=False lets the FastAPI threadpool hand the same
+        # connection across event-loop tasks.
+        eng = create_engine(
+            _TEST_DATABASE_URL,
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
+    else:
+        # Server-backed dialect (Postgres in CI). pool_pre_ping catches
+        # connections the server has dropped underneath us.
+        eng = create_engine(_TEST_DATABASE_URL, pool_pre_ping=True)
+    # drop_all then create_all so re-runs against a shared Postgres
+    # instance start clean. On SQLite's :memory: the drop is a no-op.
+    models.Base.metadata.drop_all(bind=eng)
     models.Base.metadata.create_all(bind=eng)
     return eng
 
@@ -58,8 +77,8 @@ def db_session(testing_session_local, engine):
 
     The ``rollback()`` at teardown only covers in-flight transactions; tests
     that ``commit()`` (e.g. via a fixture like ``user``) leave data behind in
-    the shared in-memory DB. We also wipe all tables after every test so
-    fixtures start clean — same contract as the ``client`` fixture.
+    the shared DB. We also wipe all tables after every test so fixtures
+    start clean — same contract as the ``client`` fixture.
     """
     session = testing_session_local()
     try:
@@ -74,7 +93,7 @@ def db_session(testing_session_local, engine):
 
 @pytest.fixture
 def client(testing_session_local, engine):
-    """TestClient with the DB dependency overridden to the in-memory engine."""
+    """TestClient with the DB dependency overridden to the test engine."""
 
     def _get_db_override():
         db = testing_session_local()

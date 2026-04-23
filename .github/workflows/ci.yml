@@ -13,9 +13,27 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.11", "3.12"]
+        database: ["sqlite", "postgres"]
     defaults:
       run:
         working-directory: backend
+    services:
+      # Postgres service only consumed by the `database == postgres` legs,
+      # but GitHub Actions can't conditionally declare services — it's
+      # cheap enough to leave running for the SQLite legs too.
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: whis
+          POSTGRES_PASSWORD: whis
+          POSTGRES_DB: whis
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U whis -d whis"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
 
@@ -35,7 +53,7 @@ jobs:
       - name: Apply migrations (baseline)
         env:
           BYPASS_AUTH: "true"
-          DATABASE_URL: "sqlite:///./ci.db"
+          DATABASE_URL: ${{ matrix.database == 'postgres' && 'postgresql+psycopg://whis:whis@localhost:5432/whis' || 'sqlite:///./ci.db' }}
         run: alembic upgrade head
 
       - name: Run tests
@@ -43,10 +61,11 @@ jobs:
           BYPASS_AUTH: "false"
           SECRET_KEY: "ci-secret-key-not-a-placeholder-0000000000000"
           LOG_LEVEL: "WARNING"
+          TEST_DATABASE_URL: ${{ matrix.database == 'postgres' && 'postgresql+psycopg://whis:whis@localhost:5432/whis' || 'sqlite:///:memory:' }}
         run: pytest --cov=app --cov-report=term-missing
 
       - name: pip-audit (Python dep CVEs)
-        if: matrix.python-version == '3.12'
+        if: matrix.python-version == '3.12' && matrix.database == 'sqlite'
         run: |
           pip install pip-audit
           pip-audit -r requirements.txt --strict
