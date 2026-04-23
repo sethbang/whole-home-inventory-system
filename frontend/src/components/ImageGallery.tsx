@@ -18,8 +18,12 @@ export default function ImageGallery({ images, onDelete }: ImageGalleryProps) {
       {images.map((image) => (
         <div key={image.id} className="relative group">
           <img
-            src={image.file_path}
+            // v3.0: prefer the 512×512 WebP thumbnail when it's been
+            // generated. Falls back to the original for rows where the
+            // thumbnail job hasn't landed yet.
+            src={image.thumbnail_path ?? image.file_path}
             alt={image.filename}
+            loading="lazy"
             className="h-40 w-full object-cover rounded-lg"
           />
           <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-opacity rounded-lg flex items-center justify-center">

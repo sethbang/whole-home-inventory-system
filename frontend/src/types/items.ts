@@ -3,6 +3,10 @@ export interface ItemImage {
   filename: string;
   file_path: string;
   created_at: string;
+  // v3.0: populated asynchronously by the thumbnail_generate ARQ task.
+  // Null while the job is in flight; UI falls back to file_path.
+  thumbnail_path?: string | null;
+  thumbnail_generated_at?: string | null;
 }
 
 export interface Item {

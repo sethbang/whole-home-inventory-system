@@ -124,6 +124,12 @@ class ItemImage(Base):
     filename = Column(String)
     file_path = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
+    # v3.0: populated by the ARQ thumbnail_generate task after upload.
+    # Remains NULL while the job is in flight (or when the worker isn't
+    # active and the fallback path runs thumbnails inline in the
+    # request).
+    thumbnail_path = Column(String, nullable=True)
+    thumbnail_generated_at = Column(DateTime, nullable=True)
 
     item = relationship("Item", back_populates="images")
 

@@ -129,6 +129,11 @@ class ItemImage(BaseModel):
     filename: str
     file_path: str
     created_at: datetime
+    # Populated asynchronously by the thumbnail_generate ARQ task (v3.0).
+    # Frontend renders this when present, falls back to ``file_path``
+    # otherwise.
+    thumbnail_path: Optional[str] = None
+    thumbnail_generated_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
 

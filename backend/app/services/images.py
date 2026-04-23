@@ -22,7 +22,7 @@ from datetime import datetime
 from typing import List
 
 from fastapi import HTTPException
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, ImageOps, UnidentifiedImageError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -30,6 +30,14 @@ from .. import models
 from ..settings import settings
 
 logger = logging.getLogger(__name__)
+
+# Thumbnail dimensions. 512×512 WebP at quality 82 hits the sweet spot
+# between grid-view loading time (~20-40 KB per thumb) and visual quality
+# on retina displays. Smaller thumbs look mushy in the gallery; bigger
+# ones defeat the point of having a thumbnail.
+THUMBNAIL_SIZE: tuple[int, int] = (512, 512)
+THUMBNAIL_QUALITY = 82
+THUMBNAIL_PREFIX = "thumb_"
 
 # Pillow formats we accept on upload. Anything else is 400'd, both because
 # our frontend doesn't render them and because we don't want to store obscure
@@ -167,6 +175,71 @@ class ImageService:
         item = self._owned_item(item_id)
         return list(item.images)
 
+    def generate_thumbnail(self, image_id: uuid.UUID) -> bool:
+        """Create a 512×512 WebP thumbnail alongside the original.
+
+        Returns True on success, False when the source file is missing
+        (e.g. was deleted between upload and this task firing). Writes
+        the thumbnail to ``UPLOAD_DIR/thumb_<original_basename>.webp``
+        and stamps the ItemImage row with ``thumbnail_path`` +
+        ``thumbnail_generated_at``.
+
+        Pure helper — no HTTPException, no ownership check. The caller
+        (router enqueueing or the ARQ task) scopes the lookup. Safe to
+        call on an image whose thumbnail already exists: the file is
+        rewritten and the timestamp refreshed.
+        """
+        stmt = select(models.ItemImage).where(models.ItemImage.id == image_id)
+        image = self.db.execute(stmt).scalar_one_or_none()
+        if image is None:
+            logger.warning(
+                "thumbnail_generate called for missing image id=%s", image_id
+            )
+            return False
+
+        upload_dir = str(settings.upload_path)
+        source_path = os.path.join(upload_dir, image.filename)
+        if not os.path.exists(source_path):
+            logger.warning(
+                "thumbnail source missing on disk: %s (image id=%s)",
+                source_path,
+                image_id,
+            )
+            return False
+
+        # Derive the thumbnail filename — ``thumb_<basename>.webp``.
+        base_stem = os.path.splitext(image.filename)[0]
+        thumbnail_filename = f"{THUMBNAIL_PREFIX}{base_stem}.webp"
+        thumbnail_on_disk = os.path.join(upload_dir, thumbnail_filename)
+
+        try:
+            with Image.open(source_path) as img:
+                # Respect EXIF rotation — otherwise phone uploads come out
+                # sideways because the pixels are stored rotated with an
+                # orientation flag.
+                oriented = ImageOps.exif_transpose(img)
+                # Convert palette / alpha-only modes to RGB so WebP encoding
+                # doesn't produce surprises.
+                if oriented.mode not in ("RGB", "RGBA"):
+                    oriented = oriented.convert("RGB")
+                fitted = ImageOps.fit(
+                    oriented, THUMBNAIL_SIZE, Image.Resampling.LANCZOS
+                )
+                fitted.save(
+                    thumbnail_on_disk,
+                    format="WEBP",
+                    quality=THUMBNAIL_QUALITY,
+                    method=4,
+                )
+        except (UnidentifiedImageError, OSError):
+            logger.exception("thumbnail generation failed for image id=%s", image_id)
+            return False
+
+        image.thumbnail_path = os.path.join("uploads", thumbnail_filename)
+        image.thumbnail_generated_at = datetime.utcnow()
+        self.db.commit()
+        return True
+
     def delete(self, image_id: uuid.UUID) -> None:
         stmt = (
             select(models.ItemImage)
@@ -189,6 +262,23 @@ class ImageService:
                 # File-removal failures are noisy but non-fatal — we still
                 # want the DB row gone so the user doesn't see a ghost image.
                 logger.warning("could not remove image file %s: %s", on_disk, exc)
+
+        # v3.0: best-effort cleanup of the companion thumbnail. Derived
+        # from the thumbnail filename scheme so it works even on rows
+        # where the thumbnail job finished after the row was already
+        # fetched (thumbnail_path lagging in-memory state).
+        base_stem = os.path.splitext(image.filename)[0] if image.filename else ""
+        if base_stem:
+            thumb_on_disk = os.path.join(
+                upload_dir, f"{THUMBNAIL_PREFIX}{base_stem}.webp"
+            )
+            if os.path.exists(thumb_on_disk):
+                try:
+                    os.remove(thumb_on_disk)
+                except OSError as exc:
+                    logger.warning(
+                        "could not remove thumbnail file %s: %s", thumb_on_disk, exc
+                    )
 
         self.db.delete(image)
         self.db.commit()
