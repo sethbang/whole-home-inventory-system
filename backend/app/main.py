@@ -66,7 +66,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="WHIS - Whole-Home Inventory System",
     description="A self-hosted platform for managing household inventories",
-    version="3.0.0",
+    version="3.1.0",
     redirect_slashes=False,
     lifespan=lifespan,
 )
@@ -162,7 +162,7 @@ app.include_router(pricing.router, prefix="/api")
 
 @app.get("/api/health")
 async def health_check():
-    return {"status": "healthy", "version": "3.0.0"}
+    return {"status": "healthy", "version": "3.1.0"}
 
 
 def get_cors_headers(request):

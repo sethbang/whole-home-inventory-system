@@ -55,6 +55,14 @@ Optional env vars you can set in the same `.env`:
 - `DATABASE_URL` — defaults to `sqlite:////app/database/whis.db`. Set to `postgresql+psycopg://whis:whis@postgres:5432/whis` if you want to run Postgres alongside (requires adding a `postgres` service to this compose file; see the main `docker-compose.yml` for the reference shape).
 - `REDIS_URL` — defaults to `redis://redis:6379/0`. NAS deployments run Redis + the ARQ worker by default so 15-45s backup operations don't block uvicorn. Set to empty to force synchronous fallback.
 
+v3.1 intelligence features (both default OFF):
+- `VISION_ENABLED` / `PRICING_ENABLED` — flip to `true` to turn on vision auto-fill and item-value pricing. Both require `LLM_BASE_URL` + `LLM_API_KEY`; the app refuses to start if you flip them on without the LLM config.
+- `LLM_BASE_URL` — any OpenAI-compatible API. Common targets: `https://openrouter.ai/api/v1` (canonical; supports structured outputs + response-healing + the `openrouter:web_search` server tool), `https://api.venice.ai/api/v1`, `http://ollama:11434/v1` (local).
+- `LLM_API_KEY` — your provider API key.
+- `LLM_ALLOW_CLOUD` — set to `false` for privacy mode. The app then refuses to start if `LLM_BASE_URL` doesn't resolve to localhost / a private IP / a known container hostname. Belt-and-suspenders against accidentally leaving OpenRouter configured when you meant to use Ollama.
+- `VISION_DAILY_COST_CAP_USD` / `PRICING_DAILY_COST_CAP_USD` — per-(user, day) spend caps. Over-cap returns HTTP 402; a new day resets the rollup. Set to 0 to disable.
+- `EBAY_APP_ID` + `EBAY_CERT_ID` — optional. When set, the eBay Browse API provider activates and runs before the LLM provider (per `PRICING_PROVIDERS=ebay,llm`). Without them pricing falls back to LLM + OR web_search only.
+
 The compose file refuses to start without `SECRET_KEY`; this is intentional (prevents shipping a placeholder secret in production).
 
 ### 4. Stage the backend TLS certs

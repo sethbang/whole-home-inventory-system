@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 WHIS (Whole-Home Inventory System) — self-hosted household inventory. FastAPI + SQLite backend, React 19 + TypeScript + Tailwind + Vite PWA frontend. Served over HTTPS only (even in dev).
 
-Current version: **3.0.0** (see `CHANGELOG.md`).
+Current version: **3.1.0** (see `CHANGELOG.md`).
 
 ## Common commands
 
@@ -19,8 +19,8 @@ alembic upgrade head                          # apply migrations (use bootstrap.
 alembic revision -m "msg"                     # new migration
 alembic downgrade -1                          # revert last
 python create_dev_user.py                     # seed dev user (only useful when BYPASS_AUTH=false)
-pytest                                        # run tests (200 tests, all passing on SQLite)
-TEST_DATABASE_URL=postgresql+psycopg://... pytest  # run against Postgres (176 tests)
+pytest                                        # run tests (315 tests, all passing on SQLite)
+TEST_DATABASE_URL=postgresql+psycopg://... pytest  # run against Postgres (subset — LLM/pricing tests are mock-heavy and SQLite-only)
 pytest tests/test_items.py::test_item_crud_round_trip  # single test
 pytest --cov=app tests/                       # with coverage
 ```
@@ -78,15 +78,18 @@ Browser (HTTPS :5173) → Vite dev server → proxies `/api` and `/uploads` to `
 - `schemas.py` — Pydantic v2 schemas. Uses `model_config = ConfigDict(from_attributes=True)` (migrated from `class Config` in 2.0.0). Use `model_dump()` not `dict()`.
 - `database.py` — SQLite engine, configurable via `DATABASE_URL`. **No longer calls `Base.metadata.create_all()` — Alembic is now the sole source of truth for schema.**
 - `security.py` — JWT via **PyJWT** (swapped from unmaintained `python-jose` in 2.0.0). All bypass/secret logic is driven by `settings.BYPASS_AUTH` / `settings.SECRET_KEY`. `DEV_USER` and `DEV_USER_ID` still exist for the bypass path.
-- `routers/` — one file per resource: `auth`, `items`, `images`, `analytics`, `backups`, `ebay`, `facebook`, `jobs` (v3.0). Routers are thin — they delegate to `services/` for business logic and ownership enforcement. Upload validation in `images.py` uses Pillow magic-byte verification + `settings.MAX_UPLOAD_BYTES` + `settings.MAX_IMAGE_DIMENSION`. Per-route rate limits via `slowapi` are declared in `main.py`.
-- `jobs/` — v3.0 ARQ job queue scaffold. `client.py` builds/caches the pool (returns None when `REDIS_URL` is unset so enqueuers fall back to synchronous execution). `worker.py` exports `WorkerSettings` for `arq app.jobs.worker.WorkerSettings`. `tasks/backups.py` + `tasks/images.py` contain the actual task coroutines.
+- `routers/` — one file per resource: `auth`, `items`, `images`, `analytics`, `backups`, `ebay`, `facebook`, `jobs` (v3.0), `vision` + `pricing` (v3.1). Routers are thin — they delegate to `services/` for business logic and ownership enforcement. Upload validation in `images.py` uses Pillow magic-byte verification + `settings.MAX_UPLOAD_BYTES` + `settings.MAX_IMAGE_DIMENSION`. Per-route rate limits via `slowapi` are declared at the router / decorator level.
+- `jobs/` — v3.0 ARQ job queue scaffold. `client.py` builds/caches the pool (returns None when `REDIS_URL` is unset so enqueuers fall back to synchronous execution). `worker.py` exports `WorkerSettings` for `arq app.jobs.worker.WorkerSettings`. `tasks/` hosts the task coroutines: `backups.py`, `images.py`, `vision.py` (v3.1), `pricing.py` (v3.1).
 - `fts.py` — v3.0 full-text search DDL + helpers. Shared between the Alembic migration (`20260422_0004_items_fts.py`) and the test conftest so tests exercise the real FTS path without re-running migrations per session.
-- `schemas_llm.py` — v3.0 pre-wire for v3.1. Empty today; will export `VisionSuggestion.model_json_schema()` / `PriceEstimate.model_json_schema()` once v3.1 lands the Pydantic models.
+- `llm/` — v3.1 shared LLM layer. `openai_compatible.py` is the sole HTTP client for OpenRouter / Venice.ai / LocalAI / Ollama. `prompts.py` carries the versioned system prompts. `budget.py` is the daily-cost cap guard.
+- `schemas_llm.py` — v3.1 Pydantic models for VisionSuggestion, VisionResult, PriceSource, PriceEstimate, PriceEstimateEnvelope. `model_json_schema()` output is handed directly to OpenRouter's `response_format: json_schema` strict mode.
+- `vision/` — VisionService orchestrates image → LLM → structured suggestion.
+- `pricing/` — PricingService + normalizer + cache + two concrete PriceProvider implementations (EbayBrowseProvider, LLMPricingProvider). aggregate_prices consolidates comparables to P10/P50/P90 (or min/median/max for N < 5).
 - `services/` — domain logic extracted from routers in v2.2 (`items`, `backups`, `images`). Each service takes `(db, user)` and owns CRUD + ownership checks.
 - `ebay/`, `facebook/` — marketplace subpackages with their own `schemas.py`, `category_mapping.py`, and `formatter.py`. Both are assist-only: eBay emits CSV, Facebook emits copy-paste blocks + Meta Commerce catalog CSV (Meta has no public listing API for individual sellers).
 - `alembic/versions/` — migrations. `20260420_0001_baseline.py` is idempotent (checks existing tables/indexes), safe against both fresh DBs and DBs previously bootstrapped via `create_all()`. Later migrations (v2.2 pricing columns, v3.0 Postgres compat, items FTS, image thumbnails) stack on top and use `op.get_bind().dialect.name` for dialect branching where needed.
 - `scripts/bootstrap.py` — runtime startup script (invoked by the Dockerfile CMD before uvicorn). Asserts the shared `certs/` volume is populated, clears any unknown Alembic revision stamp (e.g., the pre-2.0.0 `cafb3d2c47a1`), then runs `alembic upgrade head`.
-- `tests/` — pytest suite with `conftest.py` that honors `TEST_DATABASE_URL` (defaults to in-memory SQLite + StaticPool). 200 tests on SQLite, 176 on Postgres. Covers auth, items, images, backups, analytics, eBay, Facebook, rate limits, FTS, ARQ job paths, thumbnail pipeline, and service-layer contracts.
+- `tests/` — pytest suite with `conftest.py` that honors `TEST_DATABASE_URL` (defaults to in-memory SQLite + StaticPool). 315 tests on SQLite (v3.1: adds coverage for the LLM client, budget guard, schemas_llm, vision service/router, pricing normalizer/cache/aggregator, and both providers + the pricing service/router). Postgres matrix runs the subset that doesn't rely on provider mocks.
 - Upload dir is `settings.UPLOAD_DIR` (default `./uploads`, overridden to `/app/backend/uploads` in compose).
 
 ### Frontend layout (`frontend/src/`)
@@ -112,8 +115,9 @@ Browser (HTTPS :5173) → Vite dev server → proxies `/api` and `/uploads` to `
 ## Known deferred work
 - SQLAlchemy 2.x `select()` style migration across all routers (a handful of analytics/backups paths still use `db.query()`).
 - `createBrowserRouter` route-level `errorElement` wiring for every route (v2.3 introduced the data router + loaders; a few routes still rely on the top-level error boundary).
-- Analytics response models aren't Pydantic yet — those endpoints return plain dicts, so analytics TS types are hand-written in `api/types.ts` (not generated). Migrating them is v3.1 cleanup.
-- Vision auto-fill + LLM-backed pricing estimates — planned for v3.1 on top of the v3.0 queue. Uses OpenRouter structured outputs + response-healing + server-side web_search tool (see `OR_docs/`).
+- Analytics response models aren't Pydantic yet — those endpoints return plain dicts, so analytics TS types are hand-written in `api/types.ts` (not generated). Migration → typed response_models is future cleanup.
+- LLM usage accounting stamps a nominal (zero-token) usage entry for non-LLM provider calls — should thread real numbers back from the provider wrapper. Low priority since only the LLM provider actually costs money.
+- Nightly contract test that hits a real LLM to catch provider API drift (gated by a CI secret).
 
 ## Conventions
 

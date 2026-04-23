@@ -7,6 +7,161 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-04-23
+
+Vision auto-fill + item-value pricing. Two feature-flagged
+intelligence layers that ride on v3.0's ARQ queue and shared
+type contract.
+
+Both features default OFF and are fail-fast-gated — the default
+`docker compose up` posture is unchanged.
+
+### Added
+
+- **Shared LLM layer** (`backend/app/llm/`). OpenAI-compatible
+  client (works with OpenRouter / Venice.ai / LocalAI / Ollama)
+  with three hard-wired features:
+  - **OpenRouter structured outputs**
+    (`response_format: json_schema`, `strict: true`). Model output
+    is schema-valid by construction — no "permissive JSON extractor"
+    heuristic. Pydantic is called on the response as
+    defense-in-depth.
+  - **Response Healing plugin** (`plugins: [{id: 'response-healing'}]`)
+    enabled on every structured call as a zero-cost safety net for
+    truncation / markdown wrappers / trailing commas.
+  - **Server-side `openrouter:web_search` tool** for pricing.
+    Replaces the previously-planned custom SearchProvider
+    abstraction entirely — OR decides when to search, executes
+    via Exa/Parallel/native, returns grounded results.
+- **LLM-facing JSON Schemas** (`backend/app/schemas_llm.py`).
+  Single Pydantic source for VisionSuggestion, VisionResult,
+  PriceSource, PriceEstimate, PriceEstimateEnvelope.
+  `model_json_schema()` hands the same contract to OR;
+  `openapi-typescript` hands it to the frontend. No drift.
+- **Daily LLM budget cap** (`backend/app/llm/budget.py` +
+  `20260422_0006_llm_usage.py` migration). Per-(user, day,
+  feature) rollup of tokens + cost. Caps from
+  `VISION_DAILY_COST_CAP_USD` / `PRICING_DAILY_COST_CAP_USD`
+  return HTTP 402 when exceeded. Cost estimation via a small rate
+  table (gemini-2.5-flash, claude-sonnet-4.6, gpt-4o) with a
+  conservative $2/$10 fallback for unknown models.
+- **Vision auto-fill** (`backend/app/vision/`,
+  `/api/vision/identify`, `VisionSuggestionPanel` +
+  `VisionIdentifyButton`). Photograph one or more shots of an
+  item, receive structured metadata (name, brand, model,
+  condition, year, dimensions, suggested_tags, ebay/fb item
+  specifics) with per-field confidence. Field-by-field
+  checkboxes let the user accept selectively. Sync + ARQ async
+  paths both supported; image upload rejects bad magic bytes
+  up-front so bad uploads don't enqueue a doomed job. Image
+  content NEVER logged — only sha256 hashes when
+  `VISION_LOG_IMAGE_HASHES_ONLY=true` (the default).
+- **Item-value pricing** (`backend/app/pricing/`,
+  `/api/pricing/{estimate,refresh/{id},estimate/{id}}`,
+  `PriceEstimateCard`). Two providers:
+  - **eBay Browse API** — OAuth client-credentials flow, in-memory
+    token cache, `/buy/browse/v1/item_summary/search`. Results
+    aggregated via P10/P50/P90 when sample≥5, min/median/max below
+    that. Drops zero-priced Best Offer placeholders.
+  - **LLM with OR web_search** — Pricing prompt + schema +
+    `use_web_search=True`. Model researches, cites, returns strict
+    JSON. Web search usage logged for cost tracking.
+  Providers tried in `PRICING_PROVIDERS` priority order. Cache
+  layer keyed `(identity_hash, provider)` with 14-day TTL +
+  60-day stale fallback (decayed confidence) when providers are
+  rate-limited. When an `item_id` is given, the item's
+  `estimated_value_low/median/high + price_last_checked +
+  price_provider` columns (v2.2 pre-wire) are stamped.
+- **Vision → Pricing chain** on `AddItem`. After the user applies
+  a vision suggestion with brand + model_number, the form fires
+  a metadata-based pricing estimate and renders a PriceEstimateCard
+  with "Apply median as current value" wired to the form input.
+- **"AI filled" chip banner** that tracks vision-sourced fields
+  and clears on user edit via a RHF `watch` subscription.
+- **Rate limiting** on `POST /api/pricing/refresh/{id}` at
+  5/minute/user (slowapi) so accidental loops can't DOS eBay or
+  burn through the LLM quota.
+- **LLM_ALLOW_CLOUD privacy kill-switch**. When false, the app
+  refuses to start if LLM_BASE_URL resolves to anything other
+  than localhost / 127.0.0.0/8 / 10/8 / 172.16/12 / 192.168/16 /
+  the known container hostnames (ollama, host.docker.internal).
+  Belt-and-suspenders guard for operators running local-only
+  setups.
+
+### Changed
+
+- `backend/app/routers/backups.py`, `backup_restore` service
+  layer untouched from v3.0 (no behavior change — listed here so
+  the changelog is readable as a whole).
+- `backend/app/jobs/worker.py`: task registry grows to include
+  `vision_identify` and `pricing_refresh`.
+- `backend/app/models.py`: `PriceCache` PK promoted to composite
+  `(identity_hash, provider)` via migration
+  `20260422_0007_price_cache_composite_pk`. v2.2 provisioned the
+  table with single-column PK; v3.1 is the first release to
+  populate it, so the swap is safe to do without data migration.
+  SQLite path uses `batch_alter_table(recreate="always")`;
+  Postgres does a DROP/ADD CONSTRAINT.
+- `backend/app/models.py`: new `LLMUsage` table for the budget
+  rollup.
+- `backend/requirements.txt`: `openai>=1.57,<2` added (other
+  v3.1 deps — httpx + tenacity — were pre-wired in v3.0).
+
+### Test counts
+
+- Backend: **315 tests** passing on SQLite (up from 297 in v3.0).
+  New coverage: LLM client (8), LLM schemas (9), settings gates
+  (18), budget guard (8), vision service (7), vision router (7),
+  pricing normalizer (13), pricing cache (7), pricing aggregator
+  (9), pricing providers (11), pricing service (10), pricing
+  router (8).
+- Frontend: **95 tests** — no new tests this release; the new
+  components are covered by end-to-end smoke via the dev server
+  (vision + pricing flows exercised manually).
+
+### Settings added
+
+Shared LLM layer:
+- `LLM_BASE_URL` (default empty)
+- `LLM_API_KEY` (default empty)
+- `LLM_MODEL` (default `google/gemini-2.5-flash`)
+- `LLM_PRICING_MODEL` (defaults to LLM_MODEL if blank)
+- `LLM_TIMEOUT_SECONDS` (default 90)
+- `LLM_ALLOW_CLOUD` (default true)
+- `LLM_RESPONSE_HEALING` (default true)
+
+Vision:
+- `VISION_ENABLED` (default false)
+- `VISION_MAX_IMAGES_PER_REQUEST` (default 4)
+- `VISION_DAILY_COST_CAP_USD` (default 5.0)
+- `VISION_LOG_IMAGE_HASHES_ONLY` (default true)
+
+Pricing:
+- `PRICING_ENABLED` (default false)
+- `PRICING_PROVIDERS` (CSV, default `ebay,llm`)
+- `PRICING_CACHE_DAYS` (default 14)
+- `PRICING_MAX_SAMPLES` (default 30)
+- `PRICING_MULTIPROVIDER` (default false)
+- `PRICING_DAILY_COST_CAP_USD` (default 5.0)
+- `PRICING_WEB_SEARCH_MAX_RESULTS` (default 5)
+- `PRICING_WEB_SEARCH_MAX_TOTAL` (default 20)
+- `PRICING_WEB_SEARCH_DOMAINS` (CSV, default `ebay.com,mercari.com,bonanza.com`)
+
+eBay Browse API:
+- `EBAY_APP_ID`, `EBAY_CERT_ID` (both empty by default)
+- `EBAY_MARKETPLACE_ID` (default `EBAY_US`)
+- `EBAY_ENVIRONMENT` (default `production`; `sandbox` also valid)
+
+### Migration notes
+
+- `alembic upgrade head` applies migrations 0006 + 0007. Both are
+  cross-dialect; both are safe on populated DBs (0006 adds a new
+  table, 0007 reshuffles the PK of a table that's empty in v3.0
+  production deployments).
+- Enabling vision/pricing requires setting `LLM_BASE_URL` +
+  `LLM_API_KEY` + flipping the feature flag. Without these the
+  startup fail-fast guard refuses to boot — by design.
+
 ## [3.0.0] - 2026-04-22
 
 Platform leap. No new product surface — v3.0 builds the substrate that
