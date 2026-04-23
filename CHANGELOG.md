@@ -103,6 +103,23 @@ any Postgres deployment takes real traffic.
   assert the new placement explicitly so a revert doesn't sneak
   through.
 
+- **Item delete now cleans up image files on disk**
+  (`services/items.py::delete`, `services/items.py::bulk_delete`).
+  ORM cascade and the new `ON DELETE CASCADE` FK both correctly
+  removed `item_images` rows, but the disk-cleanup path that
+  `ImageService.delete` does for individual image deletes was never
+  invoked from item delete or bulk delete — every deleted item left
+  its uploaded files orphaned in `uploads/`, growing without bound.
+  Extracted the disk-cleanup logic into a shared
+  `remove_image_files_from_disk` helper in `services/images.py` and
+  wired both `ItemService.delete` and `ItemService.bulk_delete` to
+  call it for every image they remove. Bulk delete fetches
+  filenames via an ownership-scoped JOIN before the bulk SQL DELETE,
+  so a caller passing a mixed-ownership ID list only cleans disk for
+  files belonging to items they actually owned. Three new regression
+  tests cover the happy path on both delete shapes plus the
+  missing-disk-file edge case.
+
 ### Security
 
 - **python-dotenv bumped to >=1.2.2,<2** to resolve

@@ -25,6 +25,7 @@ from sqlalchemy import delete, func, select, text
 from sqlalchemy.orm import Session
 
 from .. import models, schemas
+from .images import remove_image_files_from_disk
 
 logger = logging.getLogger(__name__)
 
@@ -101,13 +102,33 @@ class ItemService:
 
     def delete(self, item_id: uuid.UUID) -> None:
         db_item = self._owned_item(item_id)
+        # Snapshot filenames before the delete — once the parent is gone,
+        # the ORM cascade drops the ItemImage rows and the in-memory
+        # collection is no longer accessible.
+        filenames = [img.filename for img in db_item.images]
         self.db.delete(db_item)
         self.db.commit()
+        for filename in filenames:
+            remove_image_files_from_disk(filename)
 
     def bulk_delete(self, item_ids: list[uuid.UUID]) -> int:
         """Delete every listed item that belongs to self.user. Returns count."""
         if not item_ids:
             return 0
+        # Fetch image filenames before the bulk delete so we can clean
+        # disk afterward. Joined to Item so the ownership filter scopes
+        # the cleanup to this user's images even if the caller passed
+        # mixed-ownership ids.
+        image_stmt = (
+            select(models.ItemImage.filename)
+            .join(models.Item)
+            .where(
+                models.ItemImage.item_id.in_(item_ids),
+                models.Item.owner_id == self.user.id,
+            )
+        )
+        filenames = list(self.db.execute(image_stmt).scalars().all())
+
         stmt = (
             delete(models.Item)
             .where(
@@ -118,6 +139,10 @@ class ItemService:
         )
         result = self.db.execute(stmt)
         self.db.commit()
+
+        for filename in filenames:
+            remove_image_files_from_disk(filename)
+
         return result.rowcount or 0
 
     # -- search / list ------------------------------------------------------

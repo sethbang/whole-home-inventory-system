@@ -7,13 +7,17 @@ live in ``tests/test_items.py``.
 
 from __future__ import annotations
 
+import io
+import os
 import uuid as _uuid
 from datetime import datetime
 
 import pytest
 from fastapi import HTTPException
+from PIL import Image
 
 from app import models, schemas, security
+from app.services.images import ImageService
 from app.services.items import ItemService
 
 
@@ -141,6 +145,78 @@ def test_bulk_delete_returns_count_and_respects_ownership(db_session, user, othe
 
 def test_bulk_delete_empty_list_is_noop(db_session, user):
     assert ItemService(db_session, user).bulk_delete([]) == 0
+
+
+# ---------------------------------------------------------------------------
+# delete + bulk_delete disk cleanup (F6 regression)
+# ---------------------------------------------------------------------------
+
+
+def _png_bytes(size=(32, 32), color="red") -> bytes:
+    buf = io.BytesIO()
+    Image.new("RGB", size, color=color).save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def test_delete_removes_image_files_from_disk(db_session, user):
+    """Deleting an item must clean up its images' files + thumbnails on disk."""
+    item = _seed(db_session, user)
+    img_svc = ImageService(db_session, user)
+    image = img_svc.store_for_item(item.id, _png_bytes())
+    img_svc.generate_thumbnail(image.id)
+
+    upload_dir = os.environ["UPLOAD_DIR"]
+    on_disk = os.path.join(upload_dir, image.filename)
+    base_stem = os.path.splitext(image.filename)[0]
+    thumb_on_disk = os.path.join(upload_dir, f"thumb_{base_stem}.webp")
+    assert os.path.exists(on_disk)
+    assert os.path.exists(thumb_on_disk)
+
+    ItemService(db_session, user).delete(item.id)
+    assert db_session.get(models.Item, item.id) is None
+    assert db_session.get(models.ItemImage, image.id) is None
+    assert not os.path.exists(on_disk)
+    assert not os.path.exists(thumb_on_disk)
+
+
+def test_bulk_delete_removes_image_files_from_disk(db_session, user, other_user):
+    """Bulk delete cleans disk only for the calling user's own items."""
+    alice_item = _seed(db_session, user, name="alice-item")
+    bob_item = _seed(db_session, other_user, name="bob-item")
+
+    alice_img = ImageService(db_session, user).store_for_item(
+        alice_item.id, _png_bytes()
+    )
+    bob_img = ImageService(db_session, other_user).store_for_item(
+        bob_item.id, _png_bytes()
+    )
+
+    upload_dir = os.environ["UPLOAD_DIR"]
+    alice_disk = os.path.join(upload_dir, alice_img.filename)
+    bob_disk = os.path.join(upload_dir, bob_img.filename)
+    assert os.path.exists(alice_disk)
+    assert os.path.exists(bob_disk)
+
+    # Alice tries to nuke both — only hers should be removed from disk.
+    deleted = ItemService(db_session, user).bulk_delete([alice_item.id, bob_item.id])
+    assert deleted == 1
+    assert not os.path.exists(alice_disk)
+    assert os.path.exists(bob_disk)
+    # Bob's row also still in DB.
+    assert db_session.get(models.ItemImage, bob_img.id) is not None
+
+
+def test_delete_with_missing_disk_files_still_completes(db_session, user):
+    """If files vanished out-of-band, item delete still succeeds."""
+    item = _seed(db_session, user)
+    image = ImageService(db_session, user).store_for_item(item.id, _png_bytes())
+
+    upload_dir = os.environ["UPLOAD_DIR"]
+    os.remove(os.path.join(upload_dir, image.filename))
+
+    # Should not raise.
+    ItemService(db_session, user).delete(item.id)
+    assert db_session.get(models.Item, item.id) is None
 
 
 # ---------------------------------------------------------------------------

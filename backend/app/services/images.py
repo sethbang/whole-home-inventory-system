@@ -52,6 +52,39 @@ EXT_BY_FORMAT = {
 }
 
 
+def remove_image_files_from_disk(filename: str | None) -> None:
+    """Best-effort removal of an upload's file plus its thumbnail companion.
+
+    Centralizes the disk-cleanup half of ``ImageService.delete`` so that
+    callers which delete ``ItemImage`` rows by other means (cascade from
+    item delete, bulk delete) can keep the uploads directory in sync
+    without re-implementing the path derivation. All filesystem errors
+    are logged and swallowed.
+    """
+    if not filename:
+        return
+    upload_dir = str(settings.upload_path)
+    on_disk = os.path.join(upload_dir, filename)
+    if os.path.exists(on_disk):
+        try:
+            os.remove(on_disk)
+        except OSError as exc:
+            logger.warning("could not remove image file %s: %s", on_disk, exc)
+
+    base_stem = os.path.splitext(filename)[0]
+    if base_stem:
+        thumb_on_disk = os.path.join(
+            upload_dir, f"{THUMBNAIL_PREFIX}{base_stem}.webp"
+        )
+        if os.path.exists(thumb_on_disk):
+            try:
+                os.remove(thumb_on_disk)
+            except OSError as exc:
+                logger.warning(
+                    "could not remove thumbnail file %s: %s", thumb_on_disk, exc
+                )
+
+
 def validate_image_bytes(data: bytes) -> str:
     """Validate raw bytes and return the normalized Pillow format name.
 
@@ -253,32 +286,7 @@ class ImageService:
         if image is None:
             raise HTTPException(status_code=404, detail="Image not found")
 
-        upload_dir = str(settings.upload_path)
-        on_disk = os.path.join(upload_dir, image.filename)
-        if os.path.exists(on_disk):
-            try:
-                os.remove(on_disk)
-            except OSError as exc:
-                # File-removal failures are noisy but non-fatal — we still
-                # want the DB row gone so the user doesn't see a ghost image.
-                logger.warning("could not remove image file %s: %s", on_disk, exc)
-
-        # v3.0: best-effort cleanup of the companion thumbnail. Derived
-        # from the thumbnail filename scheme so it works even on rows
-        # where the thumbnail job finished after the row was already
-        # fetched (thumbnail_path lagging in-memory state).
-        base_stem = os.path.splitext(image.filename)[0] if image.filename else ""
-        if base_stem:
-            thumb_on_disk = os.path.join(
-                upload_dir, f"{THUMBNAIL_PREFIX}{base_stem}.webp"
-            )
-            if os.path.exists(thumb_on_disk):
-                try:
-                    os.remove(thumb_on_disk)
-                except OSError as exc:
-                    logger.warning(
-                        "could not remove thumbnail file %s: %s", thumb_on_disk, exc
-                    )
-
+        filename = image.filename
         self.db.delete(image)
         self.db.commit()
+        remove_image_files_from_disk(filename)
