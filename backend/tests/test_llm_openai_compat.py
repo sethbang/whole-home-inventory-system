@@ -312,3 +312,63 @@ def test_parse_response_handles_null_content():
                 schema=VISION_SUGGESTION_SCHEMA,
             )
         )
+
+
+def test_parse_response_surfaces_provider_error_envelope():
+    """OR returns 200 OK with `{error: {message, code}, choices: null}`
+    when an upstream (e.g. Anthropic-via-Azure) hits a 524 timeout. The
+    OpenAI SDK deserializes this as a ChatCompletion with choices=None
+    — naive parsers TypeError on `choices[0]`. Defensive parser must
+    detect the error envelope and raise LLMProviderError with the
+    upstream message, never crash to 500.
+    """
+    client = OpenAICompatibleClient()
+    create = AsyncMock(
+        return_value=SimpleNamespace(
+            choices=None,
+            usage=None,
+            error={"message": "Provider returned error", "code": 524},
+        )
+    )
+    client._client.chat = SimpleNamespace(
+        completions=SimpleNamespace(create=create)
+    )
+
+    import asyncio
+
+    with pytest.raises(LLMProviderError) as exc:
+        asyncio.run(
+            client.structured_completion(
+                messages=[{"role": "user", "content": "x"}],
+                schema=VISION_SUGGESTION_SCHEMA,
+            )
+        )
+    msg = str(exc.value)
+    assert "524" in msg
+    assert "Provider returned error" in msg
+
+
+def test_parse_response_handles_null_choices_without_error():
+    """Defense-in-depth: if `choices` is None but no error envelope
+    accompanies it, still raise cleanly instead of TypeError-crashing.
+    """
+    client = OpenAICompatibleClient()
+    create = AsyncMock(
+        return_value=SimpleNamespace(
+            choices=None,
+            usage=None,
+        )
+    )
+    client._client.chat = SimpleNamespace(
+        completions=SimpleNamespace(create=create)
+    )
+
+    import asyncio
+
+    with pytest.raises(LLMProviderError):
+        asyncio.run(
+            client.structured_completion(
+                messages=[{"role": "user", "content": "x"}],
+                schema=VISION_SUGGESTION_SCHEMA,
+            )
+        )

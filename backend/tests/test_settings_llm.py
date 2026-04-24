@@ -104,6 +104,30 @@ def test_pricing_model_falls_back_to_vision_model(monkeypatch):
     assert settings_obj.pricing_model() == "some-model"
 
 
+def test_vision_model_defaults_to_llm_model(monkeypatch):
+    env = _env(
+        LLM_BASE_URL="https://openrouter.ai/api/v1",
+        LLM_API_KEY="sk-test",
+        LLM_MODEL="default-model",
+        LLM_VISION_MODEL="",
+    )
+    for k, v in env.items():
+        monkeypatch.setenv(k, v)
+    assert Settings().vision_model() == "default-model"
+
+
+def test_vision_model_overrides_when_set(monkeypatch):
+    env = _env(
+        LLM_BASE_URL="https://openrouter.ai/api/v1",
+        LLM_API_KEY="sk-test",
+        LLM_MODEL="default-model",
+        LLM_VISION_MODEL="google/gemini-3-flash-preview",
+    )
+    for k, v in env.items():
+        monkeypatch.setenv(k, v)
+    assert Settings().vision_model() == "google/gemini-3-flash-preview"
+
+
 @pytest.mark.parametrize(
     "url,expected",
     [

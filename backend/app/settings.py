@@ -91,6 +91,13 @@ class Settings(BaseSettings):
     # model that supports tool calling + structured outputs when using a
     # non-OpenRouter provider.
     LLM_PRICING_MODEL: str = ""
+    # Vision model override. Defaults to LLM_MODEL if blank. Some models
+    # (notably Anthropic Sonnet 4.6 via OR's Azure provider) reliably time
+    # out when asked for image+structured-output combinations — keep this
+    # pointed at a model with proven vision+schema support
+    # (google/gemini-2.5-flash, google/gemini-3-flash-preview, etc.) so
+    # the LLM_MODEL choice for pricing analysis doesn't break vision.
+    LLM_VISION_MODEL: str = ""
     LLM_TIMEOUT_SECONDS: int = 90
     # Hard kill-switch for privacy mode. When False, LLM_BASE_URL must
     # resolve to localhost or a private-range IP; the app refuses to
@@ -234,8 +241,12 @@ class Settings(BaseSettings):
                 )
 
     def pricing_model(self) -> str:
-        """Resolve the pricing model, defaulting to the vision model."""
+        """Resolve the pricing model, defaulting to LLM_MODEL."""
         return self.LLM_PRICING_MODEL or self.LLM_MODEL
+
+    def vision_model(self) -> str:
+        """Resolve the vision model, defaulting to LLM_MODEL."""
+        return self.LLM_VISION_MODEL or self.LLM_MODEL
 
     def resolve_log_format(self) -> str:
         """Return "console" or "json" after applying the DEBUG-aware default."""

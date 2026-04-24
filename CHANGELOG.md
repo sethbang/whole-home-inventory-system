@@ -169,6 +169,47 @@ any Postgres deployment takes real traffic.
   Pydantic's own validation still enforces them at
   `model_validate` time so nothing is lost.
 
+- **LLM client now surfaces upstream-error envelopes instead of
+  TypeError-crashing** (`app/llm/openai_compatible.py`). OpenRouter
+  occasionally returns 200 OK with a payload shaped
+  `{"error": {"message", "code"}, "choices": null, "usage": null}`
+  when an upstream provider hits a transient failure (observed
+  with Anthropic-via-Azure 524 timeouts; the same shape comes
+  from other transient upstream failures). The OpenAI SDK
+  deserializes this as a `ChatCompletion` with `choices=None`,
+  so accessing `choices[0]` raised `TypeError: 'NoneType' object
+  is not subscriptable` — uncaught by the previous parser's
+  `(AttributeError, IndexError)` clause and bubbled up as a 500
+  to the caller. Extracted `_extract_content` as a shared helper
+  for both `structured_completion` and `chat_completion`; it
+  detects `response.error` first and surfaces the upstream
+  message + code as `LLMProviderError`, defaults the
+  empty-choices case to a clean error, and adds `TypeError` to
+  the parsing-error catch as defense in depth. Two new
+  regression tests cover the error envelope and the bare
+  null-choices paths.
+
+- **Vision model is now configurable independently of `LLM_MODEL`**
+  via the new `LLM_VISION_MODEL` setting (`app/settings.py`,
+  `app/vision/service.py`, `backend/.env.example`). Mirrors the
+  existing `LLM_PRICING_MODEL`. Closes a regression discovered
+  while running the v3.1 validation pass against the production
+  `.env`: with `LLM_MODEL=anthropic/claude-sonnet-4.6` set for
+  pricing reasoning, every vision call timed out (HTTP 524 from
+  OpenRouter) because Sonnet 4.6's image+structured-output path
+  via Azure can't compose the two within OR's gateway timeout.
+  Sonnet without an image works; Sonnet without a strict schema
+  works; Sonnet with both reliably 524s. The fix doesn't try to
+  work around the upstream issue — it lets the operator point
+  vision at a model that handles the combination cleanly
+  (`google/gemini-3-flash-preview` confirmed working
+  end-to-end at $0.0015/call) while pricing keeps Sonnet 4.6.
+  Default sample `.env` ships with `LLM_VISION_MODEL` blank so
+  `LLM_MODEL` continues to drive both features for fresh
+  installs that haven't picked a separate pricing model. Added
+  `google/gemini-3-flash-preview` to the cost-rate table
+  (`$0.50/$3.00 per 1M`, derived from observed OR billing).
+
 ### Security
 
 - **python-dotenv bumped to >=1.2.2,<2** to resolve

@@ -271,14 +271,7 @@ class OpenAICompatibleClient:
             body["extra_body"] = extra_body
 
         response = await self._with_retry(body)
-        try:
-            text = response.choices[0].message.content
-        except (AttributeError, IndexError) as exc:
-            raise LLMProviderError(
-                "LLM response had no choices/message", raw=response
-            ) from exc
-        if text is None:
-            raise LLMProviderError("LLM response content was null", raw=response)
+        text = self._extract_content(response)
         usage = _usage_dict(getattr(response, "usage", None))
         return {
             "text": text,
@@ -369,7 +362,54 @@ class OpenAICompatibleClient:
         raise LLMError("retry exhausted without a response")
 
     @staticmethod
-    def _parse_response(response: Any) -> Dict[str, Any]:
+    def _extract_content(response: Any) -> str:
+        """Pull ``choices[0].message.content`` defensively.
+
+        OR sometimes returns 200 OK with an upstream-error envelope
+        shaped ``{error: {message, code}, choices: null, usage: null,
+        ...}`` (observed when Anthropic-via-Azure hits a 524 timeout,
+        but the same shape comes from other transient upstream
+        failures). The OpenAI SDK deserializes that into a
+        ChatCompletion with ``choices=None``, so accessing
+        ``choices[0]`` raises ``TypeError`` instead of the
+        ``AttributeError`` / ``IndexError`` a naive parser expects.
+        Detect the ``error`` envelope first and surface its message;
+        otherwise the empty-choices case raises with a generic note.
+        Either way the router maps to a meaningful HTTP status instead
+        of 500.
+        """
+        provider_error = getattr(response, "error", None)
+        if provider_error:
+            err_msg = (
+                getattr(provider_error, "message", None)
+                or (provider_error.get("message") if isinstance(provider_error, dict) else None)
+                or "LLM provider returned an error envelope"
+            )
+            err_code = (
+                getattr(provider_error, "code", None)
+                or (provider_error.get("code") if isinstance(provider_error, dict) else None)
+            )
+            raise LLMProviderError(
+                f"LLM provider error (code={err_code}): {err_msg}", raw=response
+            )
+
+        choices = getattr(response, "choices", None)
+        if not choices:
+            raise LLMProviderError(
+                "LLM response had no choices (empty or null)", raw=response
+            )
+        try:
+            content = choices[0].message.content
+        except (AttributeError, IndexError, TypeError) as exc:
+            raise LLMProviderError(
+                "LLM response had no choices/message", raw=response
+            ) from exc
+        if content is None:
+            raise LLMProviderError("LLM response content was null", raw=response)
+        return content
+
+    @classmethod
+    def _parse_response(cls, response: Any) -> Dict[str, Any]:
         """Pull the JSON body out of a chat.completions response.
 
         OR returns ``response.choices[0].message.content`` as a string
@@ -377,14 +417,7 @@ class OpenAICompatibleClient:
         mode + response healing). We json.loads it and surface the
         raw content on failure.
         """
-        try:
-            content = response.choices[0].message.content
-        except (AttributeError, IndexError) as exc:
-            raise LLMProviderError(
-                "LLM response had no choices/message", raw=response
-            ) from exc
-        if content is None:
-            raise LLMProviderError("LLM response content was null", raw=response)
+        content = cls._extract_content(response)
         try:
             data = json.loads(content)
         except json.JSONDecodeError as exc:

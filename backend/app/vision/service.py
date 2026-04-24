@@ -112,6 +112,7 @@ class VisionService:
                 images=image_list,
                 hints=hints,
                 schema=VISION_SUGGESTION_SCHEMA,
+                model=settings.vision_model(),
             )
         except LLMProviderError:
             # Pre-parse error — the content was garbage. Record a
@@ -119,7 +120,7 @@ class VisionService:
             # request happened, then surface.
             guard.record_usage(
                 "vision",
-                model=settings.LLM_MODEL,
+                model=settings.vision_model(),
                 usage={"prompt_tokens": 0, "completion_tokens": 0},
             )
             raise HTTPException(
@@ -133,7 +134,7 @@ class VisionService:
             )
 
         usage = response.get("usage", {})
-        guard.record_usage("vision", model=settings.LLM_MODEL, usage=usage)
+        guard.record_usage("vision", model=settings.vision_model(), usage=usage)
 
         # Second-pass validation. Strict mode + response healing
         # should already guarantee schema-valid JSON, but this
@@ -153,12 +154,12 @@ class VisionService:
         tokens_in = int(usage.get("prompt_tokens", 0))
         tokens_out = int(usage.get("completion_tokens", 0))
         cost = estimate_cost_usd(
-            model=settings.LLM_MODEL, tokens_in=tokens_in, tokens_out=tokens_out
+            model=settings.vision_model(), tokens_in=tokens_in, tokens_out=tokens_out
         )
         return VisionResult(
             suggestion=suggestion,
             provider=client.provider,
-            model=settings.LLM_MODEL,
+            model=settings.vision_model(),
             prompt_version=PROMPT_VERSION,
             tokens_in=tokens_in,
             tokens_out=tokens_out,

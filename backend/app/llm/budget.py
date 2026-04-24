@@ -37,6 +37,10 @@ Feature = Literal["vision", "pricing"]
 _DEFAULT_RATES: Dict[str, Dict[str, float]] = {
     # Gemini 2.5 Flash via OpenRouter: $0.30/1M in, $2.50/1M out.
     "google/gemini-2.5-flash": {"in": 0.30, "out": 2.50},
+    # Gemini 3 Flash Preview: $0.50/1M in, $3.00/1M out (derived from
+    # observed billing on a probe call: 1328 prompt + 285 completion =
+    # $0.001519 → $0.50/$3.00 per 1M).
+    "google/gemini-3-flash-preview": {"in": 0.50, "out": 3.00},
     # Claude Sonnet 4.6: $3/1M in, $15/1M out.
     "anthropic/claude-sonnet-4.6": {"in": 3.0, "out": 15.0},
     # GPT-4o: $2.50/1M in, $10/1M out.
