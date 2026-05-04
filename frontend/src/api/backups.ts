@@ -1,5 +1,6 @@
 import type { Backup, BackupList, RestoreResult } from './types';
 import { apiClient } from './http';
+import { downloadGet } from './download';
 import type { JobReference } from './jobs';
 
 /**
@@ -66,11 +67,12 @@ export const backups = {
   delete: async (backupId: string): Promise<void> => {
     await apiClient.delete(`/api/backups/${backupId}`);
   },
-  download: (backupId: string): void => {
-    // Trigger a browser download via a new tab; Content-Disposition header
-    // lives on the server.
-    window.open(`/api/backups/${backupId}/download`, '_blank');
-  },
+  download: (backupId: string, fallback = 'backup.zip'): Promise<void> =>
+    // Auth is JWT-in-Authorization-header, so a plain `window.open` request
+    // wouldn't carry credentials and the server would 401. Fetch the blob
+    // through the authenticated axios client instead, then synthesize a
+    // download via a hidden anchor.
+    downloadGet(`/api/backups/${backupId}/download`, { fallback }),
 };
 
 export type { Backup, BackupList, RestoreResult };

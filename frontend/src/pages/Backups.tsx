@@ -381,7 +381,16 @@ export default function Backups() {
                           : 'Restore'}
                       </button>
                       <button
-                        onClick={() => backups.download(backup.id)}
+                        onClick={() => {
+                          setServerError(null);
+                          backups
+                            .download(backup.id, backup.filename)
+                            .catch((err) =>
+                              setServerError(
+                                apiErrorMessage(err, 'Failed to download backup'),
+                              ),
+                            );
+                        }}
                         className="text-primary hover:text-primary-hover"
                       >
                         Download
