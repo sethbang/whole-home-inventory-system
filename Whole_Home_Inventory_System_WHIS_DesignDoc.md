@@ -1,117 +1,193 @@
 # Whole-Home Inventory System (WHIS)
 
-**Version:** 2.0.0 (Audit Remediation & Modernization)
+**Version:** 3.1.0
 **Author:** S. Bang
-**Last Updated:** 2026-04-20
+**Last Updated:** 2026-05-03
 
 ## 1. Introduction
 
 ### 1.1 Overview
 
-WHIS is a self-hosted platform for managing household inventories. It centralizes item information—descriptions, photos, locations, purchase details, valuations, warranties—into a local database accessible from multiple devices via a web interface. This ensures users maintain a clear, up-to-date record of their possessions.
+WHIS is a self-hosted platform for managing household inventories. It centralizes item information — descriptions, photos, locations, purchase details, valuations, warranties — into a local database accessible from multiple devices via a web interface. The v3.x line adds optional AI-assisted item identification (vision auto-fill) and resale-value pricing (eBay Browse + LLM with web search), all while keeping inventory data local.
 
 ### 1.2 Goals & Objectives
 
-- ✓ **Centralized Inventory:** Provide a unified repository for all household item data.
-- ✓ **Intuitive Interface:** Offer easy browsing, searching, and filtering of items.
-- ✓ **Simplified Data Entry:** Streamline adding new items with photo uploads and automated IDs.
-- ✓ **Customization:** Allow users to define custom fields and categories.
-- ✓ **Data Security & Privacy:** Store data locally, granting users full control.
+- ✓ **Centralized inventory:** Provide a unified repository for all household item data.
+- ✓ **Intuitive interface:** Easy browsing, searching, and filtering — sub-100ms full-text search.
+- ✓ **Simplified data entry:** Photo upload, camera capture, barcode scanning, and (v3.1) one-click vision auto-fill.
+- ✓ **Customization:** User-defined fields and categories alongside strict-typed marketplace integration data.
+- ✓ **Data security & privacy:** Local-first storage, optional LLM kill-switch (`LLM_ALLOW_CLOUD=false` enforces a private LLM host).
+- ✓ **Marketplace assist:** v2.3 eBay CSV + Facebook copy-paste; v3.1 eBay Browse-API pricing.
 
 ### 1.3 Target Audience
 
 - Homeowners and renters seeking organized inventory management.
 - Small businesses tracking equipment and supplies.
+- Households preparing for moves, insurance claims, or estate planning.
 
 ### 1.4 Non-Goals
 
-- Automatic cloud synchronization (though user-configurable options may be explored later).
-- Third-party e-commerce integration.
-- Enterprise-scale deployments.
+- Cloud-managed SaaS deployment.
+- Multi-tenant / enterprise-scale offerings (single-user role model only).
+- E-commerce listing automation that requires WHIS to act as a user on a marketplace (v3.1 eBay Browse is server-to-server only, not on-behalf-of).
 
 ## 2. System Architecture
 
 ### 2.1 High-Level Design
 
-WHIS uses a client-server model:
+WHIS is a client-server application with optional async-job and AI components:
 
-- ✓ **Server:** Runs on a Raspberry Pi 4 (recommended), local PC, NAS, or VM. Manages the database and image storage.
-- ✓ **Client:** Browser-based web client (desktop and mobile). Future consideration for a Progressive Web App (PWA).
-- ✓ **Network:** Designed for local network use. Remote access requires user-configured VPN or a reverse proxy.
+- **Server**: FastAPI on Python 3.11/3.12. Default deployment is single-process; the v3.0 worker profile adds Redis + ARQ for heavy ops (backup, vision, pricing, thumbnails).
+- **Client**: React 19 PWA — installable, offline-capable, mobile-optimized.
+- **Database**: SQLite by default (zero config) or Postgres 16 (opt-in via `DATABASE_URL`).
+- **Network**: Designed for LAN by default. Caddy in the NAS deployment fronts the stack on 80/443 with auto-TLS (Let's Encrypt for public hostnames, Caddy internal CA for `*.local`).
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the full topology diagram and architecture decision records.
 
 ### 2.2 Components
 
-1. ✓ **Backend (Server):**
-   - ✓ **API:** RESTful API implemented with Python and FastAPI.
-   - ✓ **Database:** SQLite for simplicity and portability.
-   - ✓ **Authentication:** Simple username/password authentication.
+1. **Backend (Server)**
+   - **API**: FastAPI — thin routers delegating to a services/ layer
+   - **Database**: SQLite default; Postgres opt-in. Alembic-managed schema (sole source of truth since 2.0.0)
+   - **Authentication**: JWT bearer tokens via PyJWT (HS256)
+   - **Job queue (v3.0)**: ARQ + Redis (worker profile); sync fallback when `REDIS_URL` is unset
+   - **LLM layer (v3.1)**: OpenAI-compatible client; OpenRouter / Venice.ai / Ollama / LocalAI all supported
 
-2. ✓ **Frontend (Web Client):**
-   - ✓ **Inventory Browser:** A React Single Page Application for viewing, searching, and editing items.
-   - ✓ **Inventory Creator:** A dedicated React component for adding new items with image uploads and validation.
+2. **Frontend (Web Client)**
+   - React 19 + TypeScript 5 + Vite 6
+   - React Router v7 data router with loaders
+   - TanStack Query 5 for server state
+   - Tailwind v4 (CSS-first config — no `tailwind.config.js`)
+   - PWA via `vite-plugin-pwa`
+   - Forms: react-hook-form + zod (Formik+Yup retired in v2.3)
+   - Tests: Vitest (Jest retired in v2.4)
 
-3. ✓ **Storage:**
-   - ✓ **Images:** Stored locally on the server's filesystem.
-   - ✓ **Database:** A single SQLite database file on the server.
+3. **Storage**
+   - Images: Server filesystem (`UPLOAD_DIR`), with v3.0 thumbnail companion files
+   - Backups: Server filesystem (`BACKUP_DIR`), zip archives with full-resolution images
+   - Database: SQLite file or Postgres volume
 
 ### 2.3 Deployment Model
 
-- ✓ Primarily self-hosted on a Raspberry Pi 4.
-- Docker image will be provided for simplified deployment on alternative platforms (Upcoming).
+- **Local dev**: HTTPS-only on `localhost`, both backend and frontend
+- **Docker compose (default)**: backend + frontend + SQLite, jobs sync — for casual local testing
+- **Docker compose with profiles**: `--profile worker` (Redis + ARQ), `--profile postgres` (PG 16), or both
+- **NAS deployment** (`docker-compose.nas.yml`): Caddy fronts the stack; Redis + worker always on; suitable for Synology / TrueNAS / generic Docker host
 
 ## 3. Feature Specifications
 
-### 3.1 Core Features
+### 3.1 Core (v1.x – v2.x)
 
-- ✓ **CRUD Operations:** Create, Read, Update, and Delete items. Each item is identified by a UUID.
-- ✓ **Data Fields:** Includes Name, Category, Location, Brand, Model/Serial Number, Purchase Date/Price, Value, Warranty Expiration, Notes, and user-defined custom fields.
-- ✓ **Photo Support:** Multiple JPEG/PNG images per item, stored locally.
-- ✓ **Browsing & Searching:** Filter by any field, sort items in ascending or descending order, and perform case-insensitive full-text searches.
+- ✓ **CRUD operations** keyed by UUID
+- ✓ **Data fields**: Name, Category, Location, Brand, Model/Serial Number, Barcode, Purchase Date/Price, Current Value, Warranty Expiration, Notes, Custom Fields
+- ✓ **Photo support**: Multiple JPEG/PNG/WebP/HEIC images per item, magic-byte-validated
+- ✓ **Browsing & searching**: Filter by any field, sort, full-text search (v3.0 FTS5 / tsvector)
+- ✓ **Custom fields**: Strict-typed top-level keys (`ebay`, `facebook`) plus free-form `user_defined`
+- ✓ **Barcode/QR scanning**: lazy-loaded `@zxing/browser`
+- ✓ **Backup/restore**: in-app zip archives, per-user
+- ✓ **Reports & analytics**: value-by-category/location, value trends, warranty status, age analysis
+
+### 3.2 Marketplace assist (v2.3)
+
+- ✓ **eBay listing CSV**: per-item or bulk export to Seller Hub-compatible CSV; streamed (no intermediate file)
+- ✓ **Facebook Marketplace**: copy-paste blocks for the Marketplace compose UI; Meta Commerce catalog CSV; image zip download
+
+### 3.3 v3.0 — Scale & ops
+
+- ✓ **Postgres support**: opt-in via `DATABASE_URL=postgresql+psycopg://...`; SQLite remains the default
+- ✓ **ARQ background jobs**: Redis-backed queue for heavy ops; worker container shares the backend image
+- ✓ **Image thumbnails**: server-side generation, served separately from full-res for fast galleries
+- ✓ **Items FTS**: SQLite FTS5 / Postgres `tsvector` + GIN, sub-100ms search
+- ✓ **OpenAPI codegen**: `frontend/src/api/openapi.d.ts` generated from live backend schema; CI's `contract-check` enforces drift detection
+
+### 3.4 v3.1 — Intelligence (optional, off by default)
+
+- ✓ **Vision auto-fill** (`/api/vision/identify`): photo → LLM → strict-JSON suggestion (name, brand, model, tags, eBay item specifics, FB item specifics). Per-day cost cap.
+- ✓ **Pricing** (`/api/pricing/estimate`): item metadata → eBay Browse API (priority) → LLM provider (fallback with `openrouter:web_search`). Returns P10/P50/P90 + sample comparables. 14-day cache.
+- ✓ **Privacy kill-switch**: `LLM_ALLOW_CLOUD=false` refuses to start unless `LLM_BASE_URL` resolves to a private host.
+- ✓ **Daily cost caps**: per-(user, day) spend ceilings on vision and pricing. Over-cap returns HTTP 402.
+- ✓ **eBay Marketplace Account Deletion exemption**: WHIS persists no eBay user data; load-bearing regression test guards the exemption (see [docs/EBAY_INTEGRATION.md](docs/EBAY_INTEGRATION.md)).
 
 ## 4. Technology Stack
 
-- ✓ **Backend:** Python 3.11+, FastAPI 0.115, SQLAlchemy 2.0, SQLite, Uvicorn 0.32, Alembic, PyJWT, pydantic-settings
-- ✓ **Frontend:** React 19, TypeScript 5.6, Tailwind CSS 3.4, Vite 6, Axios, TanStack Query, React Router v7
-- ✓ **Deployment:** Docker, Docker Compose (dev + NAS variants shipped)
+### Backend
+- **Python** 3.11 / 3.12 (CI matrix runs both)
+- **FastAPI** (>=0.115)
+- **SQLAlchemy 2.x**, **Pydantic v2**, **pydantic-settings**
+- **SQLite** (default) or **Postgres 16** (opt-in via `DATABASE_URL`)
+- **Alembic** — sole source of truth for schema
+- **PyJWT** + **passlib/bcrypt**
+- **ARQ** + **Redis** (v3.0; opt-in)
+- **OpenAI Python SDK** (v3.1; targets any OpenAI-compatible endpoint)
+- **structlog**, **slowapi** per-route rate limiting, **OpenTelemetry** (opt-in)
+
+### Frontend
+- **React 19**, **TypeScript 5**, **Vite 6**
+- **Tailwind CSS v4** (CSS-first config)
+- **React Router v7** (data router)
+- **TanStack Query 5**
+- **react-hook-form** + **zod**
+- **Vitest**, **@testing-library/react**
+- **vite-plugin-pwa**
+- **`@zxing/browser`** (lazy-loaded)
+
+### Infrastructure
+- **Docker Compose** (with profiles)
+- **Caddy** (NAS deployment, auto-TLS)
+- **GitHub Actions** CI (backend matrix × SQLite/Postgres, blocking ESLint, pip-audit, npm audit, Trivy image scan, contract-check)
 
 ## 5. User Interface
 
 ### 5.1 Desktop
 
-- ✓ **Dashboard:** Overview of items and quick filters.
-- ✓ **Item Listing:** Grid/List view with thumbnails (search/filtering in progress).
-- ✓ **Item Detail:** Displays all metadata and images with edit/delete controls.
-- ✓ **Add New Item:** A step-by-step form with image uploads and validation.
-- **Accessibility:** (Upcoming) WCAG-compliant color contrast, keyboard navigation.
+- ✓ **Dashboard**: overview tiles, recent items, value summaries, bulk export
+- ✓ **Item Listing**: grid/list view with thumbnails (v3.0)
+- ✓ **Item Detail**: full metadata, image gallery, marketplace tabs (eBay/Facebook), v3.1 pricing chip, "Auto-fill from image" button
+- ✓ **Add New Item**: react-hook-form + zod validation; vision auto-fill flow
+- ✓ **Reports**: value by category/location, warranty status, age analysis
+- ✓ **Backups**: create / list / download / restore
+- ⏳ **Accessibility**: WCAG-compliant color contrast, keyboard nav — in progress
 
-### 5.2 Mobile
+### 5.2 Mobile / PWA
 
-- ✓ **Responsive Design:** Optimized for smaller screens.
-- ✓ **Quick Add:** A dedicated button to rapidly add new items.
-- ✓ **Camera Integration:** Supports using the device's camera for photo capture.
+- ✓ **Responsive design**: optimized for phone screens
+- ✓ **PWA install**: standalone display, app icon, splash
+- ✓ **Camera capture**: native camera integration for photos
+- ✓ **Barcode/QR scanning**: live camera-based scan
+- ✓ **Offline shell**: service worker caches the app shell; read-only graceful degradation
 
 ## 6. Security & Privacy
 
-- ✓ Runs on a local network by default.
-- ✓ Username/password authentication with JWT bearer tokens (PyJWT, HS256 by default).
-- ✓ bcrypt password hashing via passlib.
-- ✓ HTTPS in dev and prod (self-signed dev CA; operator-provided TLS at the reverse proxy in prod).
-- ✓ `SECRET_KEY` required via environment; fail-fast on startup if unset/placeholder and `BYPASS_AUTH=false`.
-- ✓ Image uploads validated by magic bytes (not trusted `Content-Type`) with size and dimension caps.
-- Rate limiting / WAF / MFA are not provided by the application; terminate at the reverse proxy.
+- ✓ Runs on the operator's host; LAN-only by default
+- ✓ JWT bearer tokens (PyJWT, HS256) with per-route rate limiting (slowapi)
+- ✓ bcrypt password hashing via passlib
+- ✓ HTTPS-only in dev and prod (refuses to start without certs)
+- ✓ Fail-fast `SECRET_KEY` requirement when `BYPASS_AUTH=false`
+- ✓ Pillow magic-byte upload validation with size + dimension caps
+- ✓ Privacy kill-switch (`LLM_ALLOW_CLOUD=false`) blocks accidental egress to public LLM hosts
+- ✓ Daily LLM cost caps (per-user, per-feature)
+- ✓ eBay deletion-exemption regression-tested
+- See [SECURITY.md](SECURITY.md) for the full posture; WAF / HSTS / IP-level rate limiting are operator-provided at the reverse proxy.
 
 ## 7. Performance & Scalability
 
-- ✓ SQLite indexing for optimized queries.
-- Target performance: Up to 10,000 items on a Raspberry Pi 4 (to be tested).
-- Future Consideration: Database migration to PostgreSQL for larger datasets.
+- ✓ Indexed queries on routinely-filtered columns
+- ✓ FTS5 (SQLite) / `tsvector` + GIN (Postgres) for sub-100ms search at typical inventory sizes
+- ✓ ARQ async-by-default for heavy ops (15–60s backups, 3–10s vision/pricing)
+- ✓ React Query loaders eliminate page-load flashes
+- ✓ Image thumbnails for fast galleries
+- ✓ PriceCache 14-day TTL minimizes provider API spend
+- Postgres connection pool tuneable via `DB_POOL_*` env vars
 
 ## 8. Maintenance & Extensibility
 
-- ✓ Well-documented API using OpenAPI/Swagger.
-- Unit and integration tests (In Progress).
-- End-to-end tests for critical UI flows (Upcoming).
-- Future Consideration: A plugin architecture for community contributions.
+- ✓ Auto-generated OpenAPI spec at `/openapi.json`; UI at `/docs`
+- ✓ 336 backend pytest tests on SQLite + Postgres 16
+- ✓ 95 vitest tests on the frontend
+- ✓ ESLint blocking in CI; `pip-audit --strict`, Trivy image scan, contract-check all blocking
+- ⏳ End-to-end tests (Playwright planned)
+- ⏳ Coverage gates (currently reported but not failed-under)
+- See [TESTING.md](TESTING.md) for the test surface; [DEVELOPMENT.md](DEVELOPMENT.md) for development workflow.
 
 ## 9. Roadmap
 
@@ -124,40 +200,66 @@ WHIS uses a client-server model:
 ### Phase 2 — ✓ Completed
 - ✓ Custom fields system (JSON column on `items`)
 - ✓ Advanced search and filtering
-- ✓ Barcode/QR code scanning (lazy-loaded `@zxing/browser`)
+- ✓ Barcode/QR code scanning
 - ✓ Backend pytest suite + GitHub Actions CI
 
 ### Phase 3 — ✓ Completed
-- ✓ Backup/restore functionality (zip archives + in-app UI)
-- ✓ Reporting features (analytics endpoints + Reports page)
-- ✓ PWA implementation (`vite-plugin-pwa`)
-- ✓ Docker deployment (dev + NAS compose files)
+- ✓ Backup/restore functionality
+- ✓ Reporting features
+- ✓ PWA implementation
+- ✓ Docker deployment (dev + NAS variants)
 
 ### Phase 4 — ✓ Completed (v2.0.0 audit remediation)
-- ✓ Env-driven settings, `SECRET_KEY` required, auth bypass removed as default
+- ✓ Env-driven settings, `SECRET_KEY` required, auth bypass off by default
 - ✓ Alembic rebaselined (destructive migration replaced with idempotent baseline + `bootstrap.py`)
 - ✓ python-jose → PyJWT swap
 - ✓ Upload hardening (magic-byte validation, size + dimension caps)
 - ✓ React 18 → 19
-- ✓ Dead deps removed (sharp, jszip); BarcodeScanner lazy-loaded
+- ✓ Dead deps removed; BarcodeScanner lazy-loaded
 
-### Phase 5 — eBay integration (Phase 1 shipped in v2.0.0)
-- ✓ Seller Hub CSV export
-- ✓ Category mapping
-- ✓ eBay-specific custom fields
-- eBay API (OAuth / Trading / Inventory APIs) — deferred to a future release
+### Phase 5 — Marketplace assist — ✓ Completed (v2.3)
+- ✓ eBay Seller Hub CSV export (per-item + bulk)
+- ✓ Streaming CSV download (no intermediate disk file)
+- ✓ Strict-typed `EbayFields` schema
+- ✓ Facebook Marketplace copy-paste + Meta Commerce CSV
+- ✓ Image zip download for Facebook upload
 
-### Future
-- Formik → React Hook Form migration
-- React Router v7 data-router (`createBrowserRouter`) migration
-- SQLAlchemy 2.x `select()` style migration
-- Tailwind v4 evaluation
-- End-to-end tests (Playwright/Cypress)
+### Phase 6 — Scale & operations — ✓ Completed (v3.0)
+- ✓ Postgres dialect plumbing + 4-leg CI matrix
+- ✓ ARQ background job queue (worker profile)
+- ✓ Backup create/restore moved to ARQ
+- ✓ Image thumbnail pipeline
+- ✓ Items full-text search (FTS5 / tsvector)
+- ✓ OpenAPI → TypeScript codegen + contract-check CI gate
+
+### Phase 7 — Intelligence — ✓ Completed (v3.1)
+- ✓ Shared LLM layer (`app/llm/`) targeting any OpenAI-compatible provider
+- ✓ Vision auto-fill (image → strict-JSON suggestion)
+- ✓ Pricing service with eBay Browse API + LLM fallback
+- ✓ PriceCache (composite PK: identity_hash + provider; 14-day TTL)
+- ✓ LLM usage tracking + daily cost caps (per-user, per-feature)
+- ✓ Privacy kill-switch (`LLM_ALLOW_CLOUD=false`)
+- ✓ eBay Marketplace Account Deletion exemption + regression test
+- ✓ Two-call flow for pricing (research + extraction; works around OpenRouter middleware)
+- ✓ Defensive LLM parser (handles upstream-error-in-200 envelopes)
+- ✓ Per-feature model override (`LLM_VISION_MODEL`, `LLM_PRICING_MODEL`)
+
+### Future (genuinely not yet implemented)
+
+- End-to-end tests (Playwright)
 - Coverage gates in CI
+- SQLAlchemy 2.x `select()`-style migration across remaining `db.query()` callsites
+- Route-level `errorElement` wiring for every frontend route (a few still rely on the top-level error boundary)
+- Analytics endpoints typed via Pydantic response models (currently hand-typed on the frontend)
+- Real (non-zero) usage stamping for non-LLM providers (eBay) in the budget table
+- Nightly CI contract test against a real LLM endpoint (gated by a CI secret) to catch provider API drift
+- eBay Sell APIs (would require reversing the deletion exemption + standing up the callback listener)
+- Refresh-token / session-management enhancements
+- Plugin / extension architecture for community contributions
 
 ## 10. Open-Source
 
-WHIS will be released under the MIT License to encourage community contributions and broader adoption.
+WHIS is released under the MIT License to encourage community contributions and broader adoption.
 
 ---
 
