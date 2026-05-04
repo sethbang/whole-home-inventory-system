@@ -69,15 +69,15 @@ export default function ImageGallery({ images, onDelete }: ImageGalleryProps) {
             />
             {/*
               Tailwind v4 dropped the `bg-opacity-*` utilities; the v3-syntax
-              `bg-opacity-0` silently degrades to fully-opaque `bg-black`,
+              `bg-opacity-0` silently degrades to fully-opaque `bg-overlay`,
               which used to mask the underlying image as a solid black square.
-              v4-native syntax `bg-black/0` + `group-hover:bg-black/30` keeps
+              v4-native syntax `bg-overlay/0` + `group-hover:bg-overlay/30` keeps
               the overlay transparent until hover, with a dimmer veil so the
               delete button stays readable without obscuring the photo.
               `pointer-events-none` lets clicks fall through to the <img>;
               the delete button re-enables them locally.
             */}
-            <div className="pointer-events-none absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors rounded-lg flex items-end justify-end p-2">
+            <div className="pointer-events-none absolute inset-0 bg-overlay/0 group-hover:bg-overlay/30 transition-colors rounded-lg flex items-end justify-end p-2">
               {onDelete && (
                 <button
                   // type="button" is load-bearing: ImageGallery is rendered
@@ -90,7 +90,7 @@ export default function ImageGallery({ images, onDelete }: ImageGalleryProps) {
                     e.stopPropagation();
                     handleDelete(image.id);
                   }}
-                  className="pointer-events-auto opacity-0 group-hover:opacity-100 transition-opacity p-2 bg-red-600 text-white rounded-full hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                  className="pointer-events-auto opacity-0 group-hover:opacity-100 transition-opacity p-2 bg-danger text-white rounded-full hover:bg-danger focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-danger"
                   aria-label="Delete image"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -108,14 +108,14 @@ export default function ImageGallery({ images, onDelete }: ImageGalleryProps) {
           role="dialog"
           aria-modal="true"
           aria-label={`${previewImage.filename} preview`}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/80 p-4"
           onClick={() => setPreviewImage(null)}
         >
           <button
             type="button"
             aria-label="Close preview"
             onClick={() => setPreviewImage(null)}
-            className="absolute top-4 right-4 text-white text-3xl leading-none rounded-full bg-black/40 hover:bg-black/60 w-10 h-10 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-white"
+            className="absolute top-4 right-4 text-white text-3xl leading-none rounded-full bg-overlay/40 hover:bg-overlay/60 w-10 h-10 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-white"
           >
             ✕
           </button>

@@ -92,20 +92,20 @@ function RestoreDialog({
       role="dialog"
       aria-modal="true"
       aria-labelledby="restore-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/40 p-4"
     >
-      <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
-        <h2 id="restore-title" className="text-lg font-semibold text-gray-900">
+      <div className="w-full max-w-md rounded-lg bg-surface-raised p-6 shadow-xl">
+        <h2 id="restore-title" className="text-lg font-semibold text-fg">
           Restore backup?
         </h2>
-        <p className="mt-2 text-sm text-gray-700">
+        <p className="mt-2 text-sm text-muted">
           This will <strong>delete {expected} existing item(s)</strong> and
           replace them with{' '}
           <strong>{preview.backup_item_count ?? 0} item(s)</strong> (plus{' '}
           {preview.backup_image_count ?? 0} image(s)) from the archive. This
           cannot be undone.
         </p>
-        <p className="mt-3 text-sm text-gray-700">
+        <p className="mt-3 text-sm text-muted">
           Type <strong>{expected}</strong> below to confirm.
         </p>
 
@@ -118,7 +118,7 @@ function RestoreDialog({
           noValidate
         >
           {serverError && (
-            <div role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-700">
+            <div role="alert" className="rounded-md bg-danger-subtle p-3 text-sm text-danger">
               {serverError}
             </div>
           )}
@@ -128,24 +128,24 @@ function RestoreDialog({
             aria-label="Confirm item count"
             aria-invalid={errors.confirm ? 'true' : 'false'}
             {...register('confirm')}
-            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+            className="block w-full rounded-md border-line-strong shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
           />
           {errors.confirm && (
-            <p className="text-sm text-red-600">{errors.confirm.message}</p>
+            <p className="text-sm text-danger">{errors.confirm.message}</p>
           )}
 
           <div className="flex justify-end gap-2 pt-2">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              className="rounded-md border border-line-strong bg-surface-raised px-3 py-1.5 text-sm font-medium text-muted hover:bg-surface-muted"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting || isWorking}
-              className="rounded-md border border-transparent bg-red-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-red-700 disabled:opacity-60"
+              className="rounded-md border border-transparent bg-danger px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-danger disabled:opacity-60"
             >
               {isSubmitting || isWorking ? 'Restoring…' : 'Restore'}
             </button>
@@ -250,7 +250,7 @@ export default function Backups() {
     return (
       <div className="p-6">
         <div className="flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-fg"></div>
         </div>
       </div>
     );
@@ -268,7 +268,7 @@ export default function Backups() {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Backups</h1>
         <div className="flex gap-4">
-          <label className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded cursor-pointer disabled:opacity-50">
+          <label className="bg-success hover:bg-success/85 text-white px-4 py-2 rounded cursor-pointer disabled:opacity-50">
             <input
               type="file"
               accept=".zip"
@@ -290,7 +290,7 @@ export default function Backups() {
               createBackup.mutate();
             }}
             disabled={busy}
-            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
+            className="bg-primary-accent hover:bg-primary-hover text-white px-4 py-2 rounded disabled:opacity-50"
           >
             Create New Backup
           </button>
@@ -300,7 +300,7 @@ export default function Backups() {
       {serverError && (
         <div
           role="alert"
-          className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4"
+          className="bg-danger-subtle border border-danger text-danger px-4 py-3 rounded mb-4"
         >
           {serverError}
         </div>
@@ -321,45 +321,45 @@ export default function Backups() {
         </div>
       )}
 
-      <div className="bg-white rounded-lg shadow overflow-x-auto">
-        <table className="min-w-[800px] w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+      <div className="bg-surface-raised rounded-lg shadow overflow-x-auto">
+        <table className="min-w-[800px] w-full divide-y divide-line">
+          <thead className="bg-surface-muted">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-subtle uppercase tracking-wider">
                 Created At
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-subtle uppercase tracking-wider">
                 Size
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-subtle uppercase tracking-wider">
                 Items
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-subtle uppercase tracking-wider">
                 Status
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-subtle uppercase tracking-wider">
                 Actions
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="bg-surface-raised divide-y divide-line">
             {backupList.map((backup: Backup) => (
               <tr key={backup.id}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-fg">
                   {format(new Date(backup.created_at), 'PPp')}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-fg">
                   {formatSize(backup.size_bytes)}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-fg">
                   {backup.item_count} items, {backup.image_count} images
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span
                     className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full
-                      ${backup.status === 'completed' ? 'bg-green-100 text-green-800' : ''}
-                      ${backup.status === 'failed' ? 'bg-red-100 text-red-800' : ''}
-                      ${backup.status === 'in_progress' ? 'bg-yellow-100 text-yellow-800' : ''}`}
+                      ${backup.status === 'completed' ? 'bg-success-subtle text-success' : ''}
+                      ${backup.status === 'failed' ? 'bg-danger-subtle text-danger' : ''}
+                      ${backup.status === 'in_progress' ? 'bg-warning-subtle text-warning' : ''}`}
                   >
                     {backup.status}
                   </span>
@@ -373,7 +373,7 @@ export default function Backups() {
                           previewRestore.mutate(backup.id);
                         }}
                         disabled={busy}
-                        className="text-indigo-600 hover:text-indigo-900 disabled:opacity-50"
+                        className="text-primary hover:text-primary-hover disabled:opacity-50"
                       >
                         {previewRestore.isPending &&
                         previewRestore.variables === backup.id
@@ -382,7 +382,7 @@ export default function Backups() {
                       </button>
                       <button
                         onClick={() => backups.download(backup.id)}
-                        className="text-blue-600 hover:text-blue-900"
+                        className="text-primary hover:text-primary-hover"
                       >
                         Download
                       </button>
@@ -396,7 +396,7 @@ export default function Backups() {
                             deleteBackup.mutate(backup.id);
                           }
                         }}
-                        className="text-red-600 hover:text-red-900"
+                        className="text-danger hover:text-danger"
                       >
                         Delete
                       </button>
@@ -404,21 +404,21 @@ export default function Backups() {
                   )}
                   {backup.status === 'failed' && (
                     <span
-                      className="text-red-600"
+                      className="text-danger"
                       title={backup.error_message ?? undefined}
                     >
                       Failed: {backup.error_message}
                     </span>
                   )}
                   {backup.status === 'in_progress' && (
-                    <span className="text-yellow-600">Processing...</span>
+                    <span className="text-warning">Processing...</span>
                   )}
                 </td>
               </tr>
             ))}
             {backupList.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
+                <td colSpan={5} className="px-6 py-4 text-center text-subtle">
                   No backups found. Create your first backup to protect your data.
                 </td>
               </tr>

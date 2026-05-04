@@ -118,8 +118,8 @@ export default function BarcodeScanner({ onCapture, onBarcodeScan, onClose }: Ba
   }, [stream, isScanning, initBarcodeReader]);
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-lg w-full overflow-hidden">
+    <div className="fixed inset-0 bg-overlay bg-opacity-75 z-50 flex items-center justify-center p-4">
+      <div className="bg-surface-raised rounded-lg shadow-xl max-w-lg w-full overflow-hidden">
         <div className="p-4 flex justify-between items-center border-b">
           <h3 className="text-lg font-medium">Scan Barcode or Take Photo</h3>
           <button
@@ -127,13 +127,13 @@ export default function BarcodeScanner({ onCapture, onBarcodeScan, onClose }: Ba
               stopCamera();
               onClose();
             }}
-            className="text-gray-400 hover:text-gray-500"
+            className="text-subtle hover:text-subtle"
           >
             <XMarkIcon className="h-6 w-6" />
           </button>
         </div>
 
-        <div className="relative aspect-[4/3] bg-black">
+        <div className="relative aspect-[4/3] bg-overlay">
           {error ? (
             <div className="absolute inset-0 flex items-center justify-center text-white text-center p-4">
               {error}
@@ -151,7 +151,7 @@ export default function BarcodeScanner({ onCapture, onBarcodeScan, onClose }: Ba
               </div>
               {!isScanning && lastScanned && (
                 <div className="absolute bottom-4 left-0 right-0 mx-auto text-center">
-                  <div className="bg-green-500 text-white px-4 py-2 rounded-full inline-flex items-center">
+                  <div className="bg-success text-white px-4 py-2 rounded-full inline-flex items-center">
                     <QrCodeIcon className="h-5 w-5 mr-2" />
                     Code Scanned!
                   </div>

@@ -47,25 +47,25 @@ export default function PriceEstimateCard({
   const confidencePct = Math.round((estimate.confidence ?? 0) * 100);
   const confidenceTone =
     confidencePct >= 75
-      ? 'bg-green-100 text-green-800'
+      ? 'bg-success-subtle text-success'
       : confidencePct >= 50
-      ? 'bg-yellow-100 text-yellow-800'
-      : 'bg-red-100 text-red-800';
+      ? 'bg-warning-subtle text-warning'
+      : 'bg-danger-subtle text-danger';
 
   return (
     <section
       aria-labelledby="price-estimate-title"
-      className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
+      className="rounded-lg border border-line bg-surface-raised p-4 shadow-sm"
     >
       <header className="flex items-start justify-between gap-2">
         <div>
           <h3
             id="price-estimate-title"
-            className="text-sm font-semibold text-gray-900"
+            className="text-sm font-semibold text-fg"
           >
             Estimated resale value
           </h3>
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-subtle">
             {envelope.provider} · {formatDate(envelope.queried_at)}
             {envelope.cache_hit && ' · cached'}
           </p>
@@ -79,9 +79,9 @@ export default function PriceEstimateCard({
       </header>
 
       <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-        <div className="rounded bg-gray-50 p-2">
-          <div className="text-xs text-gray-500">low</div>
-          <div className="text-lg font-semibold text-gray-800">
+        <div className="rounded bg-surface-muted p-2">
+          <div className="text-xs text-subtle">low</div>
+          <div className="text-lg font-semibold text-fg">
             {formatUsd(estimate.low)}
           </div>
         </div>
@@ -91,15 +91,15 @@ export default function PriceEstimateCard({
             {formatUsd(estimate.median)}
           </div>
         </div>
-        <div className="rounded bg-gray-50 p-2">
-          <div className="text-xs text-gray-500">high</div>
-          <div className="text-lg font-semibold text-gray-800">
+        <div className="rounded bg-surface-muted p-2">
+          <div className="text-xs text-subtle">high</div>
+          <div className="text-lg font-semibold text-fg">
             {formatUsd(estimate.high)}
           </div>
         </div>
       </div>
 
-      <p className="mt-2 text-xs text-gray-600">
+      <p className="mt-2 text-xs text-muted">
         Based on {estimate.sample_count} comparable
         {estimate.sample_count === 1 ? '' : 's'}.
       </p>
@@ -121,7 +121,7 @@ export default function PriceEstimateCard({
                 >
                   {source.title}
                 </a>
-                <span className="whitespace-nowrap text-gray-700">
+                <span className="whitespace-nowrap text-muted">
                   {formatUsd(source.price)}
                   {source.condition ? ` · ${source.condition}` : ''}
                 </span>
@@ -138,7 +138,7 @@ export default function PriceEstimateCard({
               type="button"
               onClick={onRefresh}
               disabled={refreshing}
-              className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+              className="rounded-md border border-line-strong bg-surface-raised px-3 py-1.5 text-xs font-medium text-muted hover:bg-surface-muted disabled:opacity-60"
             >
               {refreshing ? 'Refreshing…' : 'Refresh'}
             </button>

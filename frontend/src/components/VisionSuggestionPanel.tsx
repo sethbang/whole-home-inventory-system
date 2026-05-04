@@ -96,10 +96,10 @@ export default function VisionSuggestionPanel({
   const confidencePct = Math.round((suggestion.confidence ?? 0) * 100);
   const confidenceTone =
     confidencePct >= 80
-      ? 'bg-green-100 text-green-800'
+      ? 'bg-success-subtle text-success'
       : confidencePct >= 50
-      ? 'bg-yellow-100 text-yellow-800'
-      : 'bg-red-100 text-red-800';
+      ? 'bg-warning-subtle text-warning'
+      : 'bg-danger-subtle text-danger';
 
   return (
     <section
@@ -120,7 +120,7 @@ export default function VisionSuggestionPanel({
           <button
             type="button"
             onClick={onDismiss}
-            className="text-sm text-gray-500 hover:text-gray-700"
+            className="text-sm text-subtle hover:text-muted"
           >
             Dismiss
           </button>
@@ -128,7 +128,7 @@ export default function VisionSuggestionPanel({
       </header>
 
       {provider && model && (
-        <p className="mt-1 text-xs text-gray-600">
+        <p className="mt-1 text-xs text-muted">
           {provider} · {model}
         </p>
       )}
@@ -136,7 +136,7 @@ export default function VisionSuggestionPanel({
       {suggestion.warnings && suggestion.warnings.length > 0 && (
         <ul
           aria-label="warnings"
-          className="mt-3 list-disc space-y-0.5 pl-5 text-sm text-yellow-700"
+          className="mt-3 list-disc space-y-0.5 pl-5 text-sm text-warning"
         >
           {suggestion.warnings.map((warning, idx) => (
             <li key={idx}>{warning}</li>
@@ -145,7 +145,7 @@ export default function VisionSuggestionPanel({
       )}
 
       {populated.length === 0 ? (
-        <p className="mt-4 text-sm text-gray-700">
+        <p className="mt-4 text-sm text-muted">
           The model returned no confident suggestions. Try another photo?
         </p>
       ) : (
@@ -159,14 +159,14 @@ export default function VisionSuggestionPanel({
                   type="checkbox"
                   checked={selected.has(fieldKey)}
                   onChange={() => toggle(fieldKey)}
-                  className="mt-1 rounded border-gray-300 text-primary focus:ring-primary"
+                  className="mt-1 rounded border-line-strong text-primary focus:ring-primary"
                 />
                 <label
                   htmlFor={`vision-apply-${fieldKey}`}
                   className="flex-1 text-sm"
                 >
-                  <span className="font-medium text-gray-800">{fieldKey}</span>
-                  <span className="ml-2 text-gray-700">
+                  <span className="font-medium text-fg">{fieldKey}</span>
+                  <span className="ml-2 text-muted">
                     {renderValue(suggestion[field])}
                   </span>
                 </label>
@@ -180,7 +180,7 @@ export default function VisionSuggestionPanel({
         <button
           type="button"
           onClick={onDismiss}
-          className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          className="rounded-md border border-line-strong bg-surface-raised px-3 py-1.5 text-sm font-medium text-muted hover:bg-surface-muted"
         >
           Cancel
         </button>

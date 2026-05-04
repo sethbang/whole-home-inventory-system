@@ -51,12 +51,12 @@ export function RouteErrorBoundary() {
 
   return (
     <div className="flex min-h-[50vh] flex-col items-center justify-center px-4">
-      <div className="max-w-md rounded-lg border border-red-200 bg-red-50 p-6 text-center">
-        <h1 className="mb-2 text-lg font-semibold text-red-800">{title}</h1>
-        <p className="mb-4 text-sm text-red-700">{detail}</p>
+      <div className="max-w-md rounded-lg border border-danger bg-danger-subtle p-6 text-center">
+        <h1 className="mb-2 text-lg font-semibold text-danger">{title}</h1>
+        <p className="mb-4 text-sm text-danger">{detail}</p>
         <button
           onClick={() => window.location.reload()}
-          className="rounded bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+          className="rounded bg-danger px-4 py-2 text-sm font-medium text-white hover:bg-danger"
         >
           Reload
         </button>
@@ -92,13 +92,13 @@ function DefaultSectionFallback({
   return (
     <div
       role="alert"
-      className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
+      className="rounded border border-warning bg-warning-subtle p-3 text-sm text-warning"
     >
       <p className="font-semibold">{label} failed to load</p>
       <p className="mt-1 text-xs">{detail}</p>
       <button
         onClick={resetErrorBoundary}
-        className="mt-2 rounded border border-amber-500 bg-amber-100 px-2 py-1 text-xs font-medium text-amber-900 hover:bg-amber-200"
+        className="mt-2 rounded border border-warning bg-warning-subtle px-2 py-1 text-xs font-medium text-warning hover:bg-warning/85"
       >
         Try again
       </button>

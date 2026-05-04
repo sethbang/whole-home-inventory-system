@@ -3,9 +3,11 @@
  *
  * React Router v7's data-router pattern composes layouts via nested route
  * elements that render ``<Outlet />``. The app's provider chain
- * (DevModeProvider -> AuthProvider) lives in the root layout so
- * ``useNavigate`` works inside the AuthProvider (it needs to be *inside* a
- * RouterProvider). The protected layout wraps RequireAuth + Layout so
+ * (ThemeProvider -> DevModeProvider -> AuthProvider) lives in the root
+ * layout so ``useNavigate`` works inside the AuthProvider (it needs to be
+ * *inside* a RouterProvider). ThemeProvider is outermost so Login /
+ * Register inherit the active day/night theme even before AuthProvider
+ * resolves a session. The protected layout wraps RequireAuth + Layout so
  * every authenticated page gets the chrome with no per-route boilerplate.
  */
 
@@ -14,15 +16,18 @@ import { Navigate, Outlet } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { AuthProvider, RequireAuth } from '../contexts/AuthContext';
 import { DevModeProvider } from '../contexts/DevModeContext';
+import { ThemeProvider } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/useAuth';
 
 export function RootLayout() {
   return (
-    <DevModeProvider>
-      <AuthProvider>
-        <Outlet />
-      </AuthProvider>
-    </DevModeProvider>
+    <ThemeProvider>
+      <DevModeProvider>
+        <AuthProvider>
+          <Outlet />
+        </AuthProvider>
+      </DevModeProvider>
+    </ThemeProvider>
   );
 }
 

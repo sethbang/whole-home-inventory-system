@@ -72,7 +72,7 @@ export default function CustomFields({ fields, onChange }: CustomFieldsProps) {
             type="checkbox"
             checked={field.value as boolean}
             onChange={(e) => handleFieldChange(field, e.target.checked)}
-            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+            className="h-4 w-4 rounded border-line-strong text-primary focus:ring-primary"
           />
         );
       case 'number':
@@ -81,7 +81,7 @@ export default function CustomFields({ fields, onChange }: CustomFieldsProps) {
             type="number"
             value={field.value as number}
             onChange={(e) => handleFieldChange(field, parseFloat(e.target.value) || 0)}
-            className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary sm:text-sm sm:leading-6"
+            className="block w-full rounded-md border-0 py-1.5 text-fg shadow-sm ring-1 ring-inset ring-line placeholder:text-subtle focus:ring-2 focus:ring-inset focus:ring-primary sm:text-sm sm:leading-6"
           />
         );
       default:
@@ -90,7 +90,7 @@ export default function CustomFields({ fields, onChange }: CustomFieldsProps) {
             type="text"
             value={field.value as string}
             onChange={(e) => handleFieldChange(field, e.target.value)}
-            className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary sm:text-sm sm:leading-6"
+            className="block w-full rounded-md border-0 py-1.5 text-fg shadow-sm ring-1 ring-inset ring-line placeholder:text-subtle focus:ring-2 focus:ring-inset focus:ring-primary sm:text-sm sm:leading-6"
           />
         );
     }
@@ -105,14 +105,14 @@ export default function CustomFields({ fields, onChange }: CustomFieldsProps) {
             placeholder="Field name"
             value={newFieldKey}
             onChange={(e) => setNewFieldKey(e.target.value)}
-            className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary sm:text-sm sm:leading-6"
+            className="block w-full rounded-md border-0 py-1.5 text-fg shadow-sm ring-1 ring-inset ring-line placeholder:text-subtle focus:ring-2 focus:ring-inset focus:ring-primary sm:text-sm sm:leading-6"
           />
         </div>
         <div className="sm:col-span-3">
           <select
             value={newFieldType}
             onChange={(e) => setNewFieldType(e.target.value as FieldType)}
-            className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary sm:text-sm sm:leading-6"
+            className="block w-full rounded-md border-0 py-1.5 text-fg shadow-sm ring-1 ring-inset ring-line focus:ring-2 focus:ring-inset focus:ring-primary sm:text-sm sm:leading-6"
           >
             <option value="string">Text</option>
             <option value="number">Number</option>
@@ -137,14 +137,14 @@ export default function CustomFields({ fields, onChange }: CustomFieldsProps) {
           {customFields.map((field) => (
             <div key={field.key} className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-8 items-center">
               <div className="sm:col-span-3">
-                <label className="block text-sm font-medium text-gray-700">{field.key}</label>
+                <label className="block text-sm font-medium text-muted">{field.key}</label>
               </div>
               <div className="sm:col-span-4">{renderFieldInput(field)}</div>
               <div className="sm:col-span-1">
                 <button
                   type="button"
                   onClick={() => handleRemoveField(field.key)}
-                  className="inline-flex items-center rounded-md text-gray-400 hover:text-gray-500"
+                  className="inline-flex items-center rounded-md text-subtle hover:text-subtle"
                 >
                   <XMarkIcon className="h-5 w-5" />
                 </button>

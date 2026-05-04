@@ -169,7 +169,7 @@ export default function AddItem() {
     <div>
       <div className="md:flex md:items-center md:justify-between">
         <div className="min-w-0 flex-1">
-          <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-3xl sm:tracking-tight">
+          <h2 className="text-2xl font-bold leading-7 text-fg sm:truncate sm:text-3xl sm:tracking-tight">
             Add New Item
           </h2>
         </div>
@@ -180,7 +180,7 @@ export default function AddItem() {
               onClick={() =>
                 createItemMutation.mutate({ values: {}, isDev: true })
               }
-              className="ml-3 inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+              className="ml-3 inline-flex items-center rounded-md bg-primary px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             >
               Quick Add (Dev)
             </button>
@@ -190,15 +190,15 @@ export default function AddItem() {
 
       <form onSubmit={handleSubmit(onSubmit)} className="mt-8 space-y-8" noValidate>
         {serverError && (
-          <div role="alert" className="rounded-md bg-red-50 p-4">
-            <div className="text-sm text-red-700">{serverError}</div>
+          <div role="alert" className="rounded-md bg-danger-subtle p-4">
+            <div className="text-sm text-danger">{serverError}</div>
           </div>
         )}
 
-        <div className="space-y-8 divide-y divide-gray-200">
+        <div className="space-y-8 divide-y divide-line">
           <div className="grid grid-cols-1 gap-y-6 sm:grid-cols-6 sm:gap-x-6">
             <div className="sm:col-span-4">
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="name" className="block text-sm font-medium text-muted">
                 Name
               </label>
               <input
@@ -206,15 +206,15 @@ export default function AddItem() {
                 type="text"
                 aria-invalid={errors.name ? 'true' : 'false'}
                 {...register('name')}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+                className="mt-1 block w-full rounded-md border-line-strong shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
               />
               {errors.name && (
-                <p className="mt-2 text-sm text-red-600">{errors.name.message}</p>
+                <p className="mt-2 text-sm text-danger">{errors.name.message}</p>
               )}
             </div>
 
             <div className="sm:col-span-3">
-              <label htmlFor="category" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="category" className="block text-sm font-medium text-muted">
                 Category
               </label>
               <input
@@ -222,16 +222,16 @@ export default function AddItem() {
                 type="text"
                 aria-invalid={errors.category ? 'true' : 'false'}
                 {...register('category')}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+                className="mt-1 block w-full rounded-md border-line-strong shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
                 placeholder="Enter a category"
               />
               {errors.category && (
-                <p className="mt-2 text-sm text-red-600">{errors.category.message}</p>
+                <p className="mt-2 text-sm text-danger">{errors.category.message}</p>
               )}
             </div>
 
             <div className="sm:col-span-3">
-              <label htmlFor="location" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="location" className="block text-sm font-medium text-muted">
                 Location
               </label>
               <input
@@ -239,81 +239,81 @@ export default function AddItem() {
                 type="text"
                 aria-invalid={errors.location ? 'true' : 'false'}
                 {...register('location')}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+                className="mt-1 block w-full rounded-md border-line-strong shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
                 placeholder="Enter a location"
               />
               {errors.location && (
-                <p className="mt-2 text-sm text-red-600">{errors.location.message}</p>
+                <p className="mt-2 text-sm text-danger">{errors.location.message}</p>
               )}
             </div>
 
             <div className="sm:col-span-3">
-              <label htmlFor="brand" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="brand" className="block text-sm font-medium text-muted">
                 Brand
               </label>
               <input
                 id="brand"
                 type="text"
                 {...register('brand')}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+                className="mt-1 block w-full rounded-md border-line-strong shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
               />
             </div>
 
             <div className="sm:col-span-3">
-              <label htmlFor="model_number" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="model_number" className="block text-sm font-medium text-muted">
                 Model Number
               </label>
               <input
                 id="model_number"
                 type="text"
                 {...register('model_number')}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+                className="mt-1 block w-full rounded-md border-line-strong shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
               />
             </div>
 
             <div className="sm:col-span-3">
-              <label htmlFor="serial_number" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="serial_number" className="block text-sm font-medium text-muted">
                 Serial Number
               </label>
               <input
                 id="serial_number"
                 type="text"
                 {...register('serial_number')}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+                className="mt-1 block w-full rounded-md border-line-strong shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
               />
             </div>
 
             <div className="sm:col-span-3">
-              <label htmlFor="barcode" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="barcode" className="block text-sm font-medium text-muted">
                 Barcode
               </label>
               <input
                 id="barcode"
                 type="text"
                 {...register('barcode')}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+                className="mt-1 block w-full rounded-md border-line-strong shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
               />
             </div>
 
             <div className="sm:col-span-3">
-              <label htmlFor="purchase_date" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="purchase_date" className="block text-sm font-medium text-muted">
                 Purchase Date
               </label>
               <input
                 id="purchase_date"
                 type="date"
                 {...register('purchase_date')}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+                className="mt-1 block w-full rounded-md border-line-strong shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
               />
             </div>
 
             <div className="sm:col-span-3">
-              <label htmlFor="purchase_price" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="purchase_price" className="block text-sm font-medium text-muted">
                 Purchase Price
               </label>
               <div className="mt-1 relative rounded-md shadow-sm">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <span className="text-gray-500 sm:text-sm">$</span>
+                  <span className="text-subtle sm:text-sm">$</span>
                 </div>
                 <input
                   id="purchase_price"
@@ -321,23 +321,23 @@ export default function AddItem() {
                   step="0.01"
                   min="0"
                   {...register('purchase_price')}
-                  className="mt-1 block w-full pl-7 rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+                  className="mt-1 block w-full pl-7 rounded-md border-line-strong shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
                 />
               </div>
               {errors.purchase_price && (
-                <p className="mt-2 text-sm text-red-600">
+                <p className="mt-2 text-sm text-danger">
                   {errors.purchase_price.message}
                 </p>
               )}
             </div>
 
             <div className="sm:col-span-3">
-              <label htmlFor="current_value" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="current_value" className="block text-sm font-medium text-muted">
                 Current Value
               </label>
               <div className="mt-1 relative rounded-md shadow-sm">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <span className="text-gray-500 sm:text-sm">$</span>
+                  <span className="text-subtle sm:text-sm">$</span>
                 </div>
                 <input
                   id="current_value"
@@ -345,42 +345,42 @@ export default function AddItem() {
                   step="0.01"
                   min="0"
                   {...register('current_value')}
-                  className="mt-1 block w-full pl-7 rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+                  className="mt-1 block w-full pl-7 rounded-md border-line-strong shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
                 />
               </div>
               {errors.current_value && (
-                <p className="mt-2 text-sm text-red-600">
+                <p className="mt-2 text-sm text-danger">
                   {errors.current_value.message}
                 </p>
               )}
             </div>
 
             <div className="sm:col-span-3">
-              <label htmlFor="warranty_expiration" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="warranty_expiration" className="block text-sm font-medium text-muted">
                 Warranty Expiration
               </label>
               <input
                 id="warranty_expiration"
                 type="date"
                 {...register('warranty_expiration')}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+                className="mt-1 block w-full rounded-md border-line-strong shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
               />
             </div>
 
             <div className="sm:col-span-6">
-              <label htmlFor="notes" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="notes" className="block text-sm font-medium text-muted">
                 Notes
               </label>
               <textarea
                 id="notes"
                 rows={3}
                 {...register('notes')}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+                className="mt-1 block w-full rounded-md border-line-strong shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
               />
             </div>
 
             <div className="sm:col-span-6">
-              <label className="block text-sm font-medium text-gray-700 mb-4">
+              <label className="block text-sm font-medium text-muted mb-4">
                 Custom Fields
               </label>
               <Controller
@@ -397,7 +397,7 @@ export default function AddItem() {
 
             <div className="sm:col-span-6">
               <div>
-                <label htmlFor="images" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="images" className="block text-sm font-medium text-muted">
                   Images
                 </label>
                 <div className="mt-1 flex items-center gap-4">
@@ -407,13 +407,13 @@ export default function AddItem() {
                     multiple
                     accept="image/*"
                     onChange={handleFileChange}
-                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary-subtle file:text-primary-hover hover:file:bg-primary-subtle-hover"
+                    className="block w-full text-sm text-subtle file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary-subtle file:text-primary-hover hover:file:bg-primary-subtle-hover"
                   />
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
                       onClick={() => setShowScanner(true)}
-                      className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                      className="inline-flex items-center px-3 py-2 border border-line-strong shadow-sm text-sm font-medium rounded-md text-muted bg-surface-raised hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
                     >
                       <CameraIcon className="h-5 w-5 mr-2" />
                       Camera
@@ -421,7 +421,7 @@ export default function AddItem() {
                     <button
                       type="button"
                       onClick={() => setShowScanner(true)}
-                      className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                      className="inline-flex items-center px-3 py-2 border border-line-strong shadow-sm text-sm font-medium rounded-md text-muted bg-surface-raised hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
                     >
                       <QrCodeIcon className="h-5 w-5 mr-2" />
                       Scan Barcode
@@ -507,7 +507,7 @@ export default function AddItem() {
               )}
 
               {(estimatePriceFromMetadata.isPending || priceJobId) && !priceEnvelope && (
-                <p className="mt-3 text-xs text-gray-600">
+                <p className="mt-3 text-xs text-muted">
                   Looking up resale value from vision metadata…
                 </p>
               )}
@@ -532,15 +532,15 @@ export default function AddItem() {
               )}
 
               {scanningStatus && (
-                <div className="mt-2 rounded-md bg-blue-50 p-4">
-                  <div className="text-sm text-blue-700">{scanningStatus}</div>
+                <div className="mt-2 rounded-md bg-primary-subtle p-4">
+                  <div className="text-sm text-primary">{scanningStatus}</div>
                 </div>
               )}
 
               {showScanner && (
                 <Suspense
                   fallback={
-                    <div className="mt-2 text-sm text-gray-500">
+                    <div className="mt-2 text-sm text-subtle">
                       Loading scanner…
                     </div>
                   }
@@ -593,7 +593,7 @@ export default function AddItem() {
             <button
               type="button"
               onClick={() => navigate('/')}
-              className="rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+              className="rounded-md border border-line-strong bg-surface-raised py-2 px-4 text-sm font-medium text-muted shadow-sm hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
             >
               Cancel
             </button>

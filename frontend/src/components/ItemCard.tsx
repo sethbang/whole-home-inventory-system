@@ -61,7 +61,7 @@ export default function ItemCard({ item, layout = 'card' }: ItemCardProps) {
     return (
       <Link
         to={detailUrl}
-        className="flex items-center gap-4 rounded-lg border border-gray-200 bg-white p-3 hover:bg-primary-subtle focus:outline-none focus:ring-2 focus:ring-primary"
+        className="flex items-center gap-4 rounded-lg border border-line bg-surface-raised p-3 hover:bg-primary-subtle focus:outline-none focus:ring-2 focus:ring-primary"
       >
         {thumb ? (
           <img
@@ -74,15 +74,15 @@ export default function ItemCard({ item, layout = 'card' }: ItemCardProps) {
           <ImagePlaceholder className="h-16 w-16 flex-shrink-0 rounded-md" />
         )}
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-medium text-gray-900">
+          <div className="truncate text-sm font-medium text-fg">
             {item.name}
           </div>
-          <div className="mt-0.5 truncate text-xs text-gray-500">
+          <div className="mt-0.5 truncate text-xs text-subtle">
             {item.location}
             {item.category ? ` · ${item.category}` : ''}
           </div>
         </div>
-        <div className="ml-auto text-sm font-medium text-gray-900">
+        <div className="ml-auto text-sm font-medium text-fg">
           {formatValue(item.current_value)}
         </div>
       </Link>
@@ -92,7 +92,7 @@ export default function ItemCard({ item, layout = 'card' }: ItemCardProps) {
   return (
     <Link
       to={detailUrl}
-      className="group flex flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm transition hover:border-primary hover:shadow focus:outline-none focus:ring-2 focus:ring-primary"
+      className="group flex flex-col overflow-hidden rounded-lg border border-line bg-surface-raised shadow-sm transition hover:border-primary hover:shadow focus:outline-none focus:ring-2 focus:ring-primary"
     >
       {thumb ? (
         <img
@@ -105,10 +105,10 @@ export default function ItemCard({ item, layout = 'card' }: ItemCardProps) {
         <ImagePlaceholder className="aspect-[4/3] w-full" />
       )}
       <div className="flex flex-1 flex-col p-3">
-        <h3 className="truncate text-sm font-medium text-gray-900 group-hover:text-primary-hover">
+        <h3 className="truncate text-sm font-medium text-fg group-hover:text-primary-hover">
           {item.name}
         </h3>
-        <div className="mt-1 flex items-center gap-1.5 text-xs text-gray-500">
+        <div className="mt-1 flex items-center gap-1.5 text-xs text-subtle">
           <span className="truncate">{item.location || '—'}</span>
           {item.category && (
             <span className="inline-flex shrink-0 items-center rounded bg-primary-subtle px-1.5 py-0.5 text-[11px] font-medium text-primary-hover">
@@ -116,7 +116,7 @@ export default function ItemCard({ item, layout = 'card' }: ItemCardProps) {
             </span>
           )}
         </div>
-        <div className="mt-3 text-sm font-semibold text-gray-900">
+        <div className="mt-3 text-sm font-semibold text-fg">
           {formatValue(item.current_value)}
         </div>
       </div>

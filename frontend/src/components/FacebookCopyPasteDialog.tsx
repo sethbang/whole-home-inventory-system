@@ -86,40 +86,40 @@ export default function FacebookCopyPasteDialog({
       role="dialog"
       aria-modal="true"
       aria-labelledby="fb-cp-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/40 p-4"
     >
-      <div className="w-full max-w-2xl rounded-lg bg-white p-6 shadow-xl">
+      <div className="w-full max-w-2xl rounded-lg bg-surface-raised p-6 shadow-xl">
         <div className="flex items-start justify-between">
-          <h2 id="fb-cp-title" className="text-lg font-semibold text-gray-900">
+          <h2 id="fb-cp-title" className="text-lg font-semibold text-fg">
             Facebook Marketplace copy-paste block
           </h2>
           <button
             type="button"
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700"
+            className="text-subtle hover:text-muted"
             aria-label="Close"
           >
             ✕
           </button>
         </div>
-        <p className="mt-1 text-xs text-gray-600">
+        <p className="mt-1 text-xs text-muted">
           Paste this into the FB Marketplace listing form. Images are a
           separate download — Facebook doesn't let the browser drag URLs in.
         </p>
 
         {error && (
-          <div role="alert" className="mt-3 rounded-md bg-red-50 p-3 text-sm text-red-700">
+          <div role="alert" className="mt-3 rounded-md bg-danger-subtle p-3 text-sm text-danger">
             {error}
           </div>
         )}
         {status && (
-          <div className="mt-3 rounded-md bg-green-50 p-3 text-sm text-green-700">
+          <div className="mt-3 rounded-md bg-success-subtle p-3 text-sm text-success">
             {status}
           </div>
         )}
 
         {!block && !error && (
-          <div className="mt-4 text-sm text-gray-500">Generating block…</div>
+          <div className="mt-4 text-sm text-subtle">Generating block…</div>
         )}
 
         {block && (
@@ -130,10 +130,10 @@ export default function FacebookCopyPasteDialog({
               value={block.block}
               rows={12}
               aria-label="Copy-paste block"
-              className="mt-4 block w-full rounded-md border-gray-300 font-mono text-sm shadow-sm"
+              className="mt-4 block w-full rounded-md border-line-strong font-mono text-sm shadow-sm"
             />
             {block.price !== undefined && block.price !== null && (
-              <p className="mt-2 text-xs text-gray-600">
+              <p className="mt-2 text-xs text-muted">
                 Price: ${block.price.toFixed(2)}
                 {block.suggested_category
                   ? ` · Suggested category: ${block.suggested_category}`
@@ -148,7 +148,7 @@ export default function FacebookCopyPasteDialog({
             type="button"
             onClick={handleDownloadImages}
             disabled={downloading}
-            className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+            className="rounded-md border border-line-strong bg-surface-raised px-3 py-1.5 text-sm font-medium text-muted hover:bg-surface-muted disabled:opacity-60"
           >
             {downloading ? 'Downloading…' : 'Download images ZIP'}
           </button>

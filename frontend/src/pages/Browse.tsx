@@ -56,11 +56,11 @@ function RoomsSidebar({ counts, selected, onSelect }: RoomsSidebarProps) {
           'flex w-full items-center justify-between rounded-md px-3 py-2 text-sm',
           selected === ''
             ? 'bg-primary-subtle font-semibold text-primary-hover'
-            : 'text-gray-700 hover:bg-gray-100',
+            : 'text-muted hover:bg-surface-muted',
         )}
       >
         <span>All</span>
-        <span className="text-xs text-gray-500">{total}</span>
+        <span className="text-xs text-subtle">{total}</span>
       </button>
       {counts?.map((row) => (
         <button
@@ -71,15 +71,15 @@ function RoomsSidebar({ counts, selected, onSelect }: RoomsSidebarProps) {
             'flex w-full items-center justify-between rounded-md px-3 py-2 text-sm',
             selected === row.location
               ? 'bg-primary-subtle font-semibold text-primary-hover'
-              : 'text-gray-700 hover:bg-gray-100',
+              : 'text-muted hover:bg-surface-muted',
           )}
         >
           <span className="truncate">{row.location}</span>
-          <span className="ml-2 text-xs text-gray-500">{row.count}</span>
+          <span className="ml-2 text-xs text-subtle">{row.count}</span>
         </button>
       ))}
       {counts && counts.length === 0 && (
-        <p className="px-3 py-2 text-xs text-gray-500">
+        <p className="px-3 py-2 text-xs text-subtle">
           No rooms yet — add an item to get started.
         </p>
       )}
@@ -93,12 +93,12 @@ function CardSkeletonGrid() {
       {Array.from({ length: 8 }).map((_, i) => (
         <div
           key={i}
-          className="overflow-hidden rounded-lg border border-gray-200 bg-white"
+          className="overflow-hidden rounded-lg border border-line bg-surface-raised"
         >
-          <div className="aspect-[4/3] w-full animate-pulse bg-gray-100" />
+          <div className="aspect-[4/3] w-full animate-pulse bg-surface-muted" />
           <div className="space-y-2 p-3">
-            <div className="h-4 w-3/4 animate-pulse rounded bg-gray-100" />
-            <div className="h-3 w-1/2 animate-pulse rounded bg-gray-100" />
+            <div className="h-4 w-3/4 animate-pulse rounded bg-surface-muted" />
+            <div className="h-3 w-1/2 animate-pulse rounded bg-surface-muted" />
           </div>
         </div>
       ))}
@@ -165,8 +165,8 @@ export default function Browse() {
       <div className="md:hidden">
         <Disclosure>
           {({ open }) => (
-            <div className="rounded-md border border-gray-200 bg-white">
-              <Disclosure.Button className="flex w-full items-center justify-between px-3 py-2 text-sm font-medium text-gray-900">
+            <div className="rounded-md border border-line bg-surface-raised">
+              <Disclosure.Button className="flex w-full items-center justify-between px-3 py-2 text-sm font-medium text-fg">
                 <span>
                   Rooms
                   {filters.location && (
@@ -176,12 +176,12 @@ export default function Browse() {
                   )}
                 </span>
                 {open ? (
-                  <ChevronUpIcon className="h-5 w-5 text-gray-500" />
+                  <ChevronUpIcon className="h-5 w-5 text-subtle" />
                 ) : (
-                  <ChevronDownIcon className="h-5 w-5 text-gray-500" />
+                  <ChevronDownIcon className="h-5 w-5 text-subtle" />
                 )}
               </Disclosure.Button>
-              <Disclosure.Panel className="border-t border-gray-200 p-2">
+              <Disclosure.Panel className="border-t border-line p-2">
                 <RoomsSidebar
                   counts={locationCounts}
                   selected={filters.location}
@@ -196,7 +196,7 @@ export default function Browse() {
       {/* Desktop rooms sidebar */}
       <aside className="hidden md:block md:w-56 md:flex-shrink-0">
         <div className="sticky top-6">
-          <h2 className="mb-2 px-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+          <h2 className="mb-2 px-3 text-xs font-semibold uppercase tracking-wide text-subtle">
             Rooms
           </h2>
           <RoomsSidebar
@@ -211,8 +211,8 @@ export default function Browse() {
       <div className="mt-4 min-w-0 flex-1 md:mt-0">
         <div className="mb-4 flex items-center justify-between gap-2">
           <div>
-            <h1 className="text-2xl font-semibold text-gray-900">Browse</h1>
-            <p className="mt-0.5 text-sm text-gray-600">
+            <h1 className="text-2xl font-semibold text-fg">Browse</h1>
+            <p className="mt-0.5 text-sm text-muted">
               {filters.location
                 ? `Items in ${filters.location}`
                 : 'All your items'}
@@ -222,13 +222,13 @@ export default function Browse() {
         </div>
 
         {/* Toolbar */}
-        <div className="flex flex-wrap items-center gap-2 rounded-md border border-gray-200 bg-white p-2">
+        <div className="flex flex-wrap items-center gap-2 rounded-md border border-line bg-surface-raised p-2">
           <input
             type="search"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             placeholder="Search items..."
-            className="block min-w-0 flex-1 rounded-md border-0 py-1.5 text-sm text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary"
+            className="block min-w-0 flex-1 rounded-md border-0 py-1.5 text-sm text-fg ring-1 ring-inset ring-line focus:ring-2 focus:ring-inset focus:ring-primary"
             aria-label="Search items"
           />
 
@@ -242,7 +242,7 @@ export default function Browse() {
                 'inline-flex items-center rounded-l-md px-2.5 py-1.5 text-sm',
                 viewMode === 'card'
                   ? 'bg-primary text-white'
-                  : 'bg-white text-gray-700 ring-1 ring-inset ring-gray-300 hover:bg-gray-50',
+                  : 'bg-surface-raised text-muted ring-1 ring-inset ring-line hover:bg-surface-muted',
               )}
             >
               <Squares2X2Icon className="h-4 w-4" />
@@ -256,7 +256,7 @@ export default function Browse() {
                 '-ml-px inline-flex items-center rounded-r-md px-2.5 py-1.5 text-sm',
                 viewMode === 'list'
                   ? 'bg-primary text-white'
-                  : 'bg-white text-gray-700 ring-1 ring-inset ring-gray-300 hover:bg-gray-50',
+                  : 'bg-surface-raised text-muted ring-1 ring-inset ring-line hover:bg-surface-muted',
               )}
             >
               <Bars3Icon className="h-4 w-4" />
@@ -289,7 +289,7 @@ export default function Browse() {
                 page: 1,
               }));
             }}
-            className="rounded-md border-0 py-1.5 pl-2 pr-8 text-sm text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary"
+            className="rounded-md border-0 py-1.5 pl-2 pr-8 text-sm text-fg ring-1 ring-inset ring-line focus:ring-2 focus:ring-inset focus:ring-primary"
           >
             <option value="">Sort: Default</option>
             <option value="name:asc">Name (A→Z)</option>
@@ -304,7 +304,7 @@ export default function Browse() {
             type="button"
             onClick={() => setShowMoreFilters((v) => !v)}
             aria-expanded={showMoreFilters}
-            className="inline-flex items-center gap-1 rounded-md bg-white px-2.5 py-1.5 text-sm text-gray-700 ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+            className="inline-flex items-center gap-1 rounded-md bg-surface-raised px-2.5 py-1.5 text-sm text-muted ring-1 ring-inset ring-line hover:bg-surface-muted"
           >
             More filters
             {showMoreFilters ? (
@@ -326,11 +326,11 @@ export default function Browse() {
         </div>
 
         {showMoreFilters && (
-          <div className="mt-2 grid grid-cols-1 gap-3 rounded-md border border-gray-200 bg-white p-3 sm:grid-cols-3">
+          <div className="mt-2 grid grid-cols-1 gap-3 rounded-md border border-line bg-surface-raised p-3 sm:grid-cols-3">
             <div>
               <label
                 htmlFor="browse-category"
-                className="block text-xs font-medium text-gray-700"
+                className="block text-xs font-medium text-muted"
               >
                 Category
               </label>
@@ -344,7 +344,7 @@ export default function Browse() {
                     page: 1,
                   }))
                 }
-                className="mt-1 block w-full rounded-md border-0 py-1.5 text-sm text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary"
+                className="mt-1 block w-full rounded-md border-0 py-1.5 text-sm text-fg ring-1 ring-inset ring-line focus:ring-2 focus:ring-inset focus:ring-primary"
               >
                 <option value="">All categories</option>
                 {categories?.map((c) => (
@@ -357,7 +357,7 @@ export default function Browse() {
             <div>
               <label
                 htmlFor="browse-min-value"
-                className="block text-xs font-medium text-gray-700"
+                className="block text-xs font-medium text-muted"
               >
                 Min value
               </label>
@@ -374,13 +374,13 @@ export default function Browse() {
                     page: 1,
                   }))
                 }
-                className="mt-1 block w-full rounded-md border-0 py-1.5 text-sm text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary"
+                className="mt-1 block w-full rounded-md border-0 py-1.5 text-sm text-fg ring-1 ring-inset ring-line focus:ring-2 focus:ring-inset focus:ring-primary"
               />
             </div>
             <div>
               <label
                 htmlFor="browse-max-value"
-                className="block text-xs font-medium text-gray-700"
+                className="block text-xs font-medium text-muted"
               >
                 Max value
               </label>
@@ -397,7 +397,7 @@ export default function Browse() {
                     page: 1,
                   }))
                 }
-                className="mt-1 block w-full rounded-md border-0 py-1.5 text-sm text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-primary"
+                className="mt-1 block w-full rounded-md border-0 py-1.5 text-sm text-fg ring-1 ring-inset ring-line focus:ring-2 focus:ring-inset focus:ring-primary"
               />
             </div>
           </div>
@@ -408,8 +408,8 @@ export default function Browse() {
           {isLoading ? (
             <CardSkeletonGrid />
           ) : data && data.items.length === 0 ? (
-            <div className="rounded-md border border-dashed border-gray-300 bg-white p-8 text-center">
-              <p className="text-sm text-gray-700">No items match these filters.</p>
+            <div className="rounded-md border border-dashed border-line-strong bg-surface-raised p-8 text-center">
+              <p className="text-sm text-muted">No items match these filters.</p>
               {hasActiveFilters && (
                 <button
                   type="button"
@@ -441,7 +441,7 @@ export default function Browse() {
         {/* Pagination */}
         {data && data.total > filters.page_size && (
           <div className="mt-6 flex items-center justify-between">
-            <p className="text-sm text-gray-700">
+            <p className="text-sm text-muted">
               Showing{' '}
               <span className="font-medium">
                 {(filters.page - 1) * filters.page_size + 1}
@@ -459,11 +459,11 @@ export default function Browse() {
                   setFilters((prev) => ({ ...prev, page: Math.max(1, prev.page - 1) }))
                 }
                 disabled={filters.page === 1}
-                className="inline-flex items-center rounded-md bg-white px-3 py-1.5 text-sm text-gray-700 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 disabled:opacity-50"
+                className="inline-flex items-center rounded-md bg-surface-raised px-3 py-1.5 text-sm text-muted ring-1 ring-inset ring-line hover:bg-surface-muted disabled:opacity-50"
               >
                 Previous
               </button>
-              <span className="inline-flex items-center text-sm text-gray-600">
+              <span className="inline-flex items-center text-sm text-muted">
                 Page {filters.page} / {totalPages}
               </span>
               <button
@@ -472,7 +472,7 @@ export default function Browse() {
                   setFilters((prev) => ({ ...prev, page: prev.page + 1 }))
                 }
                 disabled={filters.page * filters.page_size >= data.total}
-                className="inline-flex items-center rounded-md bg-white px-3 py-1.5 text-sm text-gray-700 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 disabled:opacity-50"
+                className="inline-flex items-center rounded-md bg-surface-raised px-3 py-1.5 text-sm text-muted ring-1 ring-inset ring-line hover:bg-surface-muted disabled:opacity-50"
               >
                 Next
               </button>

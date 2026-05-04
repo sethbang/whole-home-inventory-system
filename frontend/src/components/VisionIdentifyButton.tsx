@@ -113,7 +113,7 @@ export default function VisionIdentifyButton({
         )}
       </button>
       {serverError && (
-        <p role="alert" className="text-xs text-red-600">
+        <p role="alert" className="text-xs text-danger">
           {serverError}
         </p>
       )}

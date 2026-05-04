@@ -174,8 +174,8 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
   }, [requestCameraPermission, stopCamera]);
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-lg w-full overflow-hidden">
+    <div className="fixed inset-0 bg-overlay bg-opacity-75 z-50 flex items-center justify-center p-4">
+      <div className="bg-surface-raised rounded-lg shadow-xl max-w-lg w-full overflow-hidden">
         <div className="p-4 flex justify-between items-center border-b">
           <h3 className="text-lg font-medium">Take Photo</h3>
           <button
@@ -183,13 +183,13 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
               stopCamera();
               onClose();
             }}
-            className="text-gray-400 hover:text-gray-500"
+            className="text-subtle hover:text-subtle"
           >
             <XMarkIcon className="h-6 w-6" />
           </button>
         </div>
 
-        <div className="relative aspect-[4/3] bg-black">
+        <div className="relative aspect-[4/3] bg-overlay">
           {error ? (
             <div className="absolute inset-0 flex items-center justify-center text-white text-center p-4">
               <div className="max-w-sm">

@@ -41,18 +41,18 @@ export default function Register() {
         : position === 'bottom'
           ? 'rounded-b-md'
           : '';
-    const border = hasError ? 'border-red-300' : 'border-gray-300';
-    return `appearance-none rounded-none relative block w-full px-3 py-2 border ${border} placeholder-gray-500 text-gray-900 ${radius} focus:outline-none focus:ring-primary focus:border-primary focus:z-10 sm:text-sm`;
+    const border = hasError ? 'border-danger' : 'border-line-strong';
+    return `appearance-none rounded-none relative block w-full px-3 py-2 border ${border} placeholder-subtle text-fg ${radius} focus:outline-none focus:ring-primary focus:border-primary focus:z-10 sm:text-sm`;
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-surface-muted py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div>
-          <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
+          <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-fg">
             Create your account
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
+          <p className="mt-2 text-center text-sm text-muted">
             Or{' '}
             <Link
               to="/login"
@@ -64,8 +64,8 @@ export default function Register() {
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)} noValidate>
           {serverError && (
-            <div role="alert" className="rounded-md bg-red-50 p-4">
-              <div className="text-sm text-red-700">{serverError}</div>
+            <div role="alert" className="rounded-md bg-danger-subtle p-4">
+              <div className="text-sm text-danger">{serverError}</div>
             </div>
           )}
           <div className="rounded-md shadow-sm -space-y-px">
@@ -83,7 +83,7 @@ export default function Register() {
                 {...register('email')}
               />
               {errors.email && (
-                <div className="text-red-500 text-xs mt-1">{errors.email.message}</div>
+                <div className="text-danger text-xs mt-1">{errors.email.message}</div>
               )}
             </div>
             <div>
@@ -100,7 +100,7 @@ export default function Register() {
                 {...register('username')}
               />
               {errors.username && (
-                <div className="text-red-500 text-xs mt-1">
+                <div className="text-danger text-xs mt-1">
                   {errors.username.message}
                 </div>
               )}
@@ -119,7 +119,7 @@ export default function Register() {
                 {...register('password')}
               />
               {errors.password && (
-                <div className="text-red-500 text-xs mt-1">
+                <div className="text-danger text-xs mt-1">
                   {errors.password.message}
                 </div>
               )}
@@ -138,7 +138,7 @@ export default function Register() {
                 {...register('confirmPassword')}
               />
               {errors.confirmPassword && (
-                <div className="text-red-500 text-xs mt-1">
+                <div className="text-danger text-xs mt-1">
                   {errors.confirmPassword.message}
                 </div>
               )}

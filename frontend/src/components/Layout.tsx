@@ -2,9 +2,17 @@
   import whisLogo from '../assets/whis_logo.svg';
 import { Link, useLocation } from 'react-router-dom';
 import { Disclosure, Menu, Transition } from '@headlessui/react';
-import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
+import {
+  Bars3Icon,
+  ComputerDesktopIcon,
+  MoonIcon,
+  SunIcon,
+  XMarkIcon,
+} from '@heroicons/react/24/outline';
 import { useAuth } from '../contexts/useAuth';
 import { useDevMode } from '../contexts/useDevMode';
+import { useTheme } from '../contexts/useTheme';
+import type { ThemeMode } from '../contexts/ThemeContext';
 
 const navigation = [
   { name: 'Dashboard', href: '/' },
@@ -21,8 +29,56 @@ const adminNavigation = [
   { name: 'Settings', href: '/settings' },
 ];
 
+const themeOptions: Array<{
+  mode: ThemeMode;
+  label: string;
+  shortLabel: string;
+  Icon: typeof SunIcon;
+}> = [
+  { mode: 'day', label: 'Day', shortLabel: 'Day', Icon: SunIcon },
+  { mode: 'night', label: 'Night', shortLabel: 'Night', Icon: MoonIcon },
+  { mode: 'system', label: 'System-sync', shortLabel: 'System', Icon: ComputerDesktopIcon },
+];
+
 function classNames(...classes: string[]) {
   return classes.filter(Boolean).join(' ');
+}
+
+function ThemeSegmentedControl({ size }: { size: 'sm' | 'md' }) {
+  const { mode, setMode } = useTheme();
+  const buttonPad = size === 'sm' ? 'px-2 py-1.5 text-xs' : 'px-3 py-2 text-sm';
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Color theme"
+      className="flex items-center gap-1 rounded-md border border-line bg-surface-muted p-1"
+    >
+      {themeOptions.map(({ mode: optionMode, label, shortLabel, Icon }) => {
+        const isActive = mode === optionMode;
+        return (
+          <button
+            key={optionMode}
+            type="button"
+            role="radio"
+            aria-checked={isActive}
+            aria-label={label}
+            title={label}
+            onClick={() => setMode(optionMode)}
+            className={classNames(
+              'inline-flex flex-1 items-center justify-center gap-1.5 rounded font-medium transition-colors',
+              buttonPad,
+              isActive
+                ? 'bg-primary-subtle text-primary shadow-sm'
+                : 'text-muted hover:bg-surface-raised hover:text-fg',
+            )}
+          >
+            <Icon className="h-4 w-4" aria-hidden="true" />
+            <span>{shortLabel}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 export default function Layout({ children }: { children: React.ReactNode }) {
@@ -34,8 +90,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     : navigation;
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <Disclosure as="nav" className="bg-white shadow-sm">
+    <div className="min-h-screen bg-surface-muted">
+      <Disclosure as="nav" className="bg-surface-raised shadow-sm">
         {({ open }) => (
           <>
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -53,8 +109,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                         to={item.href}
                         className={classNames(
                           location.pathname === item.href
-                            ? 'border-primary text-gray-900'
-                            : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700',
+                            ? 'border-primary text-fg'
+                            : 'border-transparent text-subtle hover:border-line-strong hover:text-muted',
                           'inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium'
                         )}
                       >
@@ -66,7 +122,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <div className="hidden sm:ml-6 sm:flex sm:items-center">
                   <Menu as="div" className="relative ml-3">
                     <div>
-                      <Menu.Button className="flex rounded-full bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
+                      <Menu.Button className="flex rounded-full bg-surface-raised text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
                         <span className="sr-only">Open user menu</span>
                         <div className="h-8 w-8 rounded-full bg-primary-subtle-hover flex items-center justify-center">
                           <span className="text-primary-hover font-medium">
@@ -84,14 +140,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                       leaveFrom="transform opacity-100 scale-100"
                       leaveTo="transform opacity-0 scale-95"
                     >
-                      <Menu.Items className="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                      <Menu.Items className="absolute right-0 z-10 mt-2 w-64 origin-top-right rounded-md bg-surface-raised py-2 shadow-lg ring-1 ring-overlay/5 focus:outline-none">
+                        <div className="px-3 pb-2">
+                          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-subtle">
+                            Theme
+                          </div>
+                          <ThemeSegmentedControl size="sm" />
+                        </div>
+                        <div className="my-1 border-t border-line" />
                         <Menu.Item>
                           {({ active }) => (
                             <button
                               onClick={toggleDevMode}
                               className={classNames(
-                                active ? 'bg-gray-100' : '',
-                                'block w-full px-4 py-2 text-left text-sm text-gray-700'
+                                active ? 'bg-surface-muted' : '',
+                                'block w-full px-4 py-2 text-left text-sm text-muted'
                               )}
                             >
                               {isDevMode ? 'Disable Dev Mode' : 'Enable Dev Mode'}
@@ -103,8 +166,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                             <button
                               onClick={logout}
                               className={classNames(
-                                active ? 'bg-gray-100' : '',
-                                'block w-full px-4 py-2 text-left text-sm text-gray-700'
+                                active ? 'bg-surface-muted' : '',
+                                'block w-full px-4 py-2 text-left text-sm text-muted'
                               )}
                             >
                               Sign out
@@ -116,7 +179,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   </Menu>
                 </div>
                 <div className="-mr-2 flex items-center sm:hidden">
-                  <Disclosure.Button className="inline-flex items-center justify-center rounded-md bg-white p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
+                  <Disclosure.Button className="inline-flex items-center justify-center rounded-md bg-surface-raised p-2 text-subtle hover:bg-surface-muted hover:text-muted focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
                     <span className="sr-only">Open main menu</span>
                     {open ? (
                       <XMarkIcon className="block h-6 w-6" aria-hidden="true" />
@@ -137,7 +200,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     className={classNames(
                       location.pathname === item.href
                         ? 'bg-primary-subtle border-primary text-primary-hover'
-                        : 'border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800',
+                        : 'border-transparent text-muted hover:bg-surface-muted hover:border-line-strong hover:text-fg',
                       'block border-l-4 py-2 pl-3 pr-4 text-base font-medium'
                     )}
                   >
@@ -145,7 +208,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   </Link>
                 ))}
               </div>
-              <div className="border-t border-gray-200 pb-3 pt-4">
+              <div className="border-t border-line pb-3 pt-4">
                 <div className="flex items-center px-4">
                   <div className="flex-shrink-0">
                     <div className="h-8 w-8 rounded-full bg-primary-subtle-hover flex items-center justify-center">
@@ -155,24 +218,30 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     </div>
                   </div>
                   <div className="ml-3">
-                    <div className="text-base font-medium text-gray-800">
+                    <div className="text-base font-medium text-fg">
                       {user?.username}
                     </div>
-                    <div className="text-sm font-medium text-gray-500">
+                    <div className="text-sm font-medium text-subtle">
                       {user?.email}
                     </div>
                   </div>
                 </div>
+                <div className="mt-3 px-4">
+                  <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-subtle">
+                    Theme
+                  </div>
+                  <ThemeSegmentedControl size="md" />
+                </div>
                 <div className="mt-3 space-y-1">
                   <button
                     onClick={toggleDevMode}
-                    className="block w-full px-4 py-2 text-left text-base font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+                    className="block w-full px-4 py-2 text-left text-base font-medium text-subtle hover:bg-surface-muted hover:text-fg"
                   >
                     {isDevMode ? 'Disable Dev Mode' : 'Enable Dev Mode'}
                   </button>
                   <button
                     onClick={logout}
-                    className="block w-full px-4 py-2 text-left text-base font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+                    className="block w-full px-4 py-2 text-left text-base font-medium text-subtle hover:bg-surface-muted hover:text-fg"
                   >
                     Sign out
                   </button>

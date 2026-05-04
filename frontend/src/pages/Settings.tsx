@@ -106,21 +106,21 @@ function CapabilityBadge({
 }) {
   if (state === true) {
     return (
-      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-success-subtle text-success">
         ✓ {label}
       </span>
     );
   }
   if (state === false) {
     return (
-      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
+      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-danger-subtle text-danger">
         ✗ {label}
       </span>
     );
   }
   return (
     <span
-      className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700"
+      className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-surface-muted text-muted"
       title="Provider didn't expose a capability flag for this model. Use the Test tab to verify."
     >
       ? {label}
@@ -138,13 +138,13 @@ function SourceTag({ source }: { source: string | undefined }) {
   }
   if (source === 'env') {
     return (
-      <span className="text-[11px] uppercase tracking-wide text-gray-500">
+      <span className="text-[11px] uppercase tracking-wide text-subtle">
         ○ from .env
       </span>
     );
   }
   return (
-    <span className="text-[11px] uppercase tracking-wide text-gray-400">
+    <span className="text-[11px] uppercase tracking-wide text-subtle">
       ○ default
     </span>
   );
@@ -235,7 +235,7 @@ export default function SettingsPage() {
 
   if (configQuery.isError) {
     return (
-      <div className="rounded-md bg-red-50 p-4 text-sm text-red-800">
+      <div className="rounded-md bg-danger-subtle p-4 text-sm text-danger">
         Could not load settings: {apiErrorMessage(configQuery.error)}
       </div>
     );
@@ -247,16 +247,16 @@ export default function SettingsPage() {
   return (
     <div className="max-w-4xl mx-auto">
       <header className="mb-6">
-        <h1 className="text-2xl font-semibold text-gray-900">Settings</h1>
-        <p className="text-sm text-gray-600 mt-1">
+        <h1 className="text-2xl font-semibold text-fg">Settings</h1>
+        <p className="text-sm text-muted mt-1">
           LLM provider configuration. Changes go live without a restart.
           The API key is encrypted at rest with a key derived from{' '}
-          <code className="bg-gray-100 px-1 rounded">SECRET_KEY</code>.
+          <code className="bg-surface-muted px-1 rounded">SECRET_KEY</code>.
         </p>
       </header>
 
-      <div className="bg-white shadow rounded-lg overflow-hidden">
-        <div className="border-b border-gray-200">
+      <div className="bg-surface-raised shadow rounded-lg overflow-hidden">
+        <div className="border-b border-line">
           <nav className="-mb-px flex" aria-label="Tabs">
             {TABS.map((tab) => (
               <button
@@ -266,7 +266,7 @@ export default function SettingsPage() {
                 className={`whitespace-nowrap py-3 px-4 border-b-2 font-medium text-sm ${
                   activeTab === tab.id
                     ? 'border-primary text-primary-hover'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    : 'border-transparent text-subtle hover:text-muted hover:border-line-strong'
                 }`}
               >
                 {tab.label}
@@ -279,26 +279,26 @@ export default function SettingsPage() {
           {activeTab === 'provider' && (
             <div className="space-y-5">
               <div>
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-muted">
                   Base URL <SourceTag source={sources.base_url} />
                 </label>
                 <input
                   {...register('base_url')}
                   placeholder="https://openrouter.ai/api/v1"
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+                  className="mt-1 block w-full rounded-md border-line-strong shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
                 />
                 {errors.base_url && (
-                  <p className="mt-1 text-xs text-red-600">{errors.base_url.message}</p>
+                  <p className="mt-1 text-xs text-danger">{errors.base_url.message}</p>
                 )}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-muted">
                   API Key <SourceTag source={sources.api_key} />
                 </label>
                 {!apiKeyDirty ? (
                   <div className="mt-1 flex items-center gap-3">
-                    <code className="font-mono text-sm bg-gray-50 px-3 py-2 rounded border border-gray-200 text-gray-700">
+                    <code className="font-mono text-sm bg-surface-muted px-3 py-2 rounded border border-line text-muted">
                       {cfg.api_key_set
                         ? `••••••••${cfg.api_key_last4 ?? ''}`
                         : '(not set)'}
@@ -317,7 +317,7 @@ export default function SettingsPage() {
                       <button
                         type="button"
                         onClick={() => updateMutation.mutate({ api_key: '' })}
-                        className="text-sm font-medium text-gray-500 hover:underline"
+                        className="text-sm font-medium text-subtle hover:underline"
                       >
                         Clear (use env)
                       </button>
@@ -330,7 +330,7 @@ export default function SettingsPage() {
                       type="password"
                       autoComplete="new-password"
                       placeholder="paste new key"
-                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+                      className="block w-full rounded-md border-line-strong shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
                     />
                     <button
                       type="button"
@@ -338,20 +338,20 @@ export default function SettingsPage() {
                         setApiKeyDirty(false);
                         setValue('api_key', '');
                       }}
-                      className="text-sm text-gray-500 hover:underline"
+                      className="text-sm text-subtle hover:underline"
                     >
                       Cancel
                     </button>
                   </div>
                 )}
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-subtle">
                   Encrypted at rest. Never returned to the browser after save.
                 </p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
+                  <label className="block text-sm font-medium text-muted">
                     Timeout (seconds){' '}
                     <SourceTag source={sources.timeout_seconds} />
                   </label>
@@ -360,7 +360,7 @@ export default function SettingsPage() {
                     min={1}
                     max={600}
                     {...register('timeout_seconds', { valueAsNumber: true })}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+                    className="mt-1 block w-full rounded-md border-line-strong shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
                   />
                 </div>
                 <div className="flex items-center sm:justify-end">
@@ -368,7 +368,7 @@ export default function SettingsPage() {
                     <input
                       type="checkbox"
                       {...register('response_healing')}
-                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                      className="h-4 w-4 rounded border-line-strong text-primary focus:ring-primary"
                     />
                     Response healing (OpenRouter only)
                   </label>
@@ -394,7 +394,7 @@ export default function SettingsPage() {
             <div className="space-y-5">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
+                  <label className="block text-sm font-medium text-muted">
                     Vision daily cap (USD){' '}
                     <SourceTag source={sources.vision_daily_cap_usd} />
                   </label>
@@ -403,15 +403,15 @@ export default function SettingsPage() {
                     step="0.5"
                     min={0}
                     {...register('vision_daily_cap_usd', { valueAsNumber: true })}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+                    className="mt-1 block w-full rounded-md border-line-strong shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
                   />
-                  <p className="mt-1 text-xs text-gray-600">
+                  <p className="mt-1 text-xs text-muted">
                     Today's spend:{' '}
                     <strong>${(cfg.today_vision_cost_usd ?? 0).toFixed(4)}</strong>
                   </p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
+                  <label className="block text-sm font-medium text-muted">
                     Pricing daily cap (USD){' '}
                     <SourceTag source={sources.pricing_daily_cap_usd} />
                   </label>
@@ -420,9 +420,9 @@ export default function SettingsPage() {
                     step="0.5"
                     min={0}
                     {...register('pricing_daily_cap_usd', { valueAsNumber: true })}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+                    className="mt-1 block w-full rounded-md border-line-strong shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
                   />
-                  <p className="mt-1 text-xs text-gray-600">
+                  <p className="mt-1 text-xs text-muted">
                     Today's spend:{' '}
                     <strong>${(cfg.today_pricing_cost_usd ?? 0).toFixed(4)}</strong>
                   </p>
@@ -434,7 +434,7 @@ export default function SettingsPage() {
                   <input
                     type="checkbox"
                     {...register('vision_enabled')}
-                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                    className="h-4 w-4 rounded border-line-strong text-primary focus:ring-primary"
                   />
                   Vision auto-fill enabled
                   <SourceTag source={sources.vision_enabled} />
@@ -444,7 +444,7 @@ export default function SettingsPage() {
                   <input
                     type="checkbox"
                     {...register('pricing_enabled')}
-                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                    className="h-4 w-4 rounded border-line-strong text-primary focus:ring-primary"
                   />
                   Pricing estimates enabled
                   <SourceTag source={sources.pricing_enabled} />
@@ -478,8 +478,8 @@ export default function SettingsPage() {
             <div
               className={`text-sm rounded-md p-3 ${
                 statusKind === 'error'
-                  ? 'bg-red-50 text-red-700'
-                  : 'bg-green-50 text-green-700'
+                  ? 'bg-danger-subtle text-danger'
+                  : 'bg-success-subtle text-success'
               }`}
             >
               {statusMessage}
@@ -487,7 +487,7 @@ export default function SettingsPage() {
           )}
 
           {activeTab !== 'test' && (
-            <div className="flex items-center gap-3 pt-4 border-t border-gray-200">
+            <div className="flex items-center gap-3 pt-4 border-t border-line">
               <button
                 type="submit"
                 disabled={updateMutation.isPending || (!isDirty && !apiKeyDirty)}
@@ -504,7 +504,7 @@ export default function SettingsPage() {
                   setStatusKind(null);
                 }}
                 disabled={!isDirty && !apiKeyDirty}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                className="inline-flex items-center px-4 py-2 border border-line-strong text-sm font-medium rounded-md text-muted bg-surface-raised hover:bg-surface-muted disabled:opacity-50"
               >
                 Discard
               </button>
@@ -561,7 +561,7 @@ function ModelsTab({
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-muted">
           Pick which model handles each role. Vision needs an image-capable
           model; pricing can usually run on a cheaper text-only model.
         </p>
@@ -596,14 +596,14 @@ function ModelsTab({
       </div>
 
       {error && (
-        <div className="text-sm rounded-md bg-red-50 text-red-700 p-3">
+        <div className="text-sm rounded-md bg-danger-subtle text-danger p-3">
           {error}
         </div>
       )}
 
       <div className="border rounded-md overflow-hidden">
-        <div className="bg-gray-50 px-4 py-2 flex items-center gap-3">
-          <span className="text-xs font-medium text-gray-700">Filter:</span>
+        <div className="bg-surface-muted px-4 py-2 flex items-center gap-3">
+          <span className="text-xs font-medium text-muted">Filter:</span>
           {(['all', 'vision', 'strict-json'] as ModelFilter[]).map((f) => (
             <button
               key={f}
@@ -612,7 +612,7 @@ function ModelsTab({
               className={`text-xs px-2 py-1 rounded ${
                 filter === f
                   ? 'bg-primary text-white'
-                  : 'bg-white text-gray-700 border border-gray-200'
+                  : 'bg-surface-raised text-muted border border-line'
               }`}
             >
               {f === 'all'
@@ -622,17 +622,17 @@ function ModelsTab({
                 : 'Strict JSON'}
             </button>
           ))}
-          <span className="ml-auto text-xs text-gray-500">
+          <span className="ml-auto text-xs text-subtle">
             {visibleModels.length} of {models.length}
           </span>
         </div>
         {models.length === 0 ? (
-          <p className="text-sm text-gray-600 p-4">
+          <p className="text-sm text-muted p-4">
             No models loaded yet. Click <em>Refresh model list</em> to fetch
             from the configured provider.
           </p>
         ) : (
-          <ul className="divide-y divide-gray-200 max-h-96 overflow-y-auto">
+          <ul className="divide-y divide-line max-h-96 overflow-y-auto">
             {visibleModels.map((m) => (
               <li
                 key={m.id}
@@ -647,7 +647,7 @@ function ModelsTab({
                       state={m.supports_strict_json}
                     />
                     {m.owned_by && (
-                      <span className="text-xs text-gray-500">
+                      <span className="text-xs text-subtle">
                         {m.owned_by}
                       </span>
                     )}
@@ -660,7 +660,7 @@ function ModelsTab({
                     className={`text-xs px-2 py-1 rounded border ${
                       defaultPick === m.id
                         ? 'bg-primary text-white border-primary'
-                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                        : 'bg-surface-raised text-muted border-line-strong hover:bg-surface-muted'
                     }`}
                   >
                     Default
@@ -673,7 +673,7 @@ function ModelsTab({
                     className={`text-xs px-2 py-1 rounded border ${
                       visionPick === m.id
                         ? 'bg-primary text-white border-primary'
-                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                        : 'bg-surface-raised text-muted border-line-strong hover:bg-surface-muted'
                     }`}
                   >
                     Vision
@@ -686,7 +686,7 @@ function ModelsTab({
                     className={`text-xs px-2 py-1 rounded border ${
                       pricingPick === m.id
                         ? 'bg-primary text-white border-primary'
-                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                        : 'bg-surface-raised text-muted border-line-strong hover:bg-surface-muted'
                     }`}
                   >
                     Pricing
@@ -714,13 +714,13 @@ function ModelSelectField({
 }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700">
+      <label className="block text-sm font-medium text-muted">
         {label} <SourceTag source={source} />
       </label>
       <input
         {...register(fieldName)}
         placeholder="provider/model-id"
-        className="mt-1 block w-full font-mono text-sm rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
+        className="mt-1 block w-full font-mono text-sm rounded-md border-line-strong shadow-sm focus:border-primary focus:ring-primary"
       />
     </div>
   );
@@ -748,8 +748,8 @@ function TestTab({
   return (
     <div className="space-y-6">
       <section>
-        <h3 className="text-sm font-medium text-gray-900">Quick test</h3>
-        <p className="text-sm text-gray-600 mt-1">
+        <h3 className="text-sm font-medium text-fg">Quick test</h3>
+        <p className="text-sm text-muted mt-1">
           Lists the provider's models and confirms the configured Default,
           Vision, and Pricing models all exist. Doesn't spend tokens.
         </p>
@@ -757,12 +757,12 @@ function TestTab({
           type="button"
           onClick={onQuick}
           disabled={quickIsPending}
-          className="mt-2 inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+          className="mt-2 inline-flex items-center px-3 py-1.5 border border-line-strong text-sm font-medium rounded-md text-muted bg-surface-raised hover:bg-surface-muted disabled:opacity-50"
         >
           {quickIsPending ? 'Running…' : 'Run quick test'}
         </button>
         {quickError && (
-          <pre className="mt-2 text-xs whitespace-pre-wrap rounded-md bg-red-50 text-red-700 p-3">
+          <pre className="mt-2 text-xs whitespace-pre-wrap rounded-md bg-danger-subtle text-danger p-3">
             {quickError}
           </pre>
         )}
@@ -770,8 +770,8 @@ function TestTab({
       </section>
 
       <section className="border-t pt-5">
-        <h3 className="text-sm font-medium text-gray-900">Run vision test</h3>
-        <p className="text-sm text-gray-600 mt-1">
+        <h3 className="text-sm font-medium text-fg">Run vision test</h3>
+        <p className="text-sm text-muted mt-1">
           Sends a tiny embedded test image through the configured Vision
           model with a strict JSON schema. Costs a small amount of tokens
           but proves end-to-end vision + strict-schema support.
@@ -780,12 +780,12 @@ function TestTab({
           type="button"
           onClick={onVision}
           disabled={visionIsPending}
-          className="mt-2 inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+          className="mt-2 inline-flex items-center px-3 py-1.5 border border-line-strong text-sm font-medium rounded-md text-muted bg-surface-raised hover:bg-surface-muted disabled:opacity-50"
         >
           {visionIsPending ? 'Running…' : 'Run vision test'}
         </button>
         {visionError && (
-          <pre className="mt-2 text-xs whitespace-pre-wrap rounded-md bg-red-50 text-red-700 p-3">
+          <pre className="mt-2 text-xs whitespace-pre-wrap rounded-md bg-danger-subtle text-danger p-3">
             {visionError}
           </pre>
         )}
@@ -808,7 +808,7 @@ function TestResultPanel({
   return (
     <div
       className={`mt-3 rounded-md p-3 text-sm ${
-        ok ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'
+        ok ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'
       }`}
     >
       <div className="font-medium">
@@ -816,12 +816,12 @@ function TestResultPanel({
       </div>
       {result.detail && <div className="mt-1 text-xs">{result.detail}</div>}
       {kind === 'quick' && 'checks' in result && result.checks && (
-        <pre className="mt-2 text-xs bg-white/50 rounded p-2 whitespace-pre-wrap">
+        <pre className="mt-2 text-xs bg-surface-raised/50 rounded p-2 whitespace-pre-wrap">
           {JSON.stringify(result.checks, null, 2)}
         </pre>
       )}
       {kind === 'vision' && 'parsed_response' in result && result.parsed_response && (
-        <pre className="mt-2 text-xs bg-white/50 rounded p-2 whitespace-pre-wrap">
+        <pre className="mt-2 text-xs bg-surface-raised/50 rounded p-2 whitespace-pre-wrap">
           {JSON.stringify(result.parsed_response, null, 2)}
         </pre>
       )}
