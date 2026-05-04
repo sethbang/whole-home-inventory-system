@@ -1,13 +1,13 @@
 # WHIS Testing Guide
 
-This document outlines the testing strategy, procedures, and best practices for the WHIS (Whole-Home Inventory System) project.
+This document describes the testing strategy, current test surface, and conventions for WHIS (Whole-Home Inventory System). Current as of v3.1.0.
 
-## Current state (as of 2.0.0)
+## Current state
 
-- **Backend:** 10 pytest tests in `backend/tests/` covering auth round-trip, item CRUD, and image upload validation. Runs against in-memory SQLite via `conftest.py`.
-- **Frontend:** 19 jest tests in `frontend/src/**/__tests__/`: eBay API client, `EbayFields` component, `ItemDetail` page.
-- **CI:** GitHub Actions at `.github/workflows/ci.yml` runs pytest against Python 3.11 and 3.12 plus `npm test` on Node 20. Lint is advisory (pre-existing warning count).
-- **Not yet present:** Playwright / E2E browser tests, Locust load tests, coverage gates. The examples referenced in the later sections of this document are **aspirational** — they describe the direction, not the current state.
+- **Backend:** 336 pytest tests (335 at v3.1.0 release + 1 deletion-exemption regression). Default run uses in-memory SQLite via `conftest.py`. Postgres 16 matrix is opt-in via `TEST_DATABASE_URL`.
+- **Frontend:** 95 vitest tests across components, API client modules, contexts, and pages.
+- **CI:** GitHub Actions at `.github/workflows/ci.yml`. 4-leg backend matrix (Python 3.11/3.12 × SQLite/Postgres). Frontend ESLint is **blocking** (0 errors). Three additional gates: `pip-audit --strict`, `npm audit --omit=dev --audit-level=high`, Trivy image scan (HIGH/CRITICAL fail), and a `contract-check` job that re-runs `npm run codegen:api` and fails if `frontend/src/api/openapi.d.ts` is out of sync.
+- **Not yet present:** Playwright / E2E browser tests, Locust load tests, formal coverage gates. Coverage is reported in the job log but not failed-under.
 
 ## Table of Contents
 
@@ -15,472 +15,322 @@ This document outlines the testing strategy, procedures, and best practices for 
 2. [Test Environment Setup](#test-environment-setup)
 3. [Backend Testing](#backend-testing)
 4. [Frontend Testing](#frontend-testing)
-5. [End-to-End Testing](#end-to-end-testing)
-6. [Performance Testing](#performance-testing)
-7. [Security Testing](#security-testing)
-8. [Continuous Integration](#continuous-integration)
+5. [Compliance / Regression Tests](#compliance--regression-tests)
+6. [End-to-End Testing](#end-to-end-testing)
+7. [Performance Testing](#performance-testing)
+8. [Security Testing](#security-testing)
+9. [Continuous Integration](#continuous-integration)
+10. [Best Practices](#best-practices)
 
 ## Testing Overview
 
-### Testing Pyramid
+### Testing pyramid
 
-WHIS follows the testing pyramid approach:
+WHIS follows the testing pyramid:
 - Many unit tests (fast, isolated)
-- Fewer integration tests (slower, dependencies)
-- Few end-to-end tests (slowest, full system)
+- Fewer integration tests (slower, real DB / mocked HTTP)
+- Few/no end-to-end tests (Playwright not yet wired up)
 
-### Coverage Targets
+### Coverage targets (aspirational, not enforced)
 
-Aspirational coverage targets (not currently enforced by CI):
 - Backend: 80%+
 - Frontend: 70%+
-- Critical paths: 100%
-
-### Test Types
-
-1. **Unit Tests**
-   - Individual components/functions
-   - Mocked dependencies
-   - Fast execution
-
-2. **Integration Tests**
-   - Component interactions
-   - Database operations
-   - API endpoints
-
-3. **End-to-End Tests**
-   - Full user workflows
-   - Browser automation
-   - Real environment
+- Critical paths (auth, deletion-exemption, restore round-trip, settings fail-fast): 100%
 
 ## Test Environment Setup
 
-### Backend Test Setup
+### Backend
 
-1. **Install Dependencies**
 ```bash
 cd backend
 source venv/bin/activate
-pip install -r requirements.txt pytest pytest-cov httpx
+pip install -r requirements.txt
 ```
 
-2. **Run the suite**
+Test deps (`pytest`, `pytest-cov`, `httpx`) are pinned in `requirements.txt` already. No separate `requirements-test.txt`.
+
+Run the suite:
+
 ```bash
-pytest                           # all tests
-pytest --cov=app tests/          # with coverage
+pytest                                              # ~50s, in-memory SQLite
+pytest --cov=app tests/                             # with coverage
 pytest tests/test_items.py::test_item_crud_round_trip   # single test
+pytest -v                                           # verbose
+pytest -k "pricing"                                 # filter by name
 ```
 
-3. **How the fixtures work**
-The suite at `backend/tests/conftest.py` sets `BYPASS_AUTH=false` and a deterministic `SECRET_KEY` at import time, wires the app to an in-memory SQLite engine (`StaticPool`), creates all tables from the SQLAlchemy metadata, and exposes:
+Run against Postgres (the CI matrix subset that doesn't depend on provider mocks):
+
+```bash
+TEST_DATABASE_URL=postgresql+psycopg://whis:whis@localhost:5432/whis pytest
+```
+
+### How the fixtures work
+
+`backend/tests/conftest.py` sets `BYPASS_AUTH=false` and a deterministic `SECRET_KEY` at import time, wires the app to either an in-memory SQLite engine (default, `StaticPool`) or the database at `TEST_DATABASE_URL`, applies the schema (Alembic head for Postgres; create_all for in-memory speed), and exposes:
+
 - `client` — FastAPI `TestClient` with `get_db` dependency override
+- `db_session` — direct SQLAlchemy session for assertions
 - `user` — a real DB user with a hashed password
 - `auth_headers` — `Authorization: Bearer <real JWT>` header dict
 
-No separate `requirements-test.txt` or `TEST_DATABASE_URL` env var is used — everything is controlled by `conftest.py`.
+Some specialty fixtures live alongside specific test files (e.g. `patch_task_session` in `test_job_tasks.py` for the ARQ task wrappers).
 
-### Frontend Test Setup
+### Frontend
 
-Testing libraries are already in `frontend/package.json` (`jest`, `ts-jest`, `@testing-library/react`, `@testing-library/jest-dom`). Jest config is inline in `package.json` under the `"jest"` key.
-
-1. **Install dependencies** (once)
 ```bash
 cd frontend
 npm install
 ```
 
-2. **Run the suite**
+Run the suite:
+
 ```bash
-npm test                         # all tests (jest)
-npm test -- --ci                 # CI-style (matches the workflow)
-npm test -- src/path/To.test.tsx # single test file
+npm test                                          # vitest run, ~6s
+npm run test:watch                                # watch mode
+npm test -- src/components/__tests__/Layout.test.tsx   # single file
 ```
+
+Vitest config is `vitest.config.ts` (jsdom env, globals enabled, setup file at `src/setupTests.ts`, matches `src/**/__tests__/**/*.test.{ts,tsx,js,jsx}`).
 
 ## Backend Testing
 
-### Unit Tests
+### Unit / API tests
 
-1. **Models Testing**
 ```python
-# tests/test_models.py
-import pytest
-from app.models import Item
-
-def test_item_creation():
-    item = Item(
-        name="Test Item",
-        category="Test",
-        location="Test Location"
-    )
-    assert item.name == "Test Item"
-    assert item.category == "Test"
-```
-
-2. **API Testing**
-```python
-# tests/test_api.py
-from fastapi.testclient import TestClient
-from app.main import app
-
-client = TestClient(app)
-
-def test_create_item():
-    response = client.post(
+# tests/test_items.py
+def test_item_crud_round_trip(client, auth_headers):
+    # Create
+    r = client.post(
         "/api/items/",
-        json={
-            "name": "Test Item",
-            "category": "Test",
-            "location": "Test Location"
-        },
-        headers={"Authorization": f"Bearer {test_token}"}
+        json={"name": "Test Item", "category": "Test"},
+        headers=auth_headers,
     )
-    assert response.status_code == 200
-    assert response.json()["name"] == "Test Item"
+    assert r.status_code == 200
+    item_id = r.json()["id"]
+
+    # Read
+    r = client.get(f"/api/items/{item_id}", headers=auth_headers)
+    assert r.json()["name"] == "Test Item"
+
+    # Update
+    r = client.put(
+        f"/api/items/{item_id}",
+        json={"name": "Renamed"},
+        headers=auth_headers,
+    )
+    assert r.json()["name"] == "Renamed"
+
+    # Delete
+    r = client.delete(f"/api/items/{item_id}", headers=auth_headers)
+    assert r.status_code == 204
 ```
 
-3. **Service Testing**
-```python
-# tests/test_services.py
-import pytest
-from app.services import ItemService
+### Service-layer tests
 
-def test_item_service():
-    service = ItemService()
-    item = service.create_item({
-        "name": "Test Item",
-        "category": "Test"
+Routers delegate to services in `app/services/`. Service tests usually take `db_session` + `user` and exercise the service directly:
+
+```python
+# tests/test_item_service.py
+from app.services.items import ItemService
+
+def test_delete_item_removes_image_files(db_session, user, tmp_path):
+    svc = ItemService(db_session, user)
+    item = svc.create({"name": "x", "category": "y"})
+    # ... attach an image file written to tmp_path
+    svc.delete(item.id)
+    # Assert the image file is gone from disk (F6 regression)
+```
+
+### LLM / pricing / vision tests
+
+These are mock-heavy and SQLite-only. Provider tests use `httpx.MockTransport`:
+
+```python
+# tests/test_pricing_providers.py
+def test_ebay_lookup_happy_path():
+    transport = _mock_transport({
+        "/identity/v1/oauth2/token": _oauth_ok(),
+        "/buy/browse/v1/item_summary/search": httpx.Response(200, json={...}),
     })
-    assert item is not None
+    # ...assert P10/P50/P90 + sample_count
 ```
 
-### Integration Tests
+Vision/pricing service tests use a fake `OpenAICompatibleClient`:
 
-1. **Database Integration**
 ```python
-# tests/test_db_integration.py
-import pytest
-from sqlalchemy.orm import Session
-from app.database import get_db
-from app.models import Item
-
-def test_database_operations():
-    db = next(get_db())
-    item = Item(name="Test", category="Test")
-    db.add(item)
-    db.commit()
-    
-    fetched = db.query(Item).first()
-    assert fetched.name == "Test"
-```
-
-2. **API Integration**
-```python
-# tests/test_api_integration.py
-def test_item_workflow():
-    # Create item
-    create_response = client.post("/api/items/", json={...})
-    item_id = create_response.json()["id"]
-    
-    # Update item
-    update_response = client.put(f"/api/items/{item_id}", json={...})
-    
-    # Delete item
-    delete_response = client.delete(f"/api/items/{item_id}")
-    
-    assert delete_response.status_code == 204
+# tests/test_vision_service.py
+def _fake_client(payload, ...):
+    client = MagicMock()
+    client.vision_completion = AsyncMock(return_value={"data": payload, ...})
+    return client
 ```
 
 ## Frontend Testing
 
-### Component Tests
+### Component tests
 
-1. **Render Testing**
-```typescript
+```tsx
 // src/components/__tests__/ItemList.test.tsx
+import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { ItemList } from '../ItemList';
 
 describe('ItemList', () => {
   it('renders items correctly', () => {
-    const items = [
-      { id: '1', name: 'Test Item', category: 'Test' }
-    ];
-    
-    render(<ItemList items={items} />);
+    const items = [{ id: '1', name: 'Test Item', category: 'Test' }];
+    render(<ItemList items={items} onItemSelect={() => {}} />);
     expect(screen.getByText('Test Item')).toBeInTheDocument();
   });
 });
 ```
 
-2. **User Interaction**
-```typescript
+### User interaction
+
+```tsx
 // src/components/__tests__/AddItem.test.tsx
+import { describe, test, expect, vi } from 'vitest';
 import { render, fireEvent } from '@testing-library/react';
 import { AddItem } from '../AddItem';
 
 test('form submission', async () => {
-  const onSubmit = jest.fn();
-  const { getByLabelText, getByText } = render(
-    <AddItem onSubmit={onSubmit} />
-  );
-  
-  fireEvent.change(getByLabelText('Name'), {
-    target: { value: 'Test Item' }
-  });
-  
+  const onSubmit = vi.fn();
+  const { getByLabelText, getByText } = render(<AddItem onSubmit={onSubmit} />);
+  fireEvent.change(getByLabelText('Name'), { target: { value: 'Test Item' } });
   fireEvent.click(getByText('Submit'));
   expect(onSubmit).toHaveBeenCalled();
 });
 ```
 
-3. **Hook Testing**
-```typescript
-// src/hooks/__tests__/useItems.test.tsx
-import { renderHook, act } from '@testing-library/react-hooks';
-import { useItems } from '../useItems';
+### React Query / context-aware tests
 
-test('useItems hook', async () => {
-  const { result } = renderHook(() => useItems());
-  
-  act(() => {
-    result.current.addItem({ name: 'Test' });
-  });
-  
-  expect(result.current.items).toHaveLength(1);
-});
+Wrap with the same providers the app uses (`QueryClientProvider`, `AuthProvider`). The `setupTests.ts` file installs `@testing-library/jest-dom` matchers (still works under vitest via the `@testing-library/jest-dom/vitest` import).
+
+```tsx
+import { QueryClientProvider, QueryClient } from '@tanstack/react-query';
+
+function renderWithProviders(ui: React.ReactNode) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>);
+}
 ```
 
-### Integration Tests
+### API client tests
 
-1. **API Integration**
-```typescript
-// src/api/__tests__/client.test.ts
-import { APIClient } from '../client';
+API client modules in `src/api/` are tested with `msw` or direct mocking of the axios instance. See `src/api/__tests__/items.test.ts` for the canonical pattern.
 
-describe('API Client', () => {
-  it('fetches items', async () => {
-    const client = new APIClient();
-    const items = await client.getItems();
-    expect(items).toBeDefined();
-  });
-});
-```
+## Compliance / Regression Tests
 
-2. **Component Integration**
-```typescript
-// src/pages/__tests__/Dashboard.test.tsx
-test('dashboard integration', async () => {
-  render(
-    <AuthProvider>
-      <Dashboard />
-    </AuthProvider>
-  );
-  
-  await waitFor(() => {
-    expect(screen.getByText('Items')).toBeInTheDocument();
-  });
-});
-```
+A small set of tests is "load-bearing" — failures imply broken commitments to external systems or compliance regimes. Treat them as critical-path:
+
+- **`test_pricing_providers.py::test_ebay_parser_drops_seller_pii_for_deletion_exemption`** — guards the eBay Marketplace Account Deletion exemption. If it fails, WHIS is no longer exempt and the deletion-notification callback must be implemented before shipping. See `docs/EBAY_INTEGRATION.md`.
+- **`test_settings.py::test_*_refuses_to_load_with_*`** — fail-fast guards on `SECRET_KEY`, `BYPASS_AUTH=false` + missing key, `LLM_ALLOW_CLOUD=false` against a public host, `VISION_ENABLED=true` without `LLM_BASE_URL`, etc.
+- **`test_backups.py::test_backup_create_and_restore_round_trip_with_images`** — guards the restore path that briefly shipped 670-byte image-less backups in pre-3.1.1 dev versions. Writes a real JPEG, backs up, restores, asserts byte-identical content.
+- **Cascade test** — guards Postgres FK enforcement: `item_images.item_id ON DELETE CASCADE` is required because the bulk-delete path (`synchronize_session=False`) bypasses ORM cascade.
 
 ## End-to-End Testing
 
-### Playwright Tests
+Not currently in-tree. Playwright is the planned vehicle. When E2E lands, expected layout:
 
-1. **Test Setup**
-```typescript
-// e2e/setup.ts
-import { test as base } from '@playwright/test';
-
-export const test = base.extend({
-  page: async ({ page }, use) => {
-    await page.goto('http://localhost:5173');
-    await use(page);
-  }
-});
+```text
+e2e/
+├── playwright.config.ts
+├── itemFlow.spec.ts
+├── auth.spec.ts
+└── pricing.spec.ts
 ```
 
-2. **User Flows**
-```typescript
-// e2e/itemFlow.spec.ts
-test('complete item workflow', async ({ page }) => {
-  // Login
-  await page.fill('[data-testid="username"]', 'testuser');
-  await page.fill('[data-testid="password"]', 'password');
-  await page.click('button[type="submit"]');
-  
-  // Add item
-  await page.click('[data-testid="add-item"]');
-  await page.fill('[data-testid="item-name"]', 'Test Item');
-  await page.click('[data-testid="submit"]');
-  
-  // Verify item
-  await expect(page.locator('text=Test Item')).toBeVisible();
-});
-```
+Until then, the [UAT_v3.1.md](UAT_v3.1.md) checklist serves as the manual E2E coverage matrix.
 
 ## Performance Testing
 
-### Backend Performance
+Not formally automated. Spot-check approaches in use:
 
-1. **Load Testing**
-```python
-# tests/performance/test_load.py
-from locust import HttpUser, task, between
-
-class WHISUser(HttpUser):
-    wait_time = between(1, 3)
-    
-    @task
-    def get_items(self):
-        self.client.get("/api/items/")
-```
-
-2. **Database Performance**
-```python
-# tests/performance/test_db.py
-import time
-
-def test_query_performance():
-    start = time.time()
-    items = db.query(Item).all()
-    duration = time.time() - start
-    
-    assert duration < 0.1  # 100ms threshold
-```
-
-### Frontend Performance
-
-1. **Component Performance**
-```typescript
-// src/components/__tests__/performance.test.tsx
-import { Profiler } from 'react';
-
-test('component render performance', () => {
-  const onRender = jest.fn();
-  
-  render(
-    <Profiler id="test" onRender={onRender}>
-      <ItemList items={items} />
-    </Profiler>
-  );
-  
-  const [duration] = onRender.mock.calls[0];
-  expect(duration).toBeLessThan(16);  // 60fps threshold
-});
-```
+- **FTS smoke**: `tests/test_items_fts.py` exercises the v3.0 FTS path on both SQLite and Postgres dialects.
+- **LLM cost ceilings**: budget guard tests assert HTTP 402 at cap.
+- **Manual load profiling** via locust or k6 is operator territory.
 
 ## Security Testing
 
-### Authentication Tests
+### Authentication
 
 ```python
-# tests/security/test_auth.py
-def test_invalid_token():
-    response = client.get(
+# tests/test_auth.py
+def test_invalid_token(client):
+    r = client.get(
         "/api/items/",
-        headers={"Authorization": "Bearer invalid"}
+        headers={"Authorization": "Bearer not-a-real-token"},
     )
-    assert response.status_code == 401
+    assert r.status_code == 401
 
 def test_password_hashing():
     from app.security import hash_password, verify_password
-    
-    password = "test_password"
-    hashed = hash_password(password)
-    assert verify_password(password, hashed)
+    hashed = hash_password("test_password")
+    assert verify_password("test_password", hashed)
 ```
 
-### Input Validation Tests
+### Settings fail-fast
 
-```python
-# tests/security/test_validation.py
-def test_xss_prevention():
-    response = client.post(
-        "/api/items/",
-        json={"name": "<script>alert('xss')</script>"}
-    )
-    assert "<script>" not in response.json()["name"]
-```
+`tests/test_settings.py` covers refusal to start with placeholder/missing `SECRET_KEY`, `LLM_ALLOW_CLOUD=false` against public LLM hosts, vision/pricing flagged on without LLM config, etc. Add a fail-fast test alongside any new setting that should refuse mis-configurations.
+
+### Supply chain
+
+CI gates: `pip-audit --strict` blocks known-vulnerable Python deps (3.12/SQLite leg). `npm audit --omit=dev --audit-level=high` blocks frontend deps. Trivy scans the backend + Caddy images for HIGH/CRITICAL CVEs. All three are blocking.
 
 ## Continuous Integration
 
-### GitHub Actions Workflow
+`.github/workflows/ci.yml` runs on push/PR to `main`:
 
-The workflow at `.github/workflows/ci.yml` runs on every push and pull request to `main`:
+| Job | What it runs | Blocking? |
+|---|---|---|
+| `backend` | pytest matrix: Python 3.11 + 3.12 × SQLite + Postgres 16. Postgres-as-service per leg. Full suite on SQLite legs; LLM-mocking subset on Postgres legs. | Yes |
+| `pip-audit` | `pip-audit --strict` (3.12/SQLite leg) | Yes |
+| `frontend` | `npm run lint` (0 errors), `npm test`, `npm audit --omit=dev --audit-level=high` | Yes (lint + tests + audit) |
+| `image-scan` | buildx + GHA cache, Trivy on backend + Caddy images, HIGH/CRITICAL fail (`--ignore-unfixed`) | Yes |
+| `contract-check` | regenerates `frontend/src/api/openapi.d.ts` from a live backend; fails if committed file is out of sync | Yes |
 
-- **backend** job — matrix over Python 3.11 and 3.12. Installs `requirements.txt` plus `pytest httpx`, runs `alembic upgrade head` against an ephemeral SQLite file, then `pytest --cov=app --cov-report=term-missing`.
-- **frontend** job — Node 20, `npm ci`, `npm run lint` (advisory — does not fail the job; tracked separately), `npm test -- --ci`.
-
-Coverage is reported in the job log but not yet gated. A `--cov-fail-under` threshold is aspirational work when coverage is more representative.
+Coverage is reported in the backend job log (`pytest --cov`) but not gated. A `--cov-fail-under` threshold can be added when coverage is broadly representative.
 
 ## Best Practices
 
-1. **Test Organization**
-   - Group related tests
-   - Use descriptive names
-   - Follow AAA pattern (Arrange, Act, Assert)
-   - Keep tests independent
+1. **Test organization**
+   - Group tests by router/module: `test_items.py`, `test_pricing_providers.py`, etc.
+   - Use descriptive names — the test name should read as a sentence describing the behavior.
+   - Follow AAA (Arrange, Act, Assert).
+   - Keep tests independent — fixtures handle DB cleanup between tests.
 
-2. **Test Data**
-   - Use factories/fixtures
-   - Avoid hard-coded values
-   - Clean up after tests
-   - Use realistic data
+2. **Test data**
+   - Prefer the conftest fixtures (`user`, `auth_headers`) over hand-built objects.
+   - Use realistic-shaped data — avoid `name="x"` when `name="MacBook Air 13"` is just as easy.
+   - Don't share mutable state between tests.
 
 3. **Assertions**
-   - Be specific
-   - Test one thing per test
-   - Use appropriate matchers
-   - Include error messages
+   - Be specific. `assert r.status_code == 200` beats `assert r.ok`.
+   - Test one behavior per test. Multiple assertions on one behavior is fine; multiple behaviors per test is not.
+   - Include explanatory `assert msg` strings on assertions whose intent isn't obvious.
 
-4. **Maintenance**
-   - Keep tests up to date
-   - Remove obsolete tests
-   - Refactor when needed
-   - Document complex tests
+4. **External services**
+   - Never hit the real LLM / eBay / Facebook API in unit tests. Use `httpx.MockTransport` (httpx) or fake clients (MagicMock + AsyncMock).
+   - The compliance tests are the only place where a "real" provider response shape is canonized — keep those mocks aligned with current provider behavior.
 
-## Running Tests
+5. **Maintenance**
+   - Delete tests that test removed features (don't keep them as `pytest.skip`).
+   - When fixing a bug, write the failing test first.
+   - When refactoring tests, do it as a separate commit.
 
-### Backend Tests
+## Running Tests — quick reference
+
 ```bash
-# Run all tests
-pytest
+# Backend
+pytest                                                            # all
+pytest --cov=app tests/                                           # coverage
+pytest tests/test_items.py                                        # one file
+pytest tests/test_items.py::test_item_crud_round_trip             # one test
+pytest -k pricing                                                 # filter
+TEST_DATABASE_URL=postgresql+psycopg://... pytest                 # Postgres
 
-# Run with coverage
-pytest --cov=app tests/
-
-# Run specific test file
-pytest tests/test_items.py
-
-# Run with verbose output
-pytest -v
+# Frontend
+npm test                                                          # all
+npm run test:watch                                                # watch
+npm test -- src/components/__tests__/Layout.test.tsx              # one file
 ```
-
-### Frontend Tests
-```bash
-# Run all tests
-npm test
-
-# Run with coverage
-npm run test:coverage
-
-# Run specific test file
-npm test ItemList.test.tsx
-
-# Watch mode
-npm test -- --watch
-```
-
-### End-to-End Tests
-```bash
-# Install Playwright
-npx playwright install
-
-# Run all E2E tests
-npx playwright test
-
-# Run specific test file
-npx playwright test itemFlow.spec.ts
-
-# Run with UI
-npx playwright test --ui
