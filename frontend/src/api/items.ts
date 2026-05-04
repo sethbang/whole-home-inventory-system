@@ -1,4 +1,9 @@
-import type { Item, ItemListResponse, SearchFilters } from './types';
+import type {
+  Item,
+  ItemListResponse,
+  LocationCount,
+  SearchFilters,
+} from './types';
 import { apiClient } from './http';
 
 /** Dev helper for the "random item" button on AddItem. Isolated so
@@ -70,6 +75,10 @@ export const items = {
     const response = await apiClient.get<string[]>('/api/locations');
     return response.data;
   },
+  getLocationCounts: async (): Promise<LocationCount[]> => {
+    const response = await apiClient.get<LocationCount[]>('/api/locations/counts');
+    return response.data;
+  },
   lookupBarcode: async (barcode: string): Promise<Item | null> => {
     try {
       const response = await apiClient.get<Item>(`/api/items/barcode/${barcode}`);
@@ -90,4 +99,4 @@ export const items = {
   },
 };
 
-export type { Item, ItemListResponse, SearchFilters };
+export type { Item, ItemListResponse, LocationCount, SearchFilters };

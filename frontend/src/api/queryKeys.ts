@@ -33,6 +33,7 @@ export const queryKeys = {
     detail: (id: string) => [...queryKeys.items.details(), id] as const,
     categories: () => [...queryKeys.items.all, 'categories'] as const,
     locations: () => [...queryKeys.items.all, 'locations'] as const,
+    locationCounts: () => [...queryKeys.items.all, 'locationCounts'] as const,
     barcode: (barcode: string) =>
       [...queryKeys.items.all, 'barcode', barcode] as const,
   },

@@ -58,6 +58,26 @@ export async function dashboardLoader(): Promise<null> {
   return null;
 }
 
+const BROWSE_LIST_FILTERS: SearchFilters = {
+  ...DEFAULT_LIST_FILTERS,
+  page_size: 24,
+};
+
+export async function browseLoader(): Promise<null> {
+  await Promise.all([
+    queryClient.ensureQueryData({
+      queryKey: queryKeys.items.list(BROWSE_LIST_FILTERS),
+      queryFn: () => items.list(BROWSE_LIST_FILTERS),
+    }),
+    queryClient.ensureQueryData({
+      queryKey: queryKeys.items.locationCounts(),
+      queryFn: items.getLocationCounts,
+    }),
+    prefetchCategoriesAndLocations(),
+  ]);
+  return null;
+}
+
 export async function addItemLoader(): Promise<null> {
   await prefetchCategoriesAndLocations();
   return null;

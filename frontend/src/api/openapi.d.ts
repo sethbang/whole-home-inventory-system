@@ -205,6 +205,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/locations/counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Location Counts */
+        get: operations["get_location_counts_api_locations_counts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/items/import": {
         parameters: {
             query?: never;
@@ -1552,6 +1569,19 @@ export interface components {
             cost_usd?: number | null;
         };
         /**
+         * LocationCount
+         * @description One row per distinct location with the caller's item count.
+         *
+         *     Drives the Browse page's rooms sidebar — see GET /api/locations/counts.
+         *     Empty / null locations are filtered out by the service.
+         */
+        LocationCount: {
+            /** Location */
+            location: string;
+            /** Count */
+            count: number;
+        };
+        /**
          * PriceEstimate
          * @description Structured resale estimate returned by a ``PriceProvider``.
          */
@@ -2329,6 +2359,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": string[];
+                };
+            };
+        };
+    };
+    get_location_counts_api_locations_counts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocationCount"][];
                 };
             };
         };

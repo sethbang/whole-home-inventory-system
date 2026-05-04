@@ -7,6 +7,7 @@ import { apiErrorMessage } from '../api/errors';
 import { queryKeys } from '../api/queryKeys';
 import type { Item, ItemListResponse } from '../api/client';
 import DataMigration from '../components/DataMigration';
+import ItemCard from '../components/ItemCard';
 
 export default function Dashboard() {
   const queryClient = useQueryClient();
@@ -400,49 +401,16 @@ export default function Dashboard() {
         /* Grid View */
         <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {data?.items.map((item: Item) => (
-            <div key={item.id} className="relative flex flex-col overflow-hidden rounded-lg border border-gray-200">
-              <div className="absolute top-4 left-4">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                  checked={selectedItems.has(item.id)}
-                  onChange={() => toggleItemSelection(item.id)}
-                />
-              </div>
-              {item.images && item.images[0] && (
-                <div className="aspect-h-1 aspect-w-1 bg-gray-200">
-                  <img
-                    src={`http://localhost:8000/uploads/${item.images[0].filename}`}
-                    alt=""
-                    className="h-48 w-full object-cover"
-                  />
-                </div>
-              )}
-              <div className="flex flex-1 flex-col p-4">
-                <h3 className="text-sm font-medium text-gray-900">
-                  <Link to={`/items/${item.id}`} className="hover:text-primary">
-                    {item.name}
-                  </Link>
-                </h3>
-                <dl className="mt-2 flex flex-col">
-                  <dt className="sr-only">Category</dt>
-                  <dd className="text-sm text-gray-500">{item.category}</dd>
-                  <dt className="sr-only">Location</dt>
-                  <dd className="text-sm text-gray-500">{item.location}</dd>
-                  <dt className="sr-only">Value</dt>
-                  <dd className="mt-1 text-sm font-medium text-gray-900">
-                    ${item.current_value?.toFixed(2) ?? '0.00'}
-                  </dd>
-                </dl>
-                <div className="mt-4">
-                  <Link
-                    to={`/items/${item.id}`}
-                    className="text-sm font-medium text-primary hover:text-primary"
-                  >
-                    Edit
-                  </Link>
-                </div>
-              </div>
+            <div key={item.id} className="relative">
+              <input
+                type="checkbox"
+                aria-label={`Select ${item.name}`}
+                className="absolute left-3 top-3 z-10 h-4 w-4 rounded border-gray-300 bg-white text-primary focus:ring-primary"
+                checked={selectedItems.has(item.id)}
+                onClick={(e) => e.stopPropagation()}
+                onChange={() => toggleItemSelection(item.id)}
+              />
+              <ItemCard item={item} layout="card" />
             </div>
           ))}
         </div>

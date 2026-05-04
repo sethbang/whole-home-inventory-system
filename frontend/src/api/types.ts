@@ -26,6 +26,7 @@ export type ItemCreate = Schemas['ItemCreate'];
 export type ItemUpdate = Schemas['ItemUpdate'];
 export type ItemList = Schemas['ItemList'];
 export type ItemImage = Schemas['ItemImage'];
+export type LocationCount = Schemas['LocationCount'];
 export type BulkDeleteRequest = Schemas['BulkDeleteRequest'];
 export type ImportResult = Schemas['ImportResult'];
 export type CustomFieldsSchema = Schemas['CustomFieldsSchema'];

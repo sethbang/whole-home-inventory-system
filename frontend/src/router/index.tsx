@@ -15,6 +15,7 @@ import { RouteErrorBoundary } from '../components/ErrorBoundary';
 import {
   addItemLoader,
   backupsLoader,
+  browseLoader,
   dashboardLoader,
   itemDetailLoader,
   reportsLoader,
@@ -52,6 +53,14 @@ export const router = createBrowserRouter([
             loader: dashboardLoader,
             lazy: async () => {
               const mod = await import('../pages/Dashboard');
+              return { Component: mod.default };
+            },
+          },
+          {
+            path: 'browse',
+            loader: browseLoader,
+            lazy: async () => {
+              const mod = await import('../pages/Browse');
               return { Component: mod.default };
             },
           },

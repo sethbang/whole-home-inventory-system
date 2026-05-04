@@ -8,6 +8,7 @@ import { useDevMode } from '../contexts/useDevMode';
 
 const navigation = [
   { name: 'Dashboard', href: '/' },
+  { name: 'Browse', href: '/browse' },
   { name: 'Add Item', href: '/items/new' },
   { name: 'Reports', href: '/reports' },
   { name: 'Backups', href: '/backups' },
