@@ -35,6 +35,67 @@ def test_list_requires_auth(client):
     assert resp.status_code == 401
 
 
+def test_locations_counts_returns_per_room_counts_for_owner_only(
+    client, db_session, auth_headers
+):
+    """Browse-page sidebar contract.
+
+    Verifies four behaviors at once:
+      * counts are grouped by location for the calling user
+      * other users' items are excluded
+      * empty / null locations are dropped
+      * results are sorted by location name
+    """
+    from app import models, security
+
+    # Seed three items for the auth'd user across two rooms, plus one
+    # item with no location to confirm it's filtered out.
+    for name, location in [
+        ("Hammer", "Garage"),
+        ("Wrench", "Garage"),
+        ("Toaster", "Kitchen"),
+        ("Mystery", ""),
+    ]:
+        client.post(
+            "/api/items/",
+            json={"name": name, "category": "Tools", "location": location},
+            headers=auth_headers,
+        )
+
+    # Seed a different user's item directly so the scoping check is real.
+    other = models.User(
+        email="bob@example.com",
+        username="bob",
+        hashed_password=security.get_password_hash("ignored-for-this-test"),
+        is_active=True,
+    )
+    db_session.add(other)
+    db_session.commit()
+    db_session.refresh(other)
+    db_session.add(
+        models.Item(
+            name="Bob's Drill",
+            category="Tools",
+            location="Garage",
+            owner_id=other.id,
+        )
+    )
+    db_session.commit()
+
+    resp = client.get("/api/locations/counts", headers=auth_headers)
+    assert resp.status_code == 200, resp.text
+    rows = resp.json()
+    assert rows == [
+        {"location": "Garage", "count": 2},
+        {"location": "Kitchen", "count": 1},
+    ]
+
+
+def test_locations_counts_requires_auth(client):
+    resp = client.get("/api/locations/counts")
+    assert resp.status_code == 401
+
+
 def test_post_without_trailing_slash_redirects_then_creates(client, auth_headers):
     """Regression: clients that POST to `/api/items` (no slash) used to
     hit `BaseHTTPMiddleware`'s "called twice on the same scope" path —

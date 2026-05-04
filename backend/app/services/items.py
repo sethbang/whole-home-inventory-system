@@ -234,6 +234,29 @@ class ItemService:
         rows = self.db.execute(stmt).scalars().all()
         return [row for row in rows if row]
 
+    def location_counts(self) -> list[dict[str, Any]]:
+        """Return [{location, count}, ...] for the current owner.
+
+        Excludes null/empty locations; sorted by location name so the UI's
+        sidebar order is stable across reloads. Counts are unfiltered —
+        they reflect the user's total inventory, not whatever search /
+        filter state is active in the browser.
+        """
+        stmt = (
+            select(models.Item.location, func.count(models.Item.id))
+            .where(
+                models.Item.owner_id == self.user.id,
+                models.Item.location.is_not(None),
+                models.Item.location != "",
+            )
+            .group_by(models.Item.location)
+            .order_by(models.Item.location)
+        )
+        return [
+            {"location": location, "count": count}
+            for location, count in self.db.execute(stmt).all()
+        ]
+
     # -- barcode -----------------------------------------------------------
 
     def lookup_by_barcode(self, barcode: str) -> models.Item:

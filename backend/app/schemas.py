@@ -199,6 +199,17 @@ class ItemList(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class LocationCount(BaseModel):
+    """One row per distinct location with the caller's item count.
+
+    Drives the Browse page's rooms sidebar — see GET /api/locations/counts.
+    Empty / null locations are filtered out by the service.
+    """
+
+    location: str
+    count: int
+
+
 class BackupBase(BaseModel):
     pass
 

@@ -207,6 +207,14 @@ def get_locations(
     return _service(db, current_user).locations()
 
 
+@router.get("/locations/counts", response_model=List[schemas.LocationCount])
+def get_location_counts(
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(security.get_current_active_user),
+) -> Any:
+    return _service(db, current_user).location_counts()
+
+
 @router.post("/items/import", response_model=schemas.ImportResult)
 async def import_items(
     file: UploadFile = File(...),
