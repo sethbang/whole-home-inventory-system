@@ -36,6 +36,10 @@ def _env(monkeypatch):
     monkeypatch.setattr(settings, "LLM_BASE_URL", "https://openrouter.ai/api/v1")
     monkeypatch.setattr(settings, "LLM_API_KEY", "sk-test")
     monkeypatch.setattr(settings, "LLM_MODEL", "google/gemini-2.5-flash")
+    # F12 introduced LLM_VISION_MODEL with a fallback to LLM_MODEL via
+    # settings.vision_model(). Pin to "" so these tests exercise the
+    # fallback regardless of what backend/.env happens to set.
+    monkeypatch.setattr(settings, "LLM_VISION_MODEL", "")
 
 
 def _fake_client(payload: dict, usage: dict | None = None, *, raises=None):
