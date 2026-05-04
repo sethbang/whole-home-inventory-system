@@ -182,7 +182,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the full topology diagram and archite
 ## 8. Maintenance & Extensibility
 
 - ✓ Auto-generated OpenAPI spec at `/openapi.json`; UI at `/docs`
-- ✓ 336 backend pytest tests on SQLite + Postgres 16
+- ✓ 335 backend pytest tests on SQLite + Postgres 16
 - ✓ 95 vitest tests on the frontend
 - ✓ ESLint blocking in CI; `pip-audit --strict`, Trivy image scan, contract-check all blocking
 - ⏳ End-to-end tests (Playwright planned)

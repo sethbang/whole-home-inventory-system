@@ -233,10 +233,88 @@ any Postgres deployment takes real traffic.
 
 ### Test counts (current Unreleased)
 
-- Backend: **336 tests** (up from 315 at v3.1.0 release):
-  +12 from F6/F10a/F10b/F11/F12 fixes, +1 deletion-exemption
-  regression, all green on SQLite + Postgres 16.
+- Backend: **335 tests** (up from 315 at v3.1.0 release):
+  fixes for F6/F10a/F10b/F11/F12 + deletion-exemption regression,
+  all green on SQLite + Postgres 16.
 - Frontend: **95 vitest** tests, 0 ESLint errors.
+
+### Documentation
+
+Full doc audit + refresh sweep — every Markdown doc in the repo
+verified against the actual codebase and brought current with
+v3.0 (Postgres / ARQ / FTS / thumbnails / openapi codegen) and
+v3.1 (vision auto-fill / pricing / shared LLM layer / privacy
+kill-switch / cost caps).
+
+- **README.md** — replace v2.0.0 tech stack (Tailwind 3.4,
+  Formik+Yup, SQLite-only) with current reality (Tailwind v4,
+  RHF+zod, Postgres opt-in, ARQ profile, OpenAI SDK, Caddy);
+  split features into Core / v3.0 / v3.1; drop broken
+  `docs/USER_GUIDE.md` link; add docker compose profile
+  variants.
+- **ARCHITECTURE.md** — high-level diagram now shows ARQ worker,
+  Redis, Postgres, LLM provider, eBay; backend layout includes
+  services/, jobs/, llm/, vision/, pricing/, ebay/, facebook/,
+  schemas_llm.py, fts.py, rate_limit.py, telemetry.py,
+  logging_config.py, all routers and the 8 migrations on top of
+  baseline; DB schema includes price_cache (composite PK),
+  llm_usage, item_images thumbnail/cascade columns, and items
+  pricing columns; ADRs added for ARQ-not-Celery, OpenAI-
+  compatible client, Caddy-not-nginx, strict JSON schema for
+  LLM outputs; Future Considerations split into "aspirational"
+  vs "already shipped" so v3.x features stop appearing on
+  roadmap-style lists.
+- **API.md** — bump version banner + /api/health to 3.1.0; add
+  4 missing routers: jobs (v3.0), vision/pricing (v3.1), and
+  facebook (v2.3); document JobReference / Union[JobReference,
+  Resource] async pattern; add 402 (LLM cost cap), 429 (slowapi)
+  and 503 (feature disabled) error codes; add v3.1 fields to
+  Item shape (estimated_value_*, price_last_checked,
+  price_provider) and ItemImage (thumbnail_path); document FTS
+  search query parameter; flip "no rate limiting" claim to the
+  current slowapi reality.
+- **TESTING.md** — backend test count 10 -> 335, frontend
+  19 jest -> 95 vitest; replace all jest examples with vitest;
+  document the 4-leg backend matrix (Python 3.11/3.12 x
+  SQLite/Postgres) and the four blocking CI gates beyond the
+  test matrix (pip-audit, npm audit, Trivy, contract-check);
+  mark ESLint as blocking; new "Compliance / Regression Tests"
+  section calling out load-bearing tests (eBay deletion
+  exemption, settings fail-fast, restore round-trip, cascade).
+- **DEVELOPMENT.md** — Project Structure mirrors CLAUDE.md;
+  jest examples replaced with vitest; add codegen workflow
+  (`npm run codegen:api`); document compose profiles (worker,
+  postgres, full v3.0); v3.1 LLM/eBay env config block; "Adding
+  a new router" recipe; `dict()` -> `model_dump()` (Pydantic v2);
+  async-job debugging section.
+- **CONTRIBUTING.md** — `--port 27182` on the dev uvicorn
+  command; jest -> vitest; full CI matrix shape; ESLint
+  blocking; supply-chain gates section.
+- **DEPLOYMENT.md** — health-check version stamp 2.0.0 -> 3.1.0.
+- **SECURITY.md** — nginx -> Caddy (since v2.4); document
+  slowapi per-route rate limiting (no longer "not provided");
+  new v3.1 LLM/eBay secrets-management section
+  (LLM_API_KEY, LLM_ALLOW_CLOUD privacy kill-switch, image/
+  query egress paths, daily cost caps); 3.x added to Supported
+  Versions table; cross-ref the deletion-exemption regression
+  test.
+- **Whole_Home_Inventory_System_WHIS_DesignDoc.md** — bump to
+  3.1.0; add Phase 6 (v3.0 scale & ops) and Phase 7 (v3.1
+  intelligence) entries with full feature lists; trim Future
+  section to genuinely-not-yet-implemented items (RHF/data-
+  router/Tailwind v4 had been listed despite shipping in v2.3+).
+- **docs/EBAY_INTEGRATION.md** — full rewrite; split into the
+  two real surfaces (CSV listing assist vs Browse pricing);
+  document Marketplace Account Deletion exemption as load-
+  bearing with regression-test reference; sandbox/production
+  keying gotcha; refreshed roadmap with shipped/future split.
+- **UAT_v3.1.md** — new manual UAT checklist for v3.1 covering
+  vision, pricing, eBay export, Facebook, backups, PWA, error
+  handling.
+- **CLAUDE.md, backend/.env.example, frontend/.env.example,
+  CHANGELOG.md, VALIDATION_PLAN.md** — verified current; no
+  changes needed.
+- **ToDo.md** — left alone (5-line personal scratchpad).
 
 
 ## [3.1.0] - 2026-04-23
