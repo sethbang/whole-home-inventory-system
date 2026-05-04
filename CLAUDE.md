@@ -19,6 +19,8 @@ alembic upgrade head                          # apply migrations (use bootstrap.
 alembic revision -m "msg"                     # new migration
 alembic downgrade -1                          # revert last
 python create_dev_user.py                     # seed dev user (only useful when BYPASS_AUTH=false)
+python scripts/test_venice_image.py           # smoke test the Venice.ai image-gen endpoint (writes one JPG)
+SEED_USER=<u> python scripts/seed_items.py    # seed dev DB with 12 curated items + Venice.ai-generated photos
 pytest                                        # run tests (315 tests, all passing on SQLite)
 TEST_DATABASE_URL=postgresql+psycopg://... pytest  # run against Postgres (subset — LLM/pricing tests are mock-heavy and SQLite-only)
 pytest tests/test_items.py::test_item_crud_round_trip  # single test
@@ -27,7 +29,10 @@ pytest --cov=app tests/                       # with coverage
 
 ### Frontend (from `frontend/`)
 ```bash
-npm run dev             # regenerates certs, then starts Vite on :5173 (HTTPS)
+npm run dev             # starts Vite on :5173 (HTTPS). Cert generation now lives in
+                        # `bin/whis certs` (host-side). The in-container path of this
+                        # script is a deliberate no-op so the SAN can't capture the
+                        # container's bridge IP instead of the host's LAN IP.
 npm run build           # tsc --noEmit + vite build
 npm run lint            # eslint . (0 errors; CI blocks on errors)
 npm test                # vitest run (95 tests, all passing)
@@ -41,17 +46,24 @@ Test config lives in `frontend/vitest.config.ts` (jsdom, globals enabled, setup 
 
 ### Docker
 ```bash
+./bin/whis up                                       # recommended: auto-detects LAN IP, mDNS, certs
+./bin/whis up --profile worker                      # passthrough flag — equivalent of below
+./bin/whis nas up                                   # NAS deployment variant (Redis + worker + mdns always on)
+
+# Direct compose still works without the wrapper (CORS_ORIGINS falls back to localhost):
 docker compose up --build                           # default: backend + frontend, SQLite, synchronous
 docker compose --profile worker up --build          # + Redis + ARQ worker (async job queue)
 docker compose --profile postgres up --build        # + Postgres 16
 docker compose --profile postgres --profile worker up --build   # full v3.0 stack
-docker compose -f docker-compose.nas.yml up -d      # NAS deployment variant (Redis + worker always on)
+docker compose -f docker-compose.nas.yml up -d      # NAS deployment variant
 ```
 
 Both compose files require `SECRET_KEY` in the shell env or a sibling `.env` file. Generate one with:
 ```bash
 python -c "import secrets; print(secrets.token_urlsafe(64))"
 ```
+
+`bin/whis` writes `.env.generated` (gitignored) at the repo root with `WHIS_LAN_IP` + `WHIS_MDNS_HOSTNAME`. Compose interpolates these into `CORS_ORIGINS` and the `mdns` sidecar. On macOS the wrapper publishes `whis.local` via `dns-sd -P` (host-side, PID stashed in `.whis-mdns.pid`). On Linux the `mdns` profile activates an avahi-based sidecar with `network_mode: host`.
 
 ### CI
 GitHub Actions workflow at `.github/workflows/ci.yml` runs on push/PR to `main`:
@@ -62,9 +74,10 @@ GitHub Actions workflow at `.github/workflows/ci.yml` runs on push/PR to `main`:
 
 ### Certificates (required — app will not start without them)
 ```bash
-cd frontend && node scripts/generate-certs.js
-# then trust certs/whis-dev-ca.crt on each device (see README for OS steps)
+./bin/whis certs           # auto-detects LAN IP, includes <hostname>.local on Mac, drift-checks
+# then trust frontend/certs/whis-dev-ca.crt on each device (see README for OS steps)
 ```
+The script also runs cleanly via `cd frontend && node scripts/generate-certs.js`; the wrapper just adds the LAN-IP + extra-SAN env vars. Re-runs are a no-op when the SAN signature in `frontend/certs/.san-signature` still matches and the cert is < 350 days old.
 
 ## Architecture
 

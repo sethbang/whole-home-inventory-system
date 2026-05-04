@@ -22,6 +22,7 @@ from app.schemas_llm import (
     PRICE_ESTIMATE_SCHEMA,
     VISION_SUGGESTION_SCHEMA,
 )
+from app.services import llm_config as llm_config_service
 from app.settings import settings
 
 
@@ -53,6 +54,12 @@ def _llm_env(monkeypatch):
     monkeypatch.setattr(settings, "LLM_MODEL", "google/gemini-2.5-flash")
     monkeypatch.setattr(settings, "LLM_RESPONSE_HEALING", True)
     monkeypatch.setattr(settings, "VISION_LOG_IMAGE_HASHES_ONLY", True)
+    # The client constructor consults the effective-config cache for
+    # response_healing (and other fields); drop any cache populated by
+    # a previous test so per-test ``settings`` patches take effect.
+    llm_config_service.invalidate_cache()
+    yield
+    llm_config_service.invalidate_cache()
 
 
 def _install_stub(client: OpenAICompatibleClient, payload: dict):
@@ -110,6 +117,32 @@ def test_structured_completion_respects_response_healing_flag(monkeypatch):
     monkeypatch.setattr(settings, "LLM_RESPONSE_HEALING", False)
     client = OpenAICompatibleClient()
     create = _install_stub(client, {"low": 1.0, "median": 2.0, "high": 3.0, "sample_count": 0, "sources": [], "confidence": 0.5, "currency": "USD"})
+
+    import asyncio
+
+    asyncio.run(
+        client.structured_completion(
+            messages=[{"role": "user", "content": "x"}],
+            schema=PRICE_ESTIMATE_SCHEMA,
+        )
+    )
+    kwargs = create.await_args.kwargs
+    assert "plugins" not in kwargs
+    assert "plugins" not in kwargs.get("extra_body", {})
+
+
+def test_structured_completion_skips_plugins_for_non_openrouter(monkeypatch):
+    # Venice / OpenAI / Ollama reject unknown body keys; the
+    # response-healing plugin is OpenRouter-specific and must not be
+    # attached even when the toggle is on.
+    monkeypatch.setattr(settings, "LLM_BASE_URL", "https://api.venice.ai/api/v1")
+    monkeypatch.setattr(settings, "LLM_RESPONSE_HEALING", True)
+    client = OpenAICompatibleClient()
+    assert client.provider != "openrouter"
+    create = _install_stub(
+        client,
+        {"low": 1.0, "median": 2.0, "high": 3.0, "sample_count": 0, "sources": [], "confidence": 0.5, "currency": "USD"},
+    )
 
     import asyncio
 

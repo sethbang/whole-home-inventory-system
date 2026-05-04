@@ -18,8 +18,23 @@ from app import models, security
 from app.services.images import (
     ALLOWED_PIL_FORMATS,
     ImageService,
+    normalize_for_llm,
     validate_image_bytes,
 )
+
+
+def _mpo_bytes() -> bytes:
+    """Synthesize a multi-frame MPO byte stream using Pillow's MPO writer.
+
+    iPhone Camera produces these in HDR / Portrait / Live Photo modes —
+    a primary JPEG followed by one or more secondary JPEGs joined by
+    EXIF MPF metadata.
+    """
+    primary = Image.new("RGB", (64, 48), color="red")
+    secondary = Image.new("RGB", (64, 48), color="blue")
+    buf = io.BytesIO()
+    primary.save(buf, format="MPO", save_all=True, append_images=[secondary])
+    return buf.getvalue()
 
 
 def _png_bytes(size=(32, 32), color="red") -> bytes:
@@ -117,6 +132,32 @@ def test_validate_rejects_oversize_dimensions(monkeypatch):
         validate_image_bytes(img)
     assert exc_info.value.status_code == 400
     assert "dimensions" in exc_info.value.detail.lower()
+
+
+def test_validate_accepts_mpo_from_iphone_hdr():
+    """MPO containers (iPhone HDR/Portrait/Live Photo) must be accepted —
+    they're the default export format for many photo-library entries and
+    were 400'd as `Unsupported image format: MPO` before this fix.
+    """
+    fmt = validate_image_bytes(_mpo_bytes())
+    assert fmt == "MPO"
+
+
+def test_normalize_for_llm_strips_mpo_to_single_frame_jpeg():
+    """Most documented vision APIs (OpenAI, Anthropic) accept JPEG/PNG/WEBP
+    only — sending raw MPO leaks the secondary frame's bytes onto the wire
+    and confuses providers. `normalize_for_llm` must extract the primary
+    frame as a clean single-frame JPEG.
+    """
+    normalized = normalize_for_llm(_mpo_bytes())
+    with Image.open(io.BytesIO(normalized)) as img:
+        assert (img.format or "").upper() == "JPEG"
+        assert getattr(img, "n_frames", 1) == 1
+
+
+def test_normalize_for_llm_passes_jpeg_through_unchanged():
+    data = _jpeg_bytes()
+    assert normalize_for_llm(data) is data
 
 
 def test_validate_rejects_gif_format():

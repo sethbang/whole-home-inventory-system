@@ -49,6 +49,10 @@ images/local
 OR_docs/
 VALIDATION_PLAN.md
 
+# Wrapper-managed runtime state (bin/whis writes these per-host)
+.env.generated
+.whis-mdns.pid
+
 # Certificates and Keys
 *.key
 *.crt

@@ -127,31 +127,38 @@ cp .env.example .env   # optional — only needed if backend runs outside compos
 
 ### Certificates (required — app is HTTPS-only, even in dev)
 
+WHIS speaks HTTPS everywhere — it relies on browser features (service worker, camera, clipboard) that don't work over plain HTTP outside `localhost`. There are three deployment shapes; pick whichever matches what you're doing:
+
+| Shape | Cert source | Browser trust setup |
+|---|---|---|
+| **A. Dev / single host** (this section) | Local CA from `generate-certs.js`. Uses `mkcert` when present (recommended), falls back to OpenSSL otherwise. | mkcert auto-installs into the system trust store. Without mkcert: one-time CA install per device. |
+| **B. Household LAN with no public domain** | Same local CA, distributed to each device. Or Caddy's internal PKI when running `docker-compose.nas.yml`. | One-time CA install per device. See [DEPLOYMENT.md](DEPLOYMENT.md). |
+| **C. NAS / public-domain deployment** | **Real Let's Encrypt cert via Caddy + ACME.** | None — every device just works. **Recommended** for any household with a domain. See [DEPLOYMENT.md](DEPLOYMENT.md). |
+
+The recommended path for shape **A** is the wrapper script — it auto-detects your LAN IP, regenerates certs only when the SAN set actually changes, writes a generated env file consumed by compose, and (on macOS) publishes `whis.local` via Bonjour so any device on your LAN can use the same URL:
+
 ```bash
-cd frontend
-node scripts/generate-certs.js
+# Strongly recommended: install mkcert first. Without it the script
+# falls back to OpenSSL and the host browser will need a manual trust
+# step, plus Firefox won't trust the cert at all (it has its own store).
+brew install mkcert nss      # macOS — Linux: see https://github.com/FiloSottile/mkcert#installation
+
+./bin/whis certs             # generate certs only
+# — or —
+./bin/whis up                # generate certs + bring the dev stack up
 ```
 
 This produces:
-- `frontend/certs/cert.pem` + `key.pem` — server cert (SANs cover localhost + LAN IPs)
-- `frontend/certs/whis-dev-ca.crt` — root CA you install on each device
+- `frontend/certs/cert.pem` + `key.pem` — server cert (SANs cover `localhost`, `whis.local`, the auto-detected LAN IP, and your Mac's `<computer-name>.local`)
+- `frontend/certs/whis-dev-ca.crt` — root CA you install on each *additional* device
+- `frontend/certs/CERTIFICATE-SETUP.md` — per-OS install instructions for the additional-device step
+- `.env.generated` at the repo root — auto-generated; consumed by compose, ignored by git
 
-Install the CA cert per OS — see `frontend/certs/CERTIFICATE-SETUP.md` (the generator produces it automatically). Quick reference:
+When mkcert is on PATH, the script runs `mkcert -install` for you — the host running the script trusts the CA automatically (system store + Firefox/NSS). For other devices on your network, copy `whis-dev-ca.crt` over and follow the steps in `CERTIFICATE-SETUP.md`. From any of those devices, browse to `https://whis.local:5173` (mDNS) — or use the LAN-IP fallback URL the wrapper prints if `whis.local` doesn't resolve on that device.
 
-#### macOS
-```bash
-sudo security add-trusted-cert -d -r trustRoot \
-  -k /Library/Keychains/System.keychain frontend/certs/whis-dev-ca.crt
-```
+If mkcert is not available the script falls back to OpenSSL. The host then needs the same per-device install as everyone else (the setup doc carries the exact command for each OS).
 
-#### Linux
-```bash
-sudo cp frontend/certs/whis-dev-ca.crt /usr/local/share/ca-certificates/
-sudo update-ca-certificates
-```
-
-#### Windows
-Double-click `whis-dev-ca.crt` → Install Certificate → Local Machine → Trusted Root Certification Authorities.
+Power users can still call `cd frontend && node scripts/generate-certs.js` directly — it works the same way; the wrapper just adds the LAN-IP detection and mDNS publishing on top.
 
 ### Run the dev servers
 
@@ -163,14 +170,18 @@ uvicorn app.main:app --reload --port 27182 \
   --ssl-keyfile ../frontend/certs/key.pem \
   --ssl-certfile ../frontend/certs/cert.pem
 
-# Frontend (HTTPS on 5173, regenerates certs on start, proxies /api + /uploads)
+# Frontend (HTTPS on 5173, proxies /api + /uploads). Cert generation
+# now lives in `bin/whis certs` — `npm run dev` just starts vite and
+# expects the certs from a prior `bin/whis certs` run to be on disk.
 cd frontend
 npm run dev
 ```
 
-App is at https://localhost:5173 (LAN: https://&lt;your-ip&gt;:5173).
+App is at https://localhost:5173 (LAN: https://whis.local:5173, or the LAN-IP URL `bin/whis` prints).
 
 ## Docker (recommended for testing the full stack)
+
+The default `docker-compose.yml` is **deployment shape A** — your laptop running the whole stack locally for evaluation. It bind-mounts `frontend/certs/` into the frontend container so the certs from `bin/whis certs` are reused (the in-container path is now a no-op — the host wrapper is the sole sanctioned cert-gen entry point, since `os.networkInterfaces()` inside a container can't see your real LAN IP).
 
 ```bash
 # At the repo root — generate a SECRET_KEY once.
@@ -179,24 +190,34 @@ SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(64))')
 EOF
 grep -q '^\.env$' .gitignore || echo '.env' >> .gitignore
 
-# Default profile: backend + frontend + SQLite, jobs run synchronously.
-docker compose up --build
+# One-command happy path. Auto-detects your LAN IP, regenerates certs
+# (skipped on subsequent runs unless the SAN set drifts), publishes
+# `whis.local` via mDNS (Bonjour on Mac, avahi sidecar on Linux), and
+# brings up backend + frontend + SQLite.
+./bin/whis up
 
-# Async-jobs profile: + Redis + ARQ worker. Heavy ops (backup, vision,
-# pricing) run on the worker; the API responds with a JobReference and
-# the frontend polls /api/jobs/{id}.
-docker compose --profile worker up --build
+# Other profiles still pass through cleanly — bin/whis just shells out
+# to docker compose, so any flag you'd pass there works:
+./bin/whis up --profile worker            # + Redis + ARQ worker
+./bin/whis up --profile postgres          # + Postgres 16
+./bin/whis up --profile postgres --profile worker   # full v3.0 stack
 
-# Postgres profile: + Postgres 16 service.
-docker compose --profile postgres up --build
-
-# Full v3.0 stack: Postgres + Redis + worker.
-docker compose --profile postgres --profile worker up --build
+# `make up` is an alias if you prefer make:
+make up
 ```
+
+Browse to `https://whis.local:5173` from any device on your LAN. If `whis.local` doesn't resolve on a particular device, fall back to the LAN-IP URL the wrapper prints on startup. Both URLs are covered by the same cert SAN.
+
+If you'd rather skip the wrapper, plain `docker compose up` still works — `CORS_ORIGINS` falls back to `https://localhost:5173`, but you'll lose the LAN-IP entry and mDNS publishing. The wrapper is purely additive.
 
 The backend container's startup script (`scripts/bootstrap.py`) runs `alembic upgrade head` on every boot and reconciles legacy migration stamps from pre-2.0.0 databases.
 
-For NAS / production deployment, see [DEPLOYMENT.md](DEPLOYMENT.md) — uses `docker-compose.nas.yml` with Caddy fronting the stack and Redis + worker always on.
+### Production / NAS deployment (shapes B and C)
+
+For anything you want a household to actually use day-to-day — a NAS, a homelab box, a small server — see [DEPLOYMENT.md](DEPLOYMENT.md). The NAS compose file (`docker-compose.nas.yml`) puts Caddy on 80/443 and supports two TLS modes:
+
+- **Shape C — public domain (recommended):** set `WHIS_DOMAIN=whis.example.com` + `CADDY_ACME_EMAIL=…` and point DNS at your public IP. Caddy auto-issues a real Let's Encrypt cert; **no client-side trust setup, ever.**
+- **Shape B — LAN-only:** when `WHIS_DOMAIN` doesn't resolve publicly (e.g. the `whis.local` default), Caddy falls back to its internal CA. The root cert lives at `/data/caddy/pki/authorities/local/root.crt` inside the container; install it once per device — same UX as the per-device step in shape A, but the CA lives on the server.
 
 ## Quick start
 

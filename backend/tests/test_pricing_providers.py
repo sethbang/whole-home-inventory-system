@@ -355,6 +355,12 @@ def _llm_env(monkeypatch):
     monkeypatch.setattr(settings, "LLM_BASE_URL", "https://openrouter.ai/api/v1")
     monkeypatch.setattr(settings, "LLM_API_KEY", "sk-test")
     monkeypatch.setattr(settings, "LLM_PRICING_MODEL", "anthropic/claude-sonnet-4.6")
+    # The pricing provider reads from the LLMConfigService cache (v3.2);
+    # invalidate so the monkeypatched env values build a fresh effective
+    # config rather than picking up stale state from a prior test.
+    from app.services import llm_config as _llm_cfg
+
+    _llm_cfg.invalidate_cache()
 
 
 def _stub_llm_client(estimate_payload: dict, *, web_search_count: int = 2):

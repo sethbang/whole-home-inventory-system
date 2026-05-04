@@ -7,6 +7,196 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — dev-DB seeding via Venice.ai nano-banana-2
+
+- **`backend/scripts/seed_items.py`.** One-shot dev-only seeder that drops
+  a curated dozen of diverse `Item` rows (Electronics / Furniture /
+  Kitchen / Tools / Clothing across realistic household locations) with
+  1–3 product photos each generated on the fly via Venice.ai's
+  `nano-banana-2` image model. Idempotent: each seeded item is tagged
+  with `custom_fields.user_defined.seeded="v1"` so re-runs are no-ops.
+  Resolves the seed user via `SEED_USER=<username>`, falling back to a
+  `developer` user, then to a single-user fallback when only one user
+  exists. Mirrors the on-disk + DB conventions in
+  `backend/app/services/images.py` (filename, thumbnail path, relative
+  `uploads/...` form) and generates 512×512 WebP thumbnails inline so
+  the gallery renders immediately, even when the ARQ worker isn't
+  active.
+- **`backend/scripts/test_venice_image.py`.** Smoke test for the same
+  endpoint — generates one image, writes it under `backend/uploads/`,
+  prints timing + bytes. Run before the full seeder to confirm
+  credentials and image quality.
+- **`VENICE_API_KEY` env override** in `backend/.env.example`. The seed
+  scripts pick `VENICE_API_KEY` first, then fall back to
+  `LLM_API_KEY` + `LLM_BASE_URL` when the latter is pointed at Venice.
+
+### Added — zero-IP-config setup wrapper + mDNS
+
+- **`bin/whis` host-side wrapper** at the repo root (with a thin
+  `Makefile` alias). Subcommands `up`, `down`, `certs`, `logs`, `nas`.
+  Auto-detects the host's LAN IP from the OS's primary interface
+  (macOS: `route -n get default` + `ipconfig getifaddr`; Linux:
+  `ip route get 1.1.1.1`), filters out Docker bridge / link-local
+  ranges, and writes `WHIS_LAN_IP` into a generated env file
+  consumed by both `docker-compose.yml` and `docker-compose.nas.yml`.
+  Falls back to manual override via the `WHIS_LAN_IP` env var.
+- **mDNS publishing.** On macOS the wrapper publishes `whis.local` via
+  `dns-sd -P` as a backgrounded host process (necessary because Docker
+  Desktop's hidden Linux VM blocks multicast from a sidecar). On Linux
+  hosts an avahi-based sidecar (`mdns/`) runs as part of compose —
+  profile-gated `--profile mdns` in dev (off by default), always-on in
+  the NAS variant. Households can now use a uniform
+  `https://whis.local:5173` URL instead of memorising per-install IPs.
+- **Auto-detected `<computer-name>.local` SAN on macOS** via `scutil
+  --get LocalHostName`, so devices that resolve via macOS Bonjour
+  (rather than the wrapper's `whis.local` publisher) still validate.
+
+### Changed — zero-IP-config setup wrapper + mDNS
+
+- **Cert SAN list is now dynamic.**
+  `frontend/scripts/generate-certs.js` reads `WHIS_LAN_IP` and
+  `WHIS_EXTRA_SANS` from the environment instead of carrying a
+  hardcoded `192.168.1.15` and Docker bridge gateways. The OpenSSL
+  `[alt_names]` block is rebuilt at runtime from the same SAN list so
+  the mkcert and OpenSSL paths stay in lock-step.
+- **Cert drift check.** The script now writes a SHA-256 SAN signature
+  to `frontend/certs/.san-signature` after each run; subsequent runs
+  exit early if the signature still matches and the existing cert is
+  fresher than 350 days. Running `./bin/whis up` repeatedly is now
+  effectively free.
+- **In-container cert generation is now a no-op.** Previously the
+  frontend container's `npm run dev` re-ran the script, which saw the
+  container's bridge IPs (e.g. `192.168.156.3`) instead of the host's
+  LAN IP and produced unreachable SANs. The script's existing
+  `/.dockerenv` detector now exits 0 with a friendly note pointing at
+  `bin/whis certs` on the host. Vite continues to start because the
+  certs already exist on the bind-mounted volume.
+- **`CORS_ORIGINS` interpolated, not hardcoded.**
+  `docker-compose.yml` now reads
+  `https://${WHIS_LAN_IP:-localhost}:5173,https://localhost:5173,https://whis.local:5173,https://frontend:5173`.
+  The `:-localhost` fallback keeps a vanilla `docker compose up` working
+  if the wrapper isn't used. The NAS compose's `CORS_ORIGINS` was
+  already parameterised and is unchanged.
+
+### Notes — zero-IP-config setup wrapper + mDNS
+
+- Existing devices that already trusted `whis-dev-ca.crt` keep
+  validating: only the *server* cert changes when the LAN IP drifts;
+  the CA stays put. Deleting `frontend/certs/ca.crt` + `ca.key` is the
+  only thing that invalidates per-device trust.
+- The mDNS sidecar requires `network_mode: host` so multicast can
+  reach the LAN. On Synology DSM hosts that already publish via avahi,
+  set `WHIS_MDNS_HOSTNAME=whis-app` (or stop the host's avahi) to
+  avoid name collisions on `whis.local`.
+- Compose v2.16+ is required for the multi-`--env-file` flag the
+  wrapper uses. The wrapper version-checks and bails clearly on older
+  versions.
+
+### Added — v3.2 LLM operator dashboard
+
+- **In-app `/settings` page (admin-only)** that lets a household admin
+  configure the LLM provider end-to-end without touching `.env` or
+  restarting Docker. Surfaces base URL, API key, default/vision/pricing
+  models, daily cost caps, vision/pricing feature flags, response-healing
+  toggle, and today's per-feature spend on one screen.
+- **First-registered user is promoted to admin.** New
+  `User.is_admin` boolean column (Alembic
+  `20260503_0009_llm_config_and_admin`); subsequent registrations default
+  to `is_admin=False`. The dev-bypass user is admin so the new page is
+  reachable from a fresh dev stack. A new `require_admin` FastAPI
+  dependency guards the operator surface.
+- **`LLMConfig` singleton table** + new
+  `app/services/llm_config.py` service that resolves the effective
+  config as "DB row overrides env, env is fallback". Existing env-only
+  deployments keep working unchanged; the form pre-fills with the
+  currently-active env values so operators can see what's live.
+- **API key encrypted at rest** with Fernet, key derived from
+  `settings.SECRET_KEY` via HKDF-SHA256
+  (`app/security_crypto.py`). Plaintext is never returned to the
+  browser — the GET response carries only `api_key_set` + the last four
+  characters.
+- **Five new endpoints on `/api/llm-config*`:** `GET` (current effective
+  config, redacted), `PUT` (partial update), `GET /models` (proxies the
+  configured provider's `/v1/models` and annotates each entry with a
+  tri-state vision / strict-JSON capability heuristic), `POST /test`
+  (lists models, confirms configured names exist — no token spend), and
+  `POST /test-vision` (sends a tiny embedded JPEG through
+  `vision_completion` against a strict schema; stamps an `LLMUsage` row
+  tagged `feature="config_test"`). `/test*` accept an optional
+  `LLMConfigUpdate` body so the UI can validate prospective values
+  before saving.
+- **Capability heuristic (`app/llm/capabilities.py`)** walks each
+  `/v1/models` entry recursively for keys like `supportsVision`,
+  `multimodal`, `input_modalities`, `architecture.modality`,
+  `supportsResponseSchema`, etc. Returns `True` / `False` /
+  `None` (= "provider didn't expose a flag — use Test to verify"). No
+  hard-coded model name allowlists — the heuristic adapts as providers
+  add new models.
+- **Hot reload throughout.** `OpenAICompatibleClient` and
+  `DailyBudgetGuard` now read through the config service rather than
+  `settings.*`, so a UI-driven model swap, key rotation, or cap change
+  takes effect on the next vision/pricing request — no Docker restart
+  required. The vision and pricing routers also gate on the live
+  `vision_enabled` / `pricing_enabled` values rather than the static env
+  flag.
+- **Privacy guard preserved.** When `LLM_ALLOW_CLOUD=false` is set in
+  env, the save endpoint refuses any non-RFC1918 base URL. The privacy
+  kill-switch stays env-only on purpose — a runtime UI shouldn't be
+  able to disable itself.
+- **85 new tests** across `test_security_crypto`,
+  `test_llm_config_service`, `test_capabilities`, and
+  `test_llm_config_router`. Total backend test count: 400 (was 315 on
+  v3.1).
+
+### Fixed — v3.2 LLM operator dashboard
+
+- **Response-healing toggle now actually disables the OpenRouter
+  `plugins` injection**, and the plugin is **provider-gated** to
+  OpenRouter (`app/llm/openai_compatible.py`). Two bugs sat on top of
+  each other: the structured-completion path read
+  `settings.LLM_RESPONSE_HEALING` directly (the env value), so the new
+  UI toggle was a no-op even after a save; and the `plugins` key was
+  emitted unconditionally on every provider, which Venice / OpenAI /
+  Ollama reject with `400 Unrecognized key(s) in object: 'plugins'`.
+  Fix threads the effective `response_healing` flag through the client
+  constructor (with the same DB→env fallback the other fields use) and
+  gates the injection on `self.provider == "openrouter"` regardless of
+  the toggle. New regression test
+  `test_structured_completion_skips_plugins_for_non_openrouter`
+  covers the Venice case.
+- **Vision self-test image upgraded from a 4×4 px probe to a 256×256
+  JPEG** (`backend/assets/test_pixel.jpg`). Venice's image validator
+  rejects sub-resolution inputs with
+  `Supplied image did not pass validation checks.`; the new asset is
+  a small (~4 KB) red square + blue circle on an off-white background
+  — large enough to pass any provider's sanity check, simple enough
+  for the model to describe back through the strict schema.
+- **`POST /api/llm-config/test-vision` no longer 500s on a second run
+  the same day** (`app/routers/llm_config.py::test_vision`). The
+  endpoint blindly inserted a new `LLMUsage` row tagged
+  `feature="config_test"`, but `llm_usage` has
+  `UNIQUE(user_id, usage_date, feature)` — so re-running the Vision
+  test against any provider that successfully returned a response
+  would crash with `IntegrityError: UNIQUE constraint failed`. Fix
+  switches to the same select-then-upsert pattern
+  `DailyBudgetGuard.record_usage` already uses: tokens / cost /
+  request_count accumulate into the existing row. New regression
+  test `test_deep_test_second_run_same_day_accumulates_into_existing_row`
+  exercises two consecutive calls and asserts the row was updated
+  rather than duplicated.
+
+### Notes — v3.2 operator dashboard
+
+- Backups created on a host with `SECRET_KEY=A` and restored onto a host
+  with `SECRET_KEY=B` will fail to decrypt the stored API key and fall
+  back to env. Re-save the key in the UI to re-encrypt under the new
+  SECRET_KEY.
+- The pricing provider continues to log a nominal usage entry on
+  non-LLM provider paths (eBay Browse). Threading real numbers from the
+  provider wrapper is still the deferred-work item it was in v3.1.
+
+## [3.1.0] — pre-v3.2 baseline
+
 Four fixes surfaced by the v3.1 pre-push validation pass. All four ship
 together — the restore path fix is a data-loss guard that must land before
 any Postgres deployment takes real traffic.
