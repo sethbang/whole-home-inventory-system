@@ -72,15 +72,20 @@ key + cert pair at `/app/certs`. On a workstation with
 [mkcert](https://github.com/FiloSottile/mkcert) installed:
 
 ```bash
-cd frontend
-node scripts/generate-certs.js
-scp -r certs/ <nas>:/volume1/docker/whole-home-inventory-system/certs/
+./bin/whis certs                    # generate certs against this workstation's LAN IP
+scp -r frontend/certs/ <nas>:/volume1/docker/whole-home-inventory-system/certs/
 ```
 
-This produces `key.pem` + `cert.pem` (SANs cover the household's LAN IPs)
-plus a `whis-dev-ca.crt` you can install on devices for direct backend
-access. If mkcert isn't available the script falls back to an OpenSSL CA
-flow — same output, slightly more to install per-device.
+This produces `key.pem` + `cert.pem` (SANs cover `localhost`,
+`whis.local`, and the workstation's auto-detected LAN IP — see the
+`bin/whis` output for the exact list) plus a `whis-dev-ca.crt` you can
+install on devices for direct backend access. If mkcert isn't available
+the script falls back to an OpenSSL CA flow — same output, slightly
+more to install per-device.
+
+If you generate the certs on the workstation but deploy on a different-
+subnet NAS, set `WHIS_EXTRA_SANS=<nas-lan-ip>` before `bin/whis certs`
+so the SAN covers the deployment host's address too.
 
 ### 5. Trust Caddy's certs
 
@@ -107,9 +112,15 @@ flow — same output, slightly more to install per-device.
 
 ```bash
 cd /volume1/docker/whole-home-inventory-system
-docker compose -f docker-compose.nas.yml up -d --build
+./bin/whis nas up                      # auto-detects LAN IP, brings the stack up detached
 docker compose -f docker-compose.nas.yml logs backend | head -30
 ```
+
+The wrapper handles `WHIS_LAN_IP` detection on the NAS (so the always-on
+mDNS sidecar advertises against the right address) and writes
+`.env.generated`. Direct `docker compose -f docker-compose.nas.yml up -d`
+also works if you set `WHIS_LAN_IP` yourself or don't care about the
+sidecar's advertisement target.
 
 On first boot after upgrading from pre-2.0.0 databases, you should see `scripts/bootstrap.py` clear the legacy `cafb3d2c47a1` Alembic stamp and run the new baseline migration. Your existing data is preserved.
 
@@ -201,7 +212,7 @@ Means the container hit Alembic directly instead of `scripts/bootstrap.py`. Chec
 4. If you've changed `NAS_ORIGINS`, ensure the value matches the exact origin the browser uses (scheme, host, port)
 
 ### `bootstrap.py` fails with "expected TLS certs at /app/certs/..."
-The shared certs volume is empty. Regenerate on a workstation with mkcert installed (`cd frontend && node scripts/generate-certs.js`) and copy the `certs/` directory into `/volume1/docker/whole-home-inventory-system/certs/`.
+The shared certs volume is empty. Regenerate on a workstation with mkcert installed (`./bin/whis certs`) and copy the `frontend/certs/` directory into `/volume1/docker/whole-home-inventory-system/certs/`.
 
 ### Let's Encrypt issuance fails
 1. Confirm TCP 80 is forwarded to the NAS — ACME HTTP-01 requires it even if you only serve HTTPS.

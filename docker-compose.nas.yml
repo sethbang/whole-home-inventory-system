@@ -56,8 +56,10 @@ services:
       - /volume1/docker/whole-home-inventory-system/uploads:/app/backend/uploads
       - /volume1/docker/whole-home-inventory-system/backups:/app/backend/backups
       # Shared certs volume. Generate once on a workstation with mkcert
-      # installed via `cd frontend && node scripts/generate-certs.js`, then
-      # copy the `certs/` directory into the path below.
+      # installed via `./bin/whis certs`, then copy `frontend/certs/` into
+      # the path below. (The legacy `cd frontend && node
+      # scripts/generate-certs.js` invocation still works for power users
+      # who'd rather not use the wrapper.)
       - /volume1/docker/whole-home-inventory-system/certs:/app/certs:ro
     healthcheck:
       test: ["CMD", "curl", "-kfsS", "https://localhost:27182/api/health"]
@@ -128,6 +130,23 @@ services:
       retries: 5
     networks:
       - whole-home-inventory-system-network
+    restart: unless-stopped
+
+  # mDNS sidecar — advertises `whis.local` (or whatever `WHIS_MDNS_HOSTNAME`
+  # is set to) on the LAN, pointing at this NAS host. Always-on for NAS
+  # because mDNS discovery is the primary way household devices reach the
+  # service without DNS-server config. `network_mode: host` is required for
+  # multicast to escape the bridge driver. Conflicts with a pre-existing
+  # avahi daemon on the host (Synology DSM publishes its own services) — set
+  # `WHIS_MDNS_HOSTNAME=whis-app` (or stop the host's avahi) if collisions
+  # arise. See DEPLOYMENT.md for the conflict-resolution procedure.
+  mdns:
+    build:
+      context: ./mdns
+    network_mode: host
+    environment:
+      - WHIS_MDNS_PORT=443
+      - WHIS_MDNS_HOSTNAME=${WHIS_MDNS_HOSTNAME:-whis}
     restart: unless-stopped
 
   worker:

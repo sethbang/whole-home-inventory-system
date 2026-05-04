@@ -63,3 +63,10 @@ tenacity>=9,<10
 # gates. Ships by default so switching on the features is just a
 # config change.
 openai>=1.57,<2
+
+# --- v3.2 additions -----------------------------------------------------------
+# Fernet encryption + HKDF for the operator-editable LLM API key
+# (app/security_crypto.py). Already pulled in transitively by
+# pyjwt[crypto], but pinned explicitly so pip-audit sees it directly
+# and the dependency stays load-bearing-visible if pyjwt's extras change.
+cryptography>=46,<47
