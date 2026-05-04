@@ -128,7 +128,7 @@ The modern path:
 After the stack is up:
 
 - Both services healthy: `docker compose -f docker-compose.nas.yml ps` reports `healthy` for `backend` and `caddy` within ~30s.
-- Backend direct health: `docker compose -f docker-compose.nas.yml exec backend curl -kfsS https://localhost:27182/api/health` → `{"status":"healthy","version":"2.0.0"}`.
+- Backend direct health: `docker compose -f docker-compose.nas.yml exec backend curl -kfsS https://localhost:27182/api/health` → `{"status":"healthy","version":"3.1.0"}`.
 - Frontend through Caddy: open `https://${WHIS_DOMAIN}/` in a browser. The SPA should load and `/api/...` requests should succeed same-origin.
 
 ## HTTPS and external exposure

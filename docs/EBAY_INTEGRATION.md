@@ -1,40 +1,29 @@
-# eBay Integration Feature
+# eBay Integration
 
-## Overview
+WHIS interacts with eBay along two distinct surfaces, both implemented as of v3.1:
 
-The eBay integration feature enables users to export their WHIS inventory items directly to eBay for listing. This feature is being implemented in two phases to provide immediate value while building towards a fully automated solution.
+1. **Listing assist (CSV export)** — composes per-item or bulk eBay listing CSVs from inventory. Operator uploads to eBay Seller Hub manually. Lives under `backend/app/ebay/` and `frontend/src/components/EbayFields.tsx`. Shipped in v2.3.
+2. **Pricing (Browse API)** — server-to-server lookups of comparable listings via eBay's `Buy/Browse` API, used by the v3.1 `PricingService` to estimate item resale value. Lives at `backend/app/pricing/provider_ebay_browse.py`. Shipped in v3.1.
 
-## Current Implementation Status
+These are entirely separate code paths with different auth flows, different data shapes, and different operational implications. Read both sections.
 
-### Completed Features
-- eBay-specific fields integration in item details
-- React components for eBay listing configuration
-- Category lookup functionality
-- Basic field validation
-- Test coverage for components and API
+---
+
+## 1. Listing assist (CSV export)
 
 ### Components
-1. **EbayFields Component** (`frontend/src/components/EbayFields.tsx`)
-   - Manages eBay-specific listing details
-   - Supports listing format selection (Auction/Fixed Price)
-   - Handles condition selection
-   - Manages pricing options
-   - Configures shipping settings
-   - Handles returns policy
-   - Supports payment methods
 
-2. **eBay API Client** (`frontend/src/api/ebay.ts`)
-   - Category lookup functionality
-   - Field updates
-   - Export preparation
+- **`EbayFields` component** (`frontend/src/components/EbayFields.tsx`) — per-item UI for eBay-specific listing details (category, condition, listing format, shipping, returns, payment methods, item specifics).
+- **`EbayFields` schema** (`backend/app/ebay/schemas.py`) — Pydantic v2 model that defines the strict shape of what gets stored on `Item.custom_fields.ebay`.
+- **Category mapping** (`backend/app/ebay/category_mapping.py`) — maps WHIS categories to eBay category IDs and emits sensible item-specifics templates per category.
+- **CSV formatter** (`backend/app/ebay/formatter.py`) — renders one or many items into a Seller-Hub-compatible CSV stream.
+- **Router** (`backend/app/routers/ebay.py`) — `/api/ebay/categories`, `/api/ebay/csv`, etc. CSV download streams directly (since v2.3) — no intermediate file is created on disk.
+- **Frontend bulk export** — Dashboard supports multi-select → "Export to eBay CSV" producing a single multi-row CSV.
 
-3. **Backend Integration** (`backend/app/ebay/`)
-   - Category mapping system
-   - Schema definitions
-   - API endpoints
+### Storage
 
-### Data Structure
-The eBay fields are stored in the item's custom_fields object:
+eBay-specific fields are stored under `Item.custom_fields.ebay` (a strict-typed JSON sub-object). The `custom_fields` column is otherwise free-form for `user_defined` keys — see `backend/app/schemas.py` for the top-level shape (`ebay` / `facebook` / `user_defined`).
+
 ```typescript
 interface EbayFieldsData {
   category_id?: string;
@@ -55,113 +44,92 @@ interface EbayFieldsData {
 }
 ```
 
-## Next Steps
+### Tests
 
-### Immediate Priorities
-1. **Bulk Export Implementation**
-   - Create bulk selection interface
-   - Implement CSV export format
-   - Add export progress tracking
-   - Support batch processing
+- Frontend: `frontend/src/components/__tests__/EbayFields.test.tsx`, `frontend/src/api/__tests__/ebay.test.ts`, `frontend/src/pages/__tests__/ItemDetail.test.tsx`
+- Backend: `backend/tests/test_ebay.py` (formatter + router round-trip)
 
-2. **Category Mapping Enhancement**
-   - Improve category suggestions
-   - Add category search
-   - Support subcategories
-   - Cache common categories
+### Limitations
 
-3. **Image Integration**
-   - Implement image URL generation
-   - Add image order management
-   - Support eBay image requirements
-   - Handle image optimization
+- CSV import is manual — operator uploads to Seller Hub themselves.
+- No real-time inventory sync, no listing edits via API.
+- Image URLs are not yet emitted in the CSV (Phase 2).
 
-### Future Enhancements (Phase 2)
-1. **Direct API Integration**
-   - OAuth implementation
-   - Real-time listing creation
-   - Inventory synchronization
-   - Order management
+---
 
-2. **Advanced Features**
-   - Listing templates
-   - Bulk pricing rules
-   - Automated category mapping
-   - Performance analytics
+## 2. Pricing (Browse API)
 
-## Testing
+### Components
 
-### Component Tests
-- `frontend/src/components/__tests__/EbayFields.test.tsx`
-  - Field population
-  - User interactions
-  - Validation behavior
-  - State management
+- **`EbayBrowseProvider`** (`backend/app/pricing/provider_ebay_browse.py`) — issues `client_credentials` OAuth, hits `/buy/browse/v1/item_summary/search`, parses results into our `PriceSource` shape.
+- **`PricingService`** (`backend/app/pricing/service.py`) — orchestrates provider priority (`PRICING_PROVIDERS=ebay,llm` by default), cache reads/writes, and per-item stamping.
+- **`PriceCache`** (`backend/app/models.py`) — composite-PK table keyed by `(identity_hash, provider)`. Holds the JSON-serialized `PriceEstimate` envelope per provider, with `expires_at` for TTL.
+- **Router** (`backend/app/routers/pricing.py`) — `/api/pricing/estimate`, `/refresh/{id}`, `/estimate/{id}`. Routes through ARQ when `REDIS_URL` is set, sync otherwise.
 
-### Integration Tests
-- `frontend/src/pages/__tests__/ItemDetail.test.tsx`
-  - eBay fields integration
-  - Category lookup
-  - Form submission
-  - API interactions
+### Auth
 
-### API Tests
-- `frontend/src/api/__tests__/ebay.test.ts`
-  - API client methods
-  - Error handling
-  - Response parsing
+OAuth `client_credentials` (server-to-server). WHIS never acts on behalf of an eBay end user — there is no `authorization_code` flow, no per-user eBay account linking, and no buyer/bidder session.
 
-## Configuration
+Required env (in `backend/.env` or root `.env` for compose):
 
-### Required Settings
-- eBay category mappings
-- Default listing settings
-- Image URL base path
-- Export preferences
+```bash
+EBAY_APP_ID=YourCo-yourapp-PRD-xxxxxxxxx-xxxxxxxx
+EBAY_CERT_ID=PRD-xxxxxxxxxxxx-xxxx-xxxx-xxxx-xxxx
+EBAY_MARKETPLACE_ID=EBAY_US           # or EBAY_GB, EBAY_DE, ...
+EBAY_ENVIRONMENT=production           # or sandbox
+```
 
-### Optional Settings
-- Default shipping options
-- Return policy defaults
-- Payment preferences
+Sandbox keys (`SBX-` prefix) require `EBAY_ENVIRONMENT=sandbox` — production keys (`PRD-` prefix) require `EBAY_ENVIRONMENT=production`. Mismatch yields a 401 `invalid_client`.
 
-## Security Considerations
+### Marketplace Account Deletion exemption
 
-- Secure storage of eBay credentials (Phase 2)
-- Safe handling of listing data
-- Protected image access
-- Rate limiting for API calls
+WHIS holds an exemption from eBay's [Marketplace User Account Deletion notification system](https://developer.ebay.com/marketplace-account-deletion) on the basis that **we persist no eBay user data**. The exemption is load-bearing — keep it valid:
 
-## Current Limitations
+- The Browse API response includes a `seller` object (`username`, `userId`, `feedbackPercentage`, `email`). Our parser at `provider_ebay_browse.py:_parse_item_summaries` deliberately ignores it.
+- We persist only the listing fields: `title`, `itemWebUrl`, `price`, `condition`, plus `source_site: "ebay"`. These land in `PriceCache.payload` and the `PriceSource` list returned to the UI.
+- Listing titles are seller-authored copy but not personal data per eBay's deletion scope.
+- A regression test (`backend/tests/test_pricing_providers.py::test_ebay_parser_drops_seller_pii_for_deletion_exemption`) feeds the parser a Browse response laden with seller PII and asserts none of it survives. **If that test ever fails, the exemption is invalidated** — you must reverse the exemption in the eBay developer portal and stand up the deletion-notification callback before shipping the change.
 
-1. Manual CSV upload required
-2. No real-time sync
-3. Limited automation
-4. Basic error handling
+If you ever expand to a User-context API (Sell APIs, Trading API on behalf of users), the exemption no longer applies.
 
-These limitations will be addressed in Phase 2 through direct API integration.
+### Tests
 
-## Development Guidelines
+- `backend/tests/test_pricing_providers.py` — full round-trip via `httpx.MockTransport`: OAuth, search, aggregation, rate-limit handling, no-result, zero-priced filtering, token caching, and the deletion-exemption regression.
+- `backend/tests/test_pricing_service.py` — provider routing, cache hit/miss, force-refresh.
+- `backend/tests/test_pricing_router.py` — HTTP layer.
 
-1. **Component Updates**
-   - Follow existing component patterns
-   - Maintain type safety
-   - Include test coverage
-   - Document changes
+### Operational notes
 
-2. **API Integration**
-   - Use existing client structure
-   - Handle errors gracefully
-   - Include retry logic
-   - Validate responses
+- Default rate limiting on the Browse API is generous; we surface 429s as `PriceProviderRateLimited` and fall through to the next provider in the priority list (typically the LLM provider).
+- `PRICING_CACHE_DAYS` (default 14) controls how long aggregated estimates are retained. After expiry the next request re-queries.
+- Daily LLM cost cap (`PRICING_DAILY_COST_CAP_USD`) does not apply to the eBay provider — Browse API has no per-call dollar cost. The cap only governs the LLM-provider fallback.
 
-3. **Testing**
-   - Write tests for new features
-   - Update existing tests as needed
-   - Include error cases
-   - Test edge conditions
+---
+
+## Roadmap
+
+### Shipped (current)
+
+- ✅ Per-item eBay listing CSV export (v2.3)
+- ✅ Bulk multi-row CSV export from Dashboard (v2.3)
+- ✅ Strict-typed `EbayFields` schema, persisted on `custom_fields.ebay` (v2.3)
+- ✅ Streaming CSV download — no intermediate disk file (v2.3)
+- ✅ Browse API pricing provider with OAuth client_credentials, cache, P10/P50/P90 aggregation (v3.1)
+- ✅ Marketplace Account Deletion exemption with regression-tested PII filter (v3.1)
+
+### Future
+
+- Image URLs in the CSV (currently CSV references images by filename; Seller Hub needs publicly-reachable URLs).
+- Sell/Inventory API integration (`authorization_code` OAuth, real-time listing creation, inventory sync, order management). This would invalidate the deletion-notification exemption — implement only after standing up the callback listener.
+- Trading API for legacy listing operations.
+- Cached category lookups and category-suggestion improvements.
+
+---
 
 ## Resources
 
 - [eBay Developer Documentation](https://developer.ebay.com/docs)
-- [Inventory API Reference](https://developer.ebay.com/api-docs/sell/inventory/resources/methods)
-- [Category API Reference](https://developer.ebay.com/api-docs/commerce/taxonomy/resources/methods)
+- [Browse API (used by v3.1 pricing)](https://developer.ebay.com/api-docs/buy/browse/resources/methods)
+- [Inventory API (future Sell-side integration)](https://developer.ebay.com/api-docs/sell/inventory/resources/methods)
+- [Taxonomy / Category API](https://developer.ebay.com/api-docs/commerce/taxonomy/resources/methods)
+- [Marketplace User Account Deletion notifications](https://developer.ebay.com/marketplace-account-deletion)
