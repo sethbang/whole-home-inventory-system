@@ -48,6 +48,14 @@ export type PriceSource = Schemas['PriceSource'];
 export type PriceEstimate = Schemas['PriceEstimate'];
 export type PriceEstimateEnvelope = Schemas['PriceEstimateEnvelope'];
 
+// --- LLM operator dashboard (v3.2) -----------------------------------------
+export type LLMConfigRead = Schemas['LLMConfigRead'];
+export type LLMConfigUpdate = Schemas['LLMConfigUpdate'];
+export type LLMModelEntry = Schemas['LLMModelEntry'];
+export type LLMModelListResponse = Schemas['LLMModelListResponse'];
+export type LLMTestResponse = Schemas['LLMTestResponse'];
+export type LLMVisionTestResponse = Schemas['LLMVisionTestResponse'];
+
 // --- eBay -------------------------------------------------------------------
 export type EbayFields = Schemas['EbayFields'];
 export type EbayCategory = Schemas['EbayCategory'];

@@ -14,6 +14,9 @@ const DEV_USER: User = {
   email: 'admin@example.com',
   username: 'admin',
   is_active: true,
+  // v3.2: dev bypass user is admin so /settings is reachable without
+  // registering a real user.
+  is_admin: true,
   created_at: new Date().toISOString(),
 };
 

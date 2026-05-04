@@ -14,7 +14,7 @@ docker compose down
 docker compose up --build
 ```
 
-The frontend will be available at `https://localhost:5173` or your local IP (e.g., `https://192.168.1.15:5173`).
+The frontend will be available at `https://localhost:5173`, at `https://whis.local:5173` from any device on the LAN (mDNS-published by `bin/whis up`), or at the auto-detected LAN-IP fallback URL the wrapper prints on startup.
 
 ### HTTPS Certificate
 

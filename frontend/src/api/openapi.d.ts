@@ -688,6 +688,81 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/llm-config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Config */
+        get: operations["read_config_api_llm_config_get"];
+        /** Update Config */
+        put: operations["update_config_api_llm_config_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/llm-config/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Models */
+        get: operations["list_models_api_llm_config_models_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/llm-config/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Test Connection
+         * @description Quick: verify URL+key, confirm configured models exist.
+         */
+        post: operations["test_connection_api_llm_config_test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/llm-config/test-vision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Test Vision
+         * @description Deep: send a tiny image through vision_completion with a strict schema.
+         */
+        post: operations["test_vision_api_llm_config_test_vision_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -1320,6 +1395,163 @@ export interface components {
          */
         JobStatus: "queued" | "running" | "complete" | "failed" | "not_found";
         /**
+         * LLMConfigRead
+         * @description GET /api/llm-config response.
+         *
+         *     The plaintext API key is never returned. ``api_key_last4`` shows
+         *     the last four characters so the operator can confirm which key is
+         *     active without ever sending the full secret to the browser; the
+         *     full secret is also redacted from logs by the audit logger.
+         *     ``sources`` reports per-field provenance — ``db`` (set in the UI),
+         *     ``env`` (still inheriting from the env var), or ``default``
+         *     (no value set anywhere).
+         */
+        LLMConfigRead: {
+            /** Base Url */
+            base_url: string;
+            /** Api Key Set */
+            api_key_set: boolean;
+            /** Api Key Last4 */
+            api_key_last4?: string | null;
+            /** Model */
+            model: string;
+            /** Vision Model */
+            vision_model: string;
+            /** Pricing Model */
+            pricing_model: string;
+            /** Timeout Seconds */
+            timeout_seconds: number;
+            /** Response Healing */
+            response_healing: boolean;
+            /** Vision Enabled */
+            vision_enabled: boolean;
+            /** Pricing Enabled */
+            pricing_enabled: boolean;
+            /** Vision Daily Cap Usd */
+            vision_daily_cap_usd: number;
+            /** Pricing Daily Cap Usd */
+            pricing_daily_cap_usd: number;
+            /** Sources */
+            sources: {
+                [key: string]: string;
+            };
+            /**
+             * Today Vision Cost Usd
+             * @default 0
+             */
+            today_vision_cost_usd?: number;
+            /**
+             * Today Pricing Cost Usd
+             * @default 0
+             */
+            today_pricing_cost_usd?: number;
+        };
+        /**
+         * LLMConfigUpdate
+         * @description PUT /api/llm-config request body.
+         *
+         *     Every field is optional. ``None`` means "leave unchanged"; an
+         *     empty string or 0 (where applicable) means "clear back to env".
+         *     The API key has its own behavior:
+         *         * ``api_key`` omitted → leave stored value untouched
+         *         * ``api_key`` empty string → clear stored value, fall back to env
+         *         * ``api_key`` non-empty string → encrypt and persist as the new key
+         */
+        LLMConfigUpdate: {
+            /** Base Url */
+            base_url?: string | null;
+            /** Api Key */
+            api_key?: string | null;
+            /** Model */
+            model?: string | null;
+            /** Vision Model */
+            vision_model?: string | null;
+            /** Pricing Model */
+            pricing_model?: string | null;
+            /** Timeout Seconds */
+            timeout_seconds?: number | null;
+            /** Response Healing */
+            response_healing?: boolean | null;
+            /** Vision Enabled */
+            vision_enabled?: boolean | null;
+            /** Pricing Enabled */
+            pricing_enabled?: boolean | null;
+            /** Vision Daily Cap Usd */
+            vision_daily_cap_usd?: number | null;
+            /** Pricing Daily Cap Usd */
+            pricing_daily_cap_usd?: number | null;
+        };
+        /**
+         * LLMModelEntry
+         * @description One entry in GET /api/llm-config/models.
+         *
+         *     ``supports_vision`` and ``supports_strict_json`` are tri-state:
+         *     ``True``/``False``/``None``. ``None`` means the provider's
+         *     /v1/models response didn't carry a capability flag we recognized;
+         *     the operator should run the deep test to verify.
+         */
+        LLMModelEntry: {
+            /** Id */
+            id: string;
+            /** Owned By */
+            owned_by?: string | null;
+            /** Supports Vision */
+            supports_vision?: boolean | null;
+            /** Supports Strict Json */
+            supports_strict_json?: boolean | null;
+        };
+        /**
+         * LLMModelListResponse
+         * @description GET /api/llm-config/models response.
+         */
+        LLMModelListResponse: {
+            /** Models */
+            models: components["schemas"]["LLMModelEntry"][];
+        };
+        /**
+         * LLMTestResponse
+         * @description POST /api/llm-config/test response.
+         *
+         *     ``ok`` rolls up the overall result; ``checks`` carries the
+         *     individual sub-checks so the UI can render a clear breakdown.
+         */
+        LLMTestResponse: {
+            /** Ok */
+            ok: boolean;
+            /** Base Url */
+            base_url: string;
+            /** Model */
+            model: string;
+            /** Detail */
+            detail?: string | null;
+            /** Checks */
+            checks?: {
+                [key: string]: unknown;
+            };
+        };
+        /**
+         * LLMVisionTestResponse
+         * @description POST /api/llm-config/test-vision response.
+         */
+        LLMVisionTestResponse: {
+            /** Ok */
+            ok: boolean;
+            /** Model */
+            model: string;
+            /** Detail */
+            detail?: string | null;
+            /** Parsed Response */
+            parsed_response?: {
+                [key: string]: unknown;
+            } | null;
+            /** Usage */
+            usage?: {
+                [key: string]: unknown;
+            } | null;
+            /** Cost Usd */
+            cost_usd?: number | null;
+        };
+        /**
          * PriceEstimate
          * @description Structured resale estimate returned by a ``PriceProvider``.
          */
@@ -1486,6 +1718,11 @@ export interface components {
             id: string;
             /** Is Active */
             is_active: boolean;
+            /**
+             * Is Admin
+             * @default false
+             */
+            is_admin?: boolean;
             /**
              * Created At
              * Format: date-time
@@ -2906,6 +3143,145 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobReference"] | components["schemas"]["PriceEstimateEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_config_api_llm_config_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LLMConfigRead"];
+                };
+            };
+        };
+    };
+    update_config_api_llm_config_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LLMConfigUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LLMConfigRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_models_api_llm_config_models_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LLMModelListResponse"];
+                };
+            };
+        };
+    };
+    test_connection_api_llm_config_test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["LLMConfigUpdate"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LLMTestResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_vision_api_llm_config_test_vision_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["LLMConfigUpdate"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LLMVisionTestResponse"];
                 };
             };
             /** @description Validation Error */

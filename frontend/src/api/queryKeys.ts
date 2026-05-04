@@ -81,4 +81,10 @@ export const queryKeys = {
     estimate: (itemId: string) =>
       [...queryKeys.pricing.all, 'estimate', itemId] as const,
   },
+  llmConfig: {
+    // v3.2: operator-editable LLM provider config.
+    all: ['llm-config'] as const,
+    detail: () => [...queryKeys.llmConfig.all, 'detail'] as const,
+    models: () => [...queryKeys.llmConfig.all, 'models'] as const,
+  },
 } as const;

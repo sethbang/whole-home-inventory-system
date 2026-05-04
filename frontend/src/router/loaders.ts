@@ -17,6 +17,7 @@ import type { LoaderFunctionArgs } from 'react-router-dom';
 import { analytics } from '../api/analytics';
 import { backups } from '../api/backups';
 import { items } from '../api/items';
+import { llmConfig } from '../api/llmConfig';
 import { queryKeys } from '../api/queryKeys';
 import type { SearchFilters } from '../api/types';
 import { queryClient } from '../queryClient';
@@ -110,5 +111,21 @@ export async function backupsLoader(): Promise<null> {
     queryKey: queryKeys.backups.list(),
     queryFn: async () => (await backups.list()).backups,
   });
+  return null;
+}
+
+export async function settingsLoader(): Promise<null> {
+  // Don't await — a non-admin will be redirected by AdminLayout before
+  // the page renders, and we don't want to surface their 403 as a
+  // loader error. Catch is a safety net.
+  queryClient
+    .ensureQueryData({
+      queryKey: queryKeys.llmConfig.detail(),
+      queryFn: llmConfig.get,
+    })
+    .catch(() => {
+      // Settings page handles its own loading state if the prefetch
+      // fails (e.g. the user isn't actually admin server-side).
+    });
   return null;
 }

@@ -18,8 +18,9 @@ import {
   dashboardLoader,
   itemDetailLoader,
   reportsLoader,
+  settingsLoader,
 } from './loaders';
-import { ProtectedLayout, RootLayout } from './layouts';
+import { AdminLayout, ProtectedLayout, RootLayout } from './layouts';
 
 export const router = createBrowserRouter([
   {
@@ -85,6 +86,20 @@ export const router = createBrowserRouter([
               const mod = await import('../pages/Backups');
               return { Component: mod.default };
             },
+          },
+          {
+            element: <AdminLayout />,
+            errorElement: <RouteErrorBoundary />,
+            children: [
+              {
+                path: 'settings',
+                loader: settingsLoader,
+                lazy: async () => {
+                  const mod = await import('../pages/Settings');
+                  return { Component: mod.default };
+                },
+              },
+            ],
           },
         ],
       },

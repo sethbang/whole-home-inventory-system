@@ -13,6 +13,13 @@ const navigation = [
   { name: 'Backups', href: '/backups' },
 ];
 
+// v3.2: admin-only entries are merged into ``navigation`` at render time
+// when ``user.is_admin`` is true. Keeping them out of the base array means
+// non-admin users never see the link.
+const adminNavigation = [
+  { name: 'Settings', href: '/settings' },
+];
+
 function classNames(...classes: string[]) {
   return classes.filter(Boolean).join(' ');
 }
@@ -21,6 +28,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const { isDevMode, toggleDevMode } = useDevMode();
   const location = useLocation();
+  const visibleNavigation = user?.is_admin
+    ? [...navigation, ...adminNavigation]
+    : navigation;
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -36,7 +46,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     </Link>
                   </div>
                   <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
-                    {navigation.map((item) => (
+                    {visibleNavigation.map((item) => (
                       <Link
                         key={item.name}
                         to={item.href}
@@ -119,7 +129,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
             <Disclosure.Panel className="sm:hidden">
               <div className="space-y-1 pb-3 pt-2">
-                {navigation.map((item) => (
+                {visibleNavigation.map((item) => (
                   <Link
                     key={item.name}
                     to={item.href}
