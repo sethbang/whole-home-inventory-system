@@ -1,6 +1,6 @@
 # WHIS Development Guide
 
-This guide provides detailed information for developers working on the WHIS (Whole-Home Inventory System) project.
+This guide provides detailed information for developers working on WHIS (Whole-Home Inventory System), currently at v3.1.0.
 
 ## Table of Contents
 
@@ -17,80 +17,94 @@ This guide provides detailed information for developers working on the WHIS (Who
 
 ### Prerequisites
 
-- Python 3.11+ (CI runs on 3.11 and 3.12)
+- Python 3.11 or 3.12 (CI matrix runs both)
 - Node.js 20+ (CI uses 20)
 - Git
 - VS Code (recommended)
-- Docker + Docker Compose (recommended for local end-to-end testing)
+- Docker + Docker Compose for the full-stack workflow
 
 ### VS Code Extensions
 
-Recommended extensions for development:
-- Python
-- Pylance
-- ESLint
-- Prettier
-- TypeScript and JavaScript
+- Python, Pylance
+- ESLint, Prettier
 - Tailwind CSS IntelliSense
 - Docker
 - SQLite Viewer
 
-### Environment Setup Steps
+### Environment setup steps
 
-1. **Clone and Setup**
 ```bash
-# Clone repository
-git clone https://github.com/yourusername/whole-home-inventory-system
+# Clone
+git clone https://github.com/sethbang/whole-home-inventory-system
 cd whole-home-inventory-system
 
-# Create Python virtual environment
+# Backend venv + deps
 cd backend
 python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+source venv/bin/activate                       # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
-# Install frontend dependencies
+# Frontend deps
 cd ../frontend
 npm install
-```
 
-2. **Development Certificates**
-```bash
-# Generate certificates
-cd frontend
+# Dev TLS certs (app is HTTPS-only, even in dev)
 node scripts/generate-certs.js
-
-# Install certificates (see CERTIFICATE-SETUP.md for OS-specific instructions)
+# Install certs/whis-dev-ca.crt per OS — see frontend/certs/CERTIFICATE-SETUP.md
 ```
 
-3. **Environment config**
+### Backend env config
+
 ```bash
 cd ../backend
 cp .env.example .env
-# Generate a SECRET_KEY and paste into .env:
 python -c "import secrets; print(secrets.token_urlsafe(64))"
+# Paste the output into SECRET_KEY in .env.
 
-# For quick local dev against the real auth flow, leave BYPASS_AUTH=false.
-# For convenience during UI exploration, you can set BYPASS_AUTH=true in .env
-# (settings fail-fast is skipped when bypass is on).
+# For real auth flow, leave BYPASS_AUTH=false (default).
+# For one-off UI exploration, set BYPASS_AUTH=true — settings fail-fast
+# is skipped in that mode.
 ```
 
-4. **Database Setup**
+### Database setup
+
 ```bash
-# bootstrap.py handles both fresh DBs and legacy-stamped DBs (pre-2.0.0)
+# bootstrap.py reconciles legacy stamps from pre-2.0.0 databases and
+# is idempotent — safe to re-run.
 python scripts/bootstrap.py
 
-# Only needed if BYPASS_AUTH=false and you want a known local user:
+# Optional dev seed (only needed when BYPASS_AUTH=false):
 python create_dev_user.py
 ```
 
-4. **IDE Configuration**
+### Optional v3.1 LLM/eBay env
 
-VS Code settings.json:
+If you'll exercise the vision auto-fill or pricing features locally, add to `backend/.env`:
+
+```bash
+LLM_BASE_URL=https://openrouter.ai/api/v1   # or http://ollama:11434/v1
+LLM_API_KEY=sk-...
+LLM_MODEL=google/gemini-2.5-flash
+# Optional model-per-feature overrides:
+LLM_VISION_MODEL=google/gemini-3-flash-preview
+LLM_PRICING_MODEL=anthropic/claude-sonnet-4.6
+VISION_ENABLED=true
+PRICING_ENABLED=true
+VISION_DAILY_COST_CAP_USD=5.0
+PRICING_DAILY_COST_CAP_USD=10.0
+# eBay Browse API (optional but the priority pricing provider):
+EBAY_APP_ID=YourCo-yourapp-PRD-...
+EBAY_CERT_ID=PRD-...
+```
+
+The settings module fail-fasts: if `VISION_ENABLED=true` without `LLM_BASE_URL`, the app refuses to start. Same for `LLM_ALLOW_CLOUD=false` against a public LLM host.
+
+### IDE configuration
+
+VS Code `settings.json`:
 ```json
 {
   "python.linting.enabled": true,
-  "python.linting.pylintEnabled": true,
   "python.formatting.provider": "black",
   "editor.formatOnSave": true,
   "editor.codeActionsOnSave": {
@@ -102,283 +116,344 @@ VS Code settings.json:
 
 ## Project Structure
 
-### Backend Structure
+### Backend (`backend/app/`)
+
 ```
 backend/
-├── alembic/              # Database migrations (baseline: 20260420_0001)
+├── alembic/versions/        # Migrations stack: 20260420_0001 (baseline)
+│                            #   → v2.2 pricing prewire
+│                            #   → v3.0 Postgres compat / FTS / thumbnails
+│                            #   → v3.1 LLM usage / pricing cache composite PK
+│                            #   → v3.1+ item_images cascade
 ├── app/
-│   ├── routers/         # API route handlers (auth, items, images, analytics, backups, ebay)
-│   ├── ebay/            # eBay CSV export submodule
-│   ├── models.py        # SQLAlchemy models (User, Item, ItemImage, Backup)
-│   ├── schemas.py       # Pydantic v2 schemas (ConfigDict-based)
-│   ├── database.py      # Engine + SessionLocal; reads DATABASE_URL from settings
-│   ├── security.py      # PyJWT-based auth; driven entirely by settings
-│   ├── settings.py      # pydantic-settings singleton (fail-fast on missing SECRET_KEY)
-│   └── main.py          # FastAPI app factory + middleware + exception handlers
+│   ├── main.py              # FastAPI factory, middleware, exception handlers,
+│   │                        # /uploads static mount, router registration with
+│   │                        # /api prefix (routers themselves carry no prefix)
+│   ├── settings.py          # pydantic-settings singleton, fail-fast guards
+│   │                        # (SECRET_KEY, LLM_*, LLM_ALLOW_CLOUD)
+│   ├── models.py            # SQLAlchemy: User, Item, ItemImage, Backup,
+│   │                        # PriceCache, LLMUsage; custom UUID TypeDecorator
+│   ├── schemas.py           # Pydantic v2 (ConfigDict). Use model_dump()
+│   ├── schemas_llm.py       # Strict json_schema for VisionSuggestion +
+│   │                        # PriceEstimate; PROMPT_VERSION
+│   ├── database.py          # Engine + SessionLocal; reads DATABASE_URL
+│   ├── security.py          # PyJWT auth (python-jose was removed in 2.0.0)
+│   ├── fts.py               # Items full-text search (SQLite FTS5 / PG tsvector)
+│   ├── routers/             # Thin handlers — delegate to services/
+│   │   ├── auth.py
+│   │   ├── items.py
+│   │   ├── images.py
+│   │   ├── analytics.py
+│   │   ├── backups.py
+│   │   ├── ebay.py          # CSV listing assist
+│   │   ├── facebook.py      # Copy-paste + Meta Commerce CSV
+│   │   ├── jobs.py          # v3.0 ARQ job status
+│   │   ├── vision.py        # v3.1 image identification
+│   │   └── pricing.py       # v3.1 resale-value estimation
+│   ├── services/            # Domain logic with ownership checks
+│   │   ├── items.py
+│   │   ├── backups.py
+│   │   └── images.py
+│   ├── jobs/                # v3.0 ARQ scaffold
+│   │   ├── client.py        # Pool factory, sync fallback when REDIS_URL unset
+│   │   ├── worker.py        # WorkerSettings export
+│   │   └── tasks/           # backups, images, vision, pricing
+│   ├── llm/                 # v3.1 shared LLM layer
+│   │   ├── openai_compatible.py   # Sole HTTP client; supports OR web_search
+│   │   ├── prompts.py             # Versioned system prompts
+│   │   └── budget.py              # Daily cost-cap guard
+│   ├── vision/              # v3.1 image -> structured suggestion
+│   ├── pricing/             # v3.1 estimate orchestration
+│   │   ├── service.py
+│   │   ├── normalizer.py
+│   │   ├── cache.py
+│   │   ├── aggregate.py     # P10/P50/P90 (or min/median/max for N<5)
+│   │   ├── provider_base.py
+│   │   ├── provider_ebay_browse.py
+│   │   └── provider_llm.py
+│   ├── ebay/                # CSV formatter + category mapping
+│   ├── facebook/            # Copy-paste + Meta Commerce CSV
+│   └── middleware/          # Rate limiting, request-ID, structured logging
 ├── scripts/
-│   └── bootstrap.py     # Runtime migration + legacy-stamp reconciliation
-├── tests/               # pytest suite with in-memory SQLite conftest
+│   └── bootstrap.py         # Runtime migration + legacy-stamp reconciliation
+├── tests/                   # pytest suite, in-memory SQLite by default,
+│                            # honors TEST_DATABASE_URL for the Postgres matrix
 ├── .env.example
 └── requirements.txt
 ```
 
-### Frontend Structure
+### Frontend (`frontend/src/`)
+
 ```
 frontend/
 ├── src/
-│   ├── api/            # API client and types
-│   ├── components/     # React components
-│   ├── contexts/       # React contexts
-│   ├── pages/         # Page components
-│   ├── assets/        # Static assets
-│   └── App.tsx        # Root component
-├── public/            # Static files
-└── package.json       # Node.js dependencies
+│   ├── App.tsx              # createBrowserRouter + RouterProvider
+│   ├── queryClient.ts       # React Query 5 client (retries=1, no focus refetch)
+│   ├── api/
+│   │   ├── client.ts        # axios instance + ApiError class
+│   │   ├── items.ts, images.ts, analytics.ts, backups.ts,
+│   │   ├── auth.ts, ebay.ts, facebook.ts, jobs.ts (v3.0)
+│   │   ├── queryKeys.ts     # Hierarchical query-key factory
+│   │   ├── openapi.d.ts     # Generated by `npm run codegen:api`
+│   │   └── types.ts         # Re-exports from openapi.d.ts + hand-written
+│   │                        # types for endpoints not yet typed in the schema
+│   ├── components/          # Layout, BarcodeScanner (lazy), CameraCapture,
+│   │                        # CustomFields, EbayFields, FacebookFields,
+│   │                        # FacebookCopyPasteDialog, ImageGallery,
+│   │                        # ErrorBoundary
+│   ├── contexts/            # AuthContext + DevModeContext (split provider/hook)
+│   ├── pages/               # Dashboard, AddItem, ItemDetail, Reports, Backups,
+│   │                        # Login, Register — each with a colocated
+│   │                        # <Name>.schema.ts (zod)
+│   ├── router/loaders.ts    # React Router data-router loaders that
+│   │                        # ensureQueryData() warm the React Query cache
+│   ├── index.css            # Tailwind v4 @theme block (semantic tokens)
+│   └── setupTests.ts        # Vitest setup
+├── scripts/generate-certs.js
+├── vitest.config.ts
+├── vite.config.ts
+└── package.json
 ```
 
 ## Development Workflow
 
-### Starting Development Servers
+### Starting dev servers
 
-1. **Backend Server**
 ```bash
+# Backend (HTTPS on 27182)
 cd backend
 source venv/bin/activate
-uvicorn app.main:app --reload --port 27182
+uvicorn app.main:app --reload --port 27182 \
+  --ssl-keyfile ../frontend/certs/key.pem \
+  --ssl-certfile ../frontend/certs/cert.pem
 ```
 
-2. **Frontend Server**
 ```bash
+# Frontend (HTTPS on 5173, regenerates certs on start, proxies /api + /uploads)
 cd frontend
 npm run dev
 ```
 
-### Database Migrations
+### Docker compose profiles
 
-1. **Create a Migration**
+```bash
+# Default — backend + frontend + SQLite, jobs run synchronously in-request.
+docker compose up --build
+
+# + Redis + ARQ worker — heavy ops (backup, vision, pricing) go async.
+docker compose --profile worker up --build
+
+# + Postgres 16.
+docker compose --profile postgres up --build
+
+# Full v3.0 stack: Postgres + Redis + worker.
+docker compose --profile postgres --profile worker up --build
+
+# NAS deployment (Caddy auto-TLS; Redis + worker always on).
+docker compose -f docker-compose.nas.yml up -d
+```
+
+Both compose files require `SECRET_KEY` in the shell env or in a sibling `.env`. Generate one with `python -c "import secrets; print(secrets.token_urlsafe(64))"`.
+
+### Database migrations
+
 ```bash
 cd backend
+
+# Create a new revision skeleton
 alembic revision -m "description_of_changes"
-```
 
-2. **Edit Migration File**
-```python
-# backend/alembic/versions/xxxx_description_of_changes.py
-def upgrade():
-    # Add upgrade changes
-    pass
-
-def downgrade():
-    # Add downgrade changes
-    pass
-```
-
-3. **Apply Migration**
-```bash
-python scripts/bootstrap.py   # preferred — handles legacy stamps and is idempotent
-# or, on known-clean databases:
+# Apply migrations (preferred — handles legacy stamps + idempotent)
+python scripts/bootstrap.py
+# Or, on known-clean DBs:
 alembic upgrade head
+
+# Revert last migration
+alembic downgrade -1
 ```
 
-4. **Revert Migration**
+When a migration needs different DDL on Postgres vs SQLite, branch on `op.get_bind().dialect.name`. See `20260423_0008_item_images_cascade.py` for an example. `Base.metadata.create_all()` is no longer called at startup — Alembic is the sole source of truth for schema.
+
+### TypeScript API types — codegen
+
+The frontend type definitions for backend resources are **generated** from the live FastAPI OpenAPI schema:
+
 ```bash
-alembic downgrade -1  # Revert last migration
+cd frontend
+npm run codegen:api    # writes frontend/src/api/openapi.d.ts
 ```
 
-**Note:** `Base.metadata.create_all()` is no longer called at startup as of 2.0.0 — Alembic is the sole source of truth for schema. When adding models, always accompany with a new Alembic revision.
+After any backend schema change (new field, renamed endpoint, etc.):
 
-### Working with TypeScript Types
+1. Run `npm run codegen:api` to regenerate.
+2. Commit the regenerated `openapi.d.ts` alongside the backend change.
 
-1. **API Types**
-```typescript
-// frontend/src/api/types.ts
-export interface Item {
-  id: string;
-  name: string;
-  category: string;
-  // ... other fields
-}
-```
-
-2. **Component Props**
-```typescript
-// frontend/src/components/ItemList.tsx
-interface ItemListProps {
-  items: Item[];
-  onItemClick: (item: Item) => void;
-}
-```
+CI's `contract-check` job re-runs codegen and fails the build if the committed file is out of sync. Don't hand-edit `openapi.d.ts` — add hand-written types to `frontend/src/api/types.ts` only for resources the backend doesn't yet emit (notably analytics responses, which are still plain dicts).
 
 ## Code Style and Standards
 
-### Python Style Guide
+### Python style guide
 
-- Follow PEP 8
-- Use type hints
-- Maximum line length: 88 characters (Black)
-- Sort imports with isort
-- Use docstrings for functions and classes
+- PEP 8 with **Black** (88-col line length)
+- Type hints everywhere
+- `isort` for imports
+- Docstrings on public functions/classes
+- Use the `logging` module — no `print()` in server code
+- Use **`model_dump()`**, not `dict()` (Pydantic v2)
 
-Example:
 ```python
-from typing import List, Optional
+from typing import Optional
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.models import Item
-from app.schemas import ItemCreate
+from app import models, schemas
+
 
 def create_item(
     db: Session,
-    item: ItemCreate,
-    user_id: str
-) -> Item:
-    """
-    Create a new inventory item.
-
-    Args:
-        db: Database session
-        item: Item data
-        user_id: ID of the creating user
-
-    Returns:
-        Created item instance
-
-    Raises:
-        HTTPException: If item creation fails
-    """
-    db_item = Item(**item.dict(), user_id=user_id)
+    item: schemas.ItemCreate,
+    user_id: str,
+) -> models.Item:
+    """Create a new inventory item owned by user_id."""
+    db_item = models.Item(**item.model_dump(), owner_id=user_id)
     db.add(db_item)
     try:
         db.commit()
         db.refresh(db_item)
         return db_item
-    except Exception as e:
+    except Exception as exc:
         db.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(exc))
 ```
 
-### TypeScript/React Style Guide
+In practice, route handlers should be thin and delegate to a service in `app/services/` (e.g. `ItemService.create(...)`) which owns ownership checks and business logic.
 
-- Use functional components
-- Use TypeScript types/interfaces
-- Follow ESLint configuration
-- Use React Hooks guidelines
-- Maximum line length: 80 characters
+### TypeScript / React style guide
 
-Example:
-```typescript
-import React, { useState, useEffect } from 'react';
-import { Item } from '../api/types';
-import { useAuth } from '../contexts/AuthContext';
+- Functional components only
+- TypeScript types/interfaces for all props
+- Follow the ESLint flat config (`eslint.config.js`) — CI lint is **blocking**
+- 80-col line length
+- Prefer relative imports
+- React Hooks rules (eslint-plugin-react-hooks enforces at lint time)
+
+```tsx
+import { useQuery } from '@tanstack/react-query';
+
+import { itemsApi } from '../api/items';
+import { queryKeys } from '../api/queryKeys';
+import type { Item } from '../api/types';
 
 interface ItemListProps {
   category?: string;
   onItemSelect: (item: Item) => void;
 }
 
-export const ItemList: React.FC<ItemListProps> = ({
-  category,
-  onItemSelect,
-}) => {
-  const [items, setItems] = useState<Item[]>([]);
-  const { api } = useAuth();
-
-  useEffect(() => {
-    const fetchItems = async () => {
-      const response = await api.getItems({ category });
-      setItems(response.data);
-    };
-
-    fetchItems();
-  }, [category, api]);
+export function ItemList({ category, onItemSelect }: ItemListProps) {
+  const { data: items = [] } = useQuery({
+    queryKey: queryKeys.items.list({ category }),
+    queryFn: () => itemsApi.list({ category }),
+  });
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {items.map((item) => (
-        <div
+        <button
           key={item.id}
           onClick={() => onItemSelect(item)}
-          className="p-4 border rounded hover:shadow-lg"
+          className="p-4 border rounded hover:shadow-lg text-left"
         >
           <h3 className="text-lg font-semibold">{item.name}</h3>
           <p className="text-gray-600">{item.category}</p>
-        </div>
+        </button>
       ))}
     </div>
   );
-};
+}
 ```
 
 ## Testing
 
-### Backend Testing
+### Backend testing
 
-1. **Unit Tests**
-```python
-# backend/tests/test_items.py
-import pytest
-from fastapi.testclient import TestClient
-
-from app.main import app
-
-client = TestClient(app)
-
-def test_create_item():
-    response = client.post(
-        "/api/items/",
-        json={
-            "name": "Test Item",
-            "category": "Test",
-            "location": "Test Location"
-        },
-        headers={"Authorization": f"Bearer {test_token}"}
-    )
-    assert response.status_code == 200
-    assert response.json()["name"] == "Test Item"
-```
-
-2. **Running Tests**
 ```bash
 cd backend
-pytest
-pytest --cov=app tests/  # With coverage
+source venv/bin/activate
+
+pytest                                              # ~50s, in-memory SQLite
+pytest --cov=app tests/                             # with coverage
+pytest tests/test_items.py::test_item_crud_round_trip   # single test
+
+# Run against Postgres (the CI matrix subset that doesn't depend on
+# provider mocks):
+TEST_DATABASE_URL=postgresql+psycopg://whis:whis@localhost:5432/whis pytest
 ```
 
-### Frontend Testing
+Conftest provides `client`, `user`, `db_session`, `auth_headers`. Fixtures honor `TEST_DATABASE_URL`; they default to in-memory SQLite + `StaticPool`.
 
-1. **Component Tests**
-```typescript
-// frontend/src/components/__tests__/ItemList.test.tsx
+```python
+# Example test (uses fixtures from conftest)
+def test_item_crud_round_trip(client, auth_headers):
+    # Create
+    r = client.post("/api/items/",
+                    json={"name": "Test Item", "category": "Test"},
+                    headers=auth_headers)
+    assert r.status_code == 200
+    item_id = r.json()["id"]
+
+    # Read
+    r = client.get(f"/api/items/{item_id}", headers=auth_headers)
+    assert r.json()["name"] == "Test Item"
+```
+
+### Frontend testing
+
+```bash
+cd frontend
+npm test                                          # vitest run
+npm run test:watch                                # watch mode
+npm test -- src/components/__tests__/Layout.test.tsx   # single file
+```
+
+Test files live under `src/**/__tests__/**/*.test.{ts,tsx,js,jsx}`. Vitest config is `vitest.config.ts` (jsdom env, globals enabled, setup file at `src/setupTests.ts`).
+
+```tsx
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+
 import { ItemList } from '../ItemList';
 
 describe('ItemList', () => {
   it('renders items correctly', () => {
-    const items = [
-      { id: '1', name: 'Test Item', category: 'Test' }
-    ];
-    
-    render(<ItemList items={items} onItemSelect={() => {}} />);
-    
+    const onItemSelect = vi.fn();
+    const items = [{ id: '1', name: 'Test Item', category: 'Test' }];
+    render(<ItemList items={items} onItemSelect={onItemSelect} />);
     expect(screen.getByText('Test Item')).toBeInTheDocument();
   });
 });
 ```
 
-2. **Running Tests**
-```bash
-cd frontend
-npm test
-npm run test:coverage  # With coverage
-```
+### CI matrix
+
+GitHub Actions (`.github/workflows/ci.yml`) runs:
+
+- **`backend`** — pytest on Python 3.11 + 3.12 × SQLite + Postgres 16 (4 legs). Postgres runs as a service container per leg.
+- **`pip-audit`** — `--strict` on the Python deps; gated to the 3.12/SQLite leg.
+- **`frontend`** — ESLint (**blocking**, 0 errors), Vitest, `npm audit --omit=dev --audit-level=high`.
+- **`image-scan`** — builds backend + Caddy images with buildx + GHA cache, scans both with Trivy. HIGH/CRITICAL fail (ignore-unfixed).
+- **`contract-check`** — regenerates `frontend/src/api/openapi.d.ts` from a live backend and fails if the committed file is out of sync.
+
+### End-to-end testing
+
+Not currently in-tree. Playwright is the planned vehicle when E2E lands.
 
 ## Debugging
 
-### Backend Debugging
+### Backend debugging
 
-1. **VS Code Launch Configuration**
+VS Code launch configuration:
+
 ```json
 {
   "version": "0.2.0",
@@ -388,7 +463,7 @@ npm run test:coverage  # With coverage
       "type": "python",
       "request": "launch",
       "module": "uvicorn",
-      "args": ["app.main:app", "--reload"],
+      "args": ["app.main:app", "--reload", "--port", "27182"],
       "jinja": true,
       "justMyCode": true
     }
@@ -396,133 +471,97 @@ npm run test:coverage  # With coverage
 }
 ```
 
-2. **Debug Logging**
-```python
-import logging
+Logging is via `structlog` with a JSON renderer in production (`LOG_FORMAT=json`) and console in dev (`LOG_FORMAT=console` or `DEBUG=true`). For temporary diagnostic prints, use the `logging` module — `logger.debug(...)` is preferred over `print()`.
 
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
+### Async-job debugging
 
-logger.debug("Debug message")
-logger.info("Info message")
-logger.error("Error message")
+When the worker profile is up:
+
+```bash
+docker compose --profile worker logs -f whis-worker
+# Tail jobs as they execute. Each task wraps return values in an envelope
+# (see backend/app/jobs/tasks/) so failures serialize cleanly back to the
+# /api/jobs/{id} endpoint.
 ```
 
-### Frontend Debugging
+### Frontend debugging
 
-1. **React Developer Tools**
-- Install Chrome/Firefox extension
-- Use Components tab for component inspection
-- Use Profiler tab for performance analysis
-
-2. **Console Logging**
-```typescript
-// Development-only logging
-if (process.env.NODE_ENV === 'development') {
-  console.log('Debug:', data);
-}
-```
+- React Developer Tools (Chrome/Firefox extension) — Components + Profiler tabs
+- React Query Devtools (auto-mounted in dev only)
+- Vite's overlay surfaces compile errors directly in the browser
 
 ## Performance Optimization
 
-### Backend Optimization
+### Backend
+- Index appropriately; consult `models.py` for current `index=True` columns.
+- The v3.0 FTS path replaces ad-hoc `LIKE` queries — use `app.fts` for any new search surface.
+- Long-running operations (backup create/restore, vision, pricing) belong on the ARQ worker — see `app/jobs/tasks/`.
+- LLM cost is the largest variable cost; respect `VISION_DAILY_COST_CAP_USD` and `PRICING_DAILY_COST_CAP_USD`.
 
-1. **Database Optimization**
-- Use appropriate indexes
-- Optimize queries
-- Use pagination
-- Cache frequent queries
-
-2. **API Optimization**
-- Use async/await
-- Implement caching
-- Optimize response payload
-- Use compression
-
-### Frontend Optimization
-
-1. **React Optimization**
-- Use React.memo for expensive components
-- Implement virtualization for long lists
-- Optimize images
-- Use code splitting
-
-2. **Build Optimization**
-- Enable tree shaking
-- Use production builds
-- Implement caching
-- Optimize bundle size
+### Frontend
+- React Query caches by hierarchical key — see `api/queryKeys.ts`.
+- Lazy-load heavy components (`BarcodeScanner` already does this).
+- `vite-plugin-pwa` handles SW caching; runtime caching is a function matcher in `vite.config.ts`.
+- The bundled images path uses thumbnails (v3.0) — prefer `<ItemImage thumbnail>` over full-res in lists.
 
 ## Common Development Tasks
 
-### Adding a New Feature
+### Adding a new model field
 
-1. Create a new branch
-2. Update database schema if needed
-3. Create/update API endpoints
-4. Add frontend components
-5. Write tests
-6. Update documentation
-7. Create pull request
+1. Update `app/models.py` and `app/schemas.py`.
+2. `alembic revision -m "add_<field>"` and write the migration.
+3. Update the relevant router/service in `app/`.
+4. Run `cd frontend && npm run codegen:api` to refresh `openapi.d.ts`.
+5. Update frontend types/components that need the new field.
+6. Add tests on both sides.
 
-### Updating Dependencies
+### Adding a new router
 
-1. **Backend Dependencies**
+1. Create `app/routers/<resource>.py` with `router = APIRouter(tags=["..."])`. Don't add a `/api` prefix — `main.py` adds it.
+2. Register the router in `main.py` via `app.include_router(<resource>.router, prefix="/api")`.
+3. Add per-route rate-limit decorators if the route is auth/cost-sensitive (see `routers/auth.py` for the slowapi pattern).
+4. Add tests.
+5. Regenerate `openapi.d.ts` via `npm run codegen:api`.
+
+### Updating dependencies
+
 ```bash
-cd backend
+# Backend
+cd backend && source venv/bin/activate
 pip list --outdated
-pip install --upgrade package-name
-```
+pip install --upgrade <package>
+pip freeze | grep '^<package>=' >> requirements.txt   # or update the pin manually
 
-2. **Frontend Dependencies**
-```bash
+# Frontend
 cd frontend
 npm outdated
-npm update
+npm update                     # or `npm install <package>@latest`
 ```
 
-### Building for Production
+CI's `pip-audit --strict` and `npm audit --audit-level=high` will block known-vulnerable versions.
 
-1. **Backend**
-```bash
-cd backend
-pip install -r requirements.txt
-python scripts/bootstrap.py
-# start uvicorn or let the Dockerfile CMD handle it
-```
+### Building for production
 
-2. **Frontend**
 ```bash
+# Backend image build is identical to dev — Dockerfile handles it.
+# Frontend production build:
 cd frontend
-npm install
-npm run build   # tsc --noEmit + vite build
+npm run build                  # tsc --noEmit + vite build → dist/
+
+# Full prod stack:
+docker compose -f docker-compose.nas.yml up -d --build
 ```
 
-3. **Docker (recommended)**
-```bash
-# from repo root, with SECRET_KEY set in .env
-docker compose up --build                              # dev stack
-docker compose -f docker-compose.nas.yml up -d --build # NAS / prod variant
-```
+## Additional resources
 
-### Troubleshooting
-
-1. **Backend Issues**
-- Check logs
-- Verify database connection
-- Check API responses
-- Validate environment variables
-
-2. **Frontend Issues**
-- Check console errors
-- Verify API endpoints
-- Check network requests
-- Validate build output
-
-## Additional Resources
-
-- [FastAPI Documentation](https://fastapi.tiangolo.com/)
-- [React Documentation](https://reactjs.org/)
-- [TypeScript Documentation](https://www.typescriptlang.org/)
-- [SQLAlchemy Documentation](https://docs.sqlalchemy.org/)
-- [Tailwind CSS Documentation](https://tailwindcss.com/)
+- [FastAPI](https://fastapi.tiangolo.com/)
+- [SQLAlchemy 2.x](https://docs.sqlalchemy.org/)
+- [Alembic](https://alembic.sqlalchemy.org/)
+- [Pydantic v2](https://docs.pydantic.dev/latest/)
+- [React](https://react.dev/)
+- [React Router v7 data router](https://reactrouter.com/)
+- [TanStack Query v5](https://tanstack.com/query/latest)
+- [Tailwind CSS v4](https://tailwindcss.com/)
+- [Vitest](https://vitest.dev/)
+- [ARQ](https://arq-docs.helpmanual.io/)
+- [OpenRouter](https://openrouter.ai/)
