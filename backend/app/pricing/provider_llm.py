@@ -36,6 +36,7 @@ from ..llm import (
 )
 from ..llm.prompts import PRICING_EXTRACTION_PROMPT, PRICING_RESEARCH_PROMPT
 from ..schemas_llm import PRICE_ESTIMATE_SCHEMA, PriceEstimate
+from ..services import llm_config as llm_config_service
 from ..settings import settings
 from .normalizer import ItemIdentity
 from .provider_base import (
@@ -63,13 +64,15 @@ class LLMPricingProvider(PriceProvider):
         self.last_usage: Dict[str, Any] = {}
 
     async def lookup(self, identity: ItemIdentity) -> PriceEstimate:
-        if not settings.LLM_BASE_URL or not settings.LLM_API_KEY:
+        eff = llm_config_service.get_effective()
+        if not eff.base_url or not eff.api_key:
             raise PriceProviderUnavailable(
-                "LLM pricing provider requires LLM_BASE_URL + LLM_API_KEY"
+                "LLM pricing provider requires base_url + api_key "
+                "(set via /api/llm-config or env)"
             )
 
         client = self._client or OpenAICompatibleClient()
-        model = settings.pricing_model()
+        model = eff.pricing_model
         item_prompt = _format_identity_prompt(identity)
 
         # --- Call 1: web_search research, no schema -------------------

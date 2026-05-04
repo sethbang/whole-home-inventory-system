@@ -32,14 +32,22 @@ def register_user(
             status_code=400, detail="Email or username already registered"
         )
 
+    # First successfully registered user gets promoted to admin so the
+    # household setup flow has someone who can edit /api/llm-config.
+    # Subsequent registrations default to is_admin=False.
+    is_first_user = db.query(models.User).count() == 0
+
     db_user = models.User(
         email=user.email,
         username=user.username,
         hashed_password=security.get_password_hash(user.password),
+        is_admin=is_first_user,
     )
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
+    if is_first_user:
+        logger.info("first user registered as admin: username=%s", db_user.username)
     return db_user
 
 

@@ -24,6 +24,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .. import models
+from ..services import llm_config as llm_config_service
 from ..settings import settings
 
 logger = logging.getLogger(__name__)
@@ -77,11 +78,22 @@ def estimate_cost_usd(
     ) * rates["out"]
 
 
-def _cap_for(feature: Feature) -> float:
+def _cap_for(feature: Feature, db: Session | None = None) -> float:
+    """Resolve the daily cap from the operator-editable config.
+
+    The DB-backed cap overrides the env value when set; otherwise we
+    fall back to ``settings.*``. The optional ``db`` argument lets
+    callers reuse an open Session; without it we hit the cached
+    EffectiveLLMConfig (rebuilt on every save).
+    """
+    if db is not None:
+        eff = llm_config_service.get_effective_for_db(db)
+    else:
+        eff = llm_config_service.get_effective()
     if feature == "vision":
-        return settings.VISION_DAILY_COST_CAP_USD
+        return eff.vision_daily_cap_usd
     if feature == "pricing":
-        return settings.PRICING_DAILY_COST_CAP_USD
+        return eff.pricing_daily_cap_usd
     raise ValueError(f"unknown feature: {feature}")
 
 
@@ -104,7 +116,7 @@ class DailyBudgetGuard:
 
     def check_or_raise(self, feature: Feature) -> None:
         """Raise HTTPException 402 when today's spend exceeds the cap."""
-        cap = _cap_for(feature)
+        cap = _cap_for(feature, db=self.db)
         if cap <= 0:
             return
         today = _floor_to_utc_day(datetime.now(timezone.utc))

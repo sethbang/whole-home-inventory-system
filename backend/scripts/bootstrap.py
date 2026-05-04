@@ -68,8 +68,8 @@ def assert_certs_present() -> None:
             file=sys.stderr,
         )
         print(
-            "[bootstrap] Run `cd frontend && node scripts/generate-certs.js` "
-            "on the host to produce them, or mount the shared certs volume.",
+            "[bootstrap] Run `./bin/whis certs` on the host to produce them, "
+            "or mount the shared certs volume.",
             file=sys.stderr,
         )
         sys.exit(1)

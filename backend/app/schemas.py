@@ -90,6 +90,7 @@ class UserCreate(UserBase):
 class User(UserBase):
     id: UUID4
     is_active: bool
+    is_admin: bool = False
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -310,3 +311,108 @@ class JobDetail(BaseModel):
     queued_at: Optional[datetime] = None
     started_at: Optional[datetime] = None
     finished_at: Optional[datetime] = None
+
+
+# --- LLM operator-dashboard contracts (v3.2) ---------------------------------
+
+
+class LLMConfigRead(BaseModel):
+    """GET /api/llm-config response.
+
+    The plaintext API key is never returned. ``api_key_last4`` shows
+    the last four characters so the operator can confirm which key is
+    active without ever sending the full secret to the browser; the
+    full secret is also redacted from logs by the audit logger.
+    ``sources`` reports per-field provenance — ``db`` (set in the UI),
+    ``env`` (still inheriting from the env var), or ``default``
+    (no value set anywhere).
+    """
+
+    base_url: str
+    api_key_set: bool
+    api_key_last4: Optional[str] = None
+    model: str
+    vision_model: str
+    pricing_model: str
+    timeout_seconds: int
+    response_healing: bool
+    vision_enabled: bool
+    pricing_enabled: bool
+    vision_daily_cap_usd: float
+    pricing_daily_cap_usd: float
+    sources: Dict[str, str]
+    # Convenience for the UI's "current spend" card. Populated only
+    # for the current authenticated admin's daily totals — the
+    # singleton is global but spend is per-user.
+    today_vision_cost_usd: float = 0.0
+    today_pricing_cost_usd: float = 0.0
+
+
+class LLMConfigUpdate(BaseModel):
+    """PUT /api/llm-config request body.
+
+    Every field is optional. ``None`` means "leave unchanged"; an
+    empty string or 0 (where applicable) means "clear back to env".
+    The API key has its own behavior:
+        * ``api_key`` omitted → leave stored value untouched
+        * ``api_key`` empty string → clear stored value, fall back to env
+        * ``api_key`` non-empty string → encrypt and persist as the new key
+    """
+
+    base_url: Optional[str] = None
+    api_key: Optional[str] = None
+    model: Optional[str] = None
+    vision_model: Optional[str] = None
+    pricing_model: Optional[str] = None
+    timeout_seconds: Optional[int] = None
+    response_healing: Optional[bool] = None
+    vision_enabled: Optional[bool] = None
+    pricing_enabled: Optional[bool] = None
+    vision_daily_cap_usd: Optional[float] = None
+    pricing_daily_cap_usd: Optional[float] = None
+
+
+class LLMModelEntry(BaseModel):
+    """One entry in GET /api/llm-config/models.
+
+    ``supports_vision`` and ``supports_strict_json`` are tri-state:
+    ``True``/``False``/``None``. ``None`` means the provider's
+    /v1/models response didn't carry a capability flag we recognized;
+    the operator should run the deep test to verify.
+    """
+
+    id: str
+    owned_by: Optional[str] = None
+    supports_vision: Optional[bool] = None
+    supports_strict_json: Optional[bool] = None
+
+
+class LLMModelListResponse(BaseModel):
+    """GET /api/llm-config/models response."""
+
+    models: List[LLMModelEntry]
+
+
+class LLMTestResponse(BaseModel):
+    """POST /api/llm-config/test response.
+
+    ``ok`` rolls up the overall result; ``checks`` carries the
+    individual sub-checks so the UI can render a clear breakdown.
+    """
+
+    ok: bool
+    base_url: str
+    model: str
+    detail: Optional[str] = None
+    checks: Dict[str, Any] = Field(default_factory=dict)
+
+
+class LLMVisionTestResponse(BaseModel):
+    """POST /api/llm-config/test-vision response."""
+
+    ok: bool
+    model: str
+    detail: Optional[str] = None
+    parsed_response: Optional[Dict[str, Any]] = None
+    usage: Optional[Dict[str, Any]] = None
+    cost_usd: Optional[float] = None

@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
@@ -23,6 +23,7 @@ from .routers import (
     images,
     items,
     jobs,
+    llm_config,
     pricing,
     vision,
 )
@@ -124,10 +125,26 @@ async def add_cors_and_trailing_slash(request, call_next):
         response = await call_next(request)
         response.headers.update(get_cors_headers(request))
 
+        # Tolerate trailing-slash mismatches between callers and routes.
+        # When a router declares `POST /items/` but a client posts to
+        # `/items`, Starlette responds 405 Method Not Allowed (because
+        # `GET /items` exists but `POST /items` does not). Send a 307
+        # redirect to the canonical slash form so the client retries
+        # with the same method + body. We deliberately do NOT internally
+        # re-call `call_next` here — `BaseHTTPMiddleware` cannot be
+        # invoked twice on the same scope (the first call's receive
+        # stream is closed), and doing so manifests as
+        # `anyio.ClosedResourceError` wrapped in `AssertionError` and
+        # surfaces to clients as a generic 500.
         if response.status_code == 405 and not request.url.path.endswith("/"):
-            request.scope["path"] = request.url.path + "/"
-            response = await call_next(request)
-            response.headers.update(get_cors_headers(request))
+            redirect_target = request.url.path + "/"
+            if request.url.query:
+                redirect_target = f"{redirect_target}?{request.url.query}"
+            return RedirectResponse(
+                url=redirect_target,
+                status_code=307,
+                headers=get_cors_headers(request),
+            )
 
         return response
     except Exception:
@@ -158,6 +175,7 @@ app.include_router(facebook.router, prefix="/api")
 app.include_router(jobs.router, prefix="/api")
 app.include_router(vision.router, prefix="/api")
 app.include_router(pricing.router, prefix="/api")
+app.include_router(llm_config.router, prefix="/api")
 
 
 @app.get("/api/health")

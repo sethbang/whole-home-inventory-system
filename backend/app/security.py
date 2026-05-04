@@ -23,6 +23,7 @@ DEV_USER = models.User(
     username="admin",
     hashed_password="",
     is_active=True,
+    is_admin=True,
     created_at=datetime.utcnow(),
 )
 
@@ -102,6 +103,23 @@ async def get_current_active_user(
         return DEV_USER
     if not current_user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
+    return current_user
+
+
+async def require_admin(
+    current_user: models.User = Depends(get_current_active_user),
+) -> models.User:
+    """Reject non-admin users with 403.
+
+    Used by the /api/llm-config router (and any future operator-only
+    surface). The bypass user is treated as admin so the dev experience
+    matches production. ``is_admin`` is a v3.2-introduced column —
+    older user rows that haven't been migrated default to False.
+    """
+    if settings.BYPASS_AUTH:
+        return DEV_USER
+    if not getattr(current_user, "is_admin", False):
+        raise HTTPException(status_code=403, detail="Admin privileges required")
     return current_user
 
 

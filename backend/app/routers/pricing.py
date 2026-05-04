@@ -29,6 +29,7 @@ from .. import database, models, schemas
 from ..pricing import PricingService
 from ..rate_limit import limiter
 from ..security import get_current_active_user
+from ..services import llm_config as llm_config_service
 from ..settings import settings
 
 logger = logging.getLogger(__name__)
@@ -65,7 +66,7 @@ async def estimate_price(
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(get_current_active_user),
 ):
-    _guard_enabled()
+    _guard_enabled(db)
     _guard_one_of_inputs(body)
     return await _enqueue_or_run(
         request=request,
@@ -88,7 +89,7 @@ async def refresh_price(
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(get_current_active_user),
 ):
-    _guard_enabled()
+    _guard_enabled(db)
     return await _enqueue_or_run(
         request=request,
         db=db,
@@ -109,7 +110,7 @@ async def get_cached_estimate(
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(get_current_active_user),
 ):
-    _guard_enabled()
+    _guard_enabled(db)
     return await _enqueue_or_run(
         request=request,
         db=db,
@@ -125,8 +126,9 @@ async def get_cached_estimate(
 # ---------------------------------------------------------------------------
 
 
-def _guard_enabled() -> None:
-    if not settings.PRICING_ENABLED:
+def _guard_enabled(db: Session) -> None:
+    eff = llm_config_service.get_effective_for_db(db)
+    if not eff.pricing_enabled:
         raise HTTPException(
             status_code=503,
             detail="Item-value pricing is disabled on this deployment.",

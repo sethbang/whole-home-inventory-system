@@ -29,6 +29,7 @@ from ..schemas_llm import (
     VisionResult,
     VisionSuggestion,
 )
+from ..services import llm_config as llm_config_service
 from ..settings import settings
 
 logger = logging.getLogger(__name__)
@@ -84,7 +85,11 @@ class VisionService:
           6. Validate the response with Pydantic for defense-in-depth.
           7. Wrap in a VisionResult with provenance metadata.
         """
-        if not settings.VISION_ENABLED:
+        # Resolve effective config first so a UI-driven feature-flag /
+        # model change goes live without a restart.
+        eff = llm_config_service.get_effective_for_db(self.db)
+
+        if not eff.vision_enabled:
             raise HTTPException(
                 status_code=503, detail="Vision auto-fill is disabled on this deployment."
             )
@@ -104,6 +109,7 @@ class VisionService:
         guard = DailyBudgetGuard(self.db, self.user)
         guard.check_or_raise("vision")
 
+        vision_model = eff.vision_model
         client = client or OpenAICompatibleClient()
 
         try:
@@ -112,7 +118,7 @@ class VisionService:
                 images=image_list,
                 hints=hints,
                 schema=VISION_SUGGESTION_SCHEMA,
-                model=settings.vision_model(),
+                model=vision_model,
             )
         except LLMProviderError:
             # Pre-parse error — the content was garbage. Record a
@@ -120,7 +126,7 @@ class VisionService:
             # request happened, then surface.
             guard.record_usage(
                 "vision",
-                model=settings.vision_model(),
+                model=vision_model,
                 usage={"prompt_tokens": 0, "completion_tokens": 0},
             )
             raise HTTPException(
@@ -134,7 +140,7 @@ class VisionService:
             )
 
         usage = response.get("usage", {})
-        guard.record_usage("vision", model=settings.vision_model(), usage=usage)
+        guard.record_usage("vision", model=vision_model, usage=usage)
 
         # Second-pass validation. Strict mode + response healing
         # should already guarantee schema-valid JSON, but this
@@ -154,12 +160,12 @@ class VisionService:
         tokens_in = int(usage.get("prompt_tokens", 0))
         tokens_out = int(usage.get("completion_tokens", 0))
         cost = estimate_cost_usd(
-            model=settings.vision_model(), tokens_in=tokens_in, tokens_out=tokens_out
+            model=vision_model, tokens_in=tokens_in, tokens_out=tokens_out
         )
         return VisionResult(
             suggestion=suggestion,
             provider=client.provider,
-            model=settings.vision_model(),
+            model=vision_model,
             prompt_version=PROMPT_VERSION,
             tokens_in=tokens_in,
             tokens_out=tokens_out,

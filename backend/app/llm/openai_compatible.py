@@ -49,6 +49,7 @@ from tenacity import (
     wait_exponential,
 )
 
+from ..services import llm_config as llm_config_service
 from ..settings import settings
 
 logger = logging.getLogger(__name__)
@@ -149,15 +150,42 @@ class OpenAICompatibleClient:
         base_url: Optional[str] = None,
         api_key: Optional[str] = None,
         timeout_seconds: Optional[int] = None,
+        response_healing: Optional[bool] = None,
     ) -> None:
+        # When the caller doesn't supply explicit values, fall back to
+        # the operator-editable config (DB row + env fallback). This is
+        # what makes UI-driven config changes go live without a restart.
+        if (
+            base_url is None
+            or api_key is None
+            or timeout_seconds is None
+            or response_healing is None
+        ):
+            try:
+                eff = llm_config_service.get_effective()
+            except Exception:  # pragma: no cover — boot-order safety net
+                eff = None
+            if eff is not None:
+                base_url = base_url or eff.base_url
+                api_key = api_key or eff.api_key
+                timeout_seconds = timeout_seconds or eff.timeout_seconds
+                if response_healing is None:
+                    response_healing = eff.response_healing
+
         self.base_url = base_url or settings.LLM_BASE_URL
         self.api_key = api_key or settings.LLM_API_KEY
         self.timeout_seconds = timeout_seconds or settings.LLM_TIMEOUT_SECONDS
+        self.response_healing = (
+            response_healing
+            if response_healing is not None
+            else settings.LLM_RESPONSE_HEALING
+        )
         self.provider = _derive_provider_name(self.base_url)
 
         if not self.base_url or not self.api_key:
             raise LLMError(
-                "OpenAICompatibleClient requires LLM_BASE_URL + LLM_API_KEY"
+                "OpenAICompatibleClient requires base_url + api_key "
+                "(set via /api/llm-config UI or LLM_BASE_URL / LLM_API_KEY env)"
             )
 
         self._client = AsyncOpenAI(
@@ -213,7 +241,12 @@ class OpenAICompatibleClient:
         # argument 'plugins'``) so `plugins` with the ``openrouter:``
         # type prefix must be nested under ``extra_body`` rather than
         # lifted to top-level body keys.
-        if settings.LLM_RESPONSE_HEALING:
+        #
+        # Provider-gated: only OpenRouter accepts the ``plugins`` key.
+        # Venice / OpenAI / Ollama reject unknown keys with a 400, so
+        # we never attach it for non-OR providers regardless of the
+        # operator's response-healing toggle.
+        if self.provider == "openrouter" and self.response_healing:
             body["extra_body"] = {"plugins": [{"id": "response-healing"}]}
 
         response = await self._with_retry(body)

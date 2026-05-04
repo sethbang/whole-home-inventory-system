@@ -30,7 +30,8 @@ from sqlalchemy.orm import Session
 
 from .. import database, models, schemas
 from ..security import get_current_active_user
-from ..services.images import validate_image_bytes
+from ..services import llm_config as llm_config_service
+from ..services.images import normalize_for_llm, validate_image_bytes
 from ..settings import settings
 from ..vision import VisionService
 
@@ -52,7 +53,8 @@ async def identify_item(
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(get_current_active_user),
 ):
-    if not settings.VISION_ENABLED:
+    eff = llm_config_service.get_effective_for_db(db)
+    if not eff.vision_enabled:
         raise HTTPException(
             status_code=503, detail="Vision auto-fill is disabled on this deployment."
         )
@@ -68,12 +70,14 @@ async def identify_item(
         )
 
     # Upfront validation in the request thread — no point enqueueing a
-    # worker job to discover the first upload is corrupt.
+    # worker job to discover the first upload is corrupt. `normalize_for_llm`
+    # re-encodes MPO containers to single-frame JPEG so the provider sees a
+    # documented format; passes JPEG/PNG/WEBP/HEIC through untouched.
     image_bytes: List[bytes] = []
     for upload in files:
         data = await upload.read()
         validate_image_bytes(data)  # 400/413 on bad bytes or oversized
-        image_bytes.append(data)
+        image_bytes.append(normalize_for_llm(data))
 
     hints_obj: Optional[dict] = None
     if hints:

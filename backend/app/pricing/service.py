@@ -44,6 +44,7 @@ from ..schemas_llm import (
     PriceEstimate,
     PriceEstimateEnvelope,
 )
+from ..services import llm_config as llm_config_service
 from ..settings import settings
 from .cache import CacheLookupResult, PriceCache
 from .normalizer import ItemIdentity, normalize_identity
@@ -106,7 +107,8 @@ class PricingService:
         fallback) and enqueueing a ``pricing_refresh`` ARQ task that
         eventually awaits this same method from the worker process.
         """
-        if not settings.PRICING_ENABLED:
+        eff = llm_config_service.get_effective_for_db(self.db)
+        if not eff.pricing_enabled:
             raise HTTPException(
                 status_code=503,
                 detail="Item-value pricing is disabled on this deployment.",
@@ -270,7 +272,7 @@ class PricingService:
             }
             guard.record_usage(
                 "pricing",
-                model=settings.pricing_model(),
+                model=llm_config_service.get_effective_for_db(self.db).pricing_model,
                 usage=provider_usage,
             )
         return estimate

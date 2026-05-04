@@ -14,6 +14,7 @@ from sqlalchemy import (
     TypeDecorator,
 )
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import expression
 
 from app.database import Base
 
@@ -73,6 +74,12 @@ class User(Base):
     username = Column(String, unique=True, index=True)
     hashed_password = Column(String)
     is_active = Column(Boolean, default=True)
+    # First successfully registered user is promoted to admin. Subsequent
+    # registrations default to False. Used to gate the LLM operator
+    # dashboard at /api/llm-config and the frontend /settings route.
+    is_admin = Column(
+        Boolean, nullable=False, default=False, server_default=expression.false()
+    )
     created_at = Column(DateTime, default=datetime.utcnow)
     items = relationship("Item", back_populates="owner")
     backups = relationship("Backup", back_populates="owner")
@@ -172,6 +179,43 @@ class PriceCache(Base):
     payload = Column(JSON, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     expires_at = Column(DateTime, nullable=False, index=True)
+
+
+class LLMConfig(Base):
+    """Singleton row for the operator-editable LLM provider config.
+
+    Lives behind the /api/llm-config router. Every column is nullable
+    so a missing value falls back to the corresponding ``settings.*``
+    env value. The API key is stored encrypted (Fernet, key derived
+    from ``SECRET_KEY``); the rest are plain values.
+
+    There is exactly one row in this table; the application enforces
+    ``id == 1`` at the service layer rather than via a check
+    constraint so the cross-dialect migration stays trivial.
+    """
+
+    __tablename__ = "llm_config"
+
+    id = Column(Integer, primary_key=True)
+    base_url = Column(String, nullable=True)
+    # Fernet ciphertext of the plaintext API key. Decrypted on demand by
+    # the service layer; never logged. NULL means "fall back to env".
+    api_key_ciphertext = Column(String, nullable=True)
+    model = Column(String, nullable=True)
+    vision_model = Column(String, nullable=True)
+    pricing_model = Column(String, nullable=True)
+    timeout_seconds = Column(Integer, nullable=True)
+    response_healing = Column(Boolean, nullable=True)
+    vision_enabled = Column(Boolean, nullable=True)
+    pricing_enabled = Column(Boolean, nullable=True)
+    vision_daily_cap_usd = Column(Float, nullable=True)
+    pricing_daily_cap_usd = Column(Float, nullable=True)
+    updated_at = Column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
+    # Convenience: who saved last. Not enforced by the schema (the
+    # actor is also written to the audit log).
+    updated_by = Column(UUID, ForeignKey("users.id"), nullable=True)
 
 
 class LLMUsage(Base):

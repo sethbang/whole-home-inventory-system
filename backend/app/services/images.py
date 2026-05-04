@@ -42,13 +42,24 @@ THUMBNAIL_PREFIX = "thumb_"
 # Pillow formats we accept on upload. Anything else is 400'd, both because
 # our frontend doesn't render them and because we don't want to store obscure
 # codecs that might be vectors for image-library CVEs down the line.
-ALLOWED_PIL_FORMATS = {"JPEG", "PNG", "WEBP", "HEIC", "HEIF"}
+#
+# MPO ("Multi Picture Object") is the container iPhones produce in HDR /
+# Portrait / Live Photo modes — it's a stack of JPEGs concatenated with
+# EXIF MPF metadata pointing at the secondary frames. Pillow opens MPO
+# transparently and returns the primary frame for `size`/`convert`/etc.,
+# and browsers reading the file as `.jpg` see the first JPEG and ignore
+# the trailer. Vision callers should still pipe the bytes through
+# ``normalize_for_llm`` before sending to providers — most documented
+# vision APIs (OpenAI, Anthropic) accept JPEG/PNG/WEBP only.
+ALLOWED_PIL_FORMATS = {"JPEG", "PNG", "WEBP", "HEIC", "HEIF", "MPO"}
 EXT_BY_FORMAT = {
     "JPEG": ".jpg",
     "PNG": ".png",
     "WEBP": ".webp",
     "HEIC": ".heic",
     "HEIF": ".heif",
+    # Primary frame is JPEG; trailing frames are ignored by browsers.
+    "MPO": ".jpg",
 }
 
 
@@ -126,6 +137,28 @@ def validate_image_bytes(data: bytes) -> str:
         # them all as 400s rather than letting them bubble up to 500.
         logger.warning("image validation failed: %s", exc)
         raise HTTPException(status_code=400, detail="File is not a valid image")
+
+
+def normalize_for_llm(data: bytes) -> bytes:
+    """Return bytes safe to send to an LLM image-input API.
+
+    MPO containers (iPhone HDR / Portrait / Live Photo exports) carry
+    multiple JPEG frames; documented vision APIs only accept single-frame
+    JPEG/PNG/WEBP, so we re-encode just the primary frame as a clean
+    JPEG. Other accepted formats pass through untouched.
+
+    Caller is responsible for having already run ``validate_image_bytes``
+    against ``data``; this helper assumes the format is in
+    ``ALLOWED_PIL_FORMATS``.
+    """
+    with Image.open(io.BytesIO(data)) as img:
+        fmt = (img.format or "").upper()
+        if fmt != "MPO":
+            return data
+        primary = img.convert("RGB")
+        buf = io.BytesIO()
+        primary.save(buf, format="JPEG", quality=92)
+        return buf.getvalue()
 
 
 class ImageService:
