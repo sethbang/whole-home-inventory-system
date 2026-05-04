@@ -4,11 +4,11 @@
 
 # Whole-Home Inventory System (WHIS)
 
-WHIS is a self-hosted platform for managing household inventories. It centralizes item information—descriptions, photos, locations, purchase details, valuations, warranties—into a local database accessible from multiple devices via a web interface.
+**Current version: 3.1.0** — see [CHANGELOG.md](CHANGELOG.md).
+
+WHIS is a self-hosted platform for managing household inventories. It centralizes item information — descriptions, photos, locations, purchase details, valuations, warranties — into a local database accessible from multiple devices via a web interface. The v3.x line adds optional AI-assisted item identification (vision auto-fill) and resale-value pricing (eBay Browse + LLM), all while keeping your data local.
 
 ## Documentation
-
-📚 **[View Full Documentation](#documentation-suite)**
 
 - 📖 [Architecture Overview](ARCHITECTURE.md)
 - 🔧 [Development Guide](DEVELOPMENT.md)
@@ -16,238 +16,220 @@ WHIS is a self-hosted platform for managing household inventories. It centralize
 - 🤝 [Contributing Guidelines](CONTRIBUTING.md)
 - 📜 [API Documentation](API.md)
 - 🔒 [Security Policy](SECURITY.md)
-- 📋 [Changelog](CHANGELOG.md)
 - 📦 [Deployment Guide](DEPLOYMENT.md)
+- 🛒 [eBay Integration](docs/EBAY_INTEGRATION.md)
+- 📋 [Changelog](CHANGELOG.md)
 
 ## Features
 
-- 📱 **Progressive Web App (PWA)**: Offline access and mobile app-like experience
-- 📸 **Photo Management**: Multiple images per item with camera integration
-- 🔍 **Advanced Search**: Filter and sort by any field
-- 🏷️ **Custom Fields**: Define your own data fields and categories
-- 🔒 **Privacy-Focused**: Self-hosted with local data storage
-- 📱 **Mobile-Optimized**: Camera integration and quick-add functionality
-- 📊 **Analytics & Reports**: Generate detailed reports about your inventory
-- 🔄 **Backup & Restore**: Automated backup system with restore capabilities
-- 📷 **Barcode/QR Scanning**: Quick item lookup and entry using barcodes
-- 🔄 **Data Migration**: Import/export functionality for various formats
+### Core (v1.x – v2.x)
+- 📱 **Progressive Web App** — installable, offline-aware, mobile app-like experience
+- 📸 **Photo management** — multiple images per item, camera capture, drag-to-reorder
+- 🔍 **Full-text search** (v3.0) — fast item search via SQLite FTS5 / Postgres `tsvector`
+- 🏷️ **Custom fields** — strict-typed top-level keys (`ebay`, `facebook`) plus free-form `user_defined`
+- 🔒 **Privacy-first** — self-hosted, all data on your host, optional LLM-cloud kill-switch
+- 📊 **Analytics & reports** — dashboard tiles, value breakdowns, charts
+- 🔄 **Backup & restore** — in-app zip archives, async via ARQ when worker enabled
+- 📷 **Barcode/QR scanning** — quick item lookup via `@zxing/browser`
+- 🛒 **Marketplace assist** — eBay listing CSV (per-item + bulk) and Facebook Marketplace copy-paste + Meta Commerce catalog CSV
+
+### v3.0 — Scale & ops
+- 🐘 **Postgres support** — opt-in via `DATABASE_URL=postgresql+psycopg://...`; SQLite remains the zero-config default
+- ⚙️ **ARQ background jobs** — Redis-backed queue for backup create/restore, thumbnail generation, vision, pricing. Synchronous fallback when `REDIS_URL` is unset
+- 🖼️ **Image thumbnails** — generated server-side, served separately from full-res for fast galleries
+- 🔎 **Items FTS** — sub-100ms search across name, brand, model, notes, location
+
+### v3.1 — Intelligence (optional, off by default)
+- 👁️ **Vision auto-fill** — point an image-capable LLM at a photo and pre-fill name/brand/model/tags. Strict JSON schema enforcement; per-day cost cap.
+- 💰 **Pricing** — eBay Browse API for catalog comparables (P10/P50/P90), with LLM+web-search fallback for off-catalog items. Aggregated estimates cached for 14 days. Marketplace Account Deletion exempt — see [docs/EBAY_INTEGRATION.md](docs/EBAY_INTEGRATION.md).
+- 🔐 **Privacy kill-switch** — `LLM_ALLOW_CLOUD=false` refuses to start unless `LLM_BASE_URL` resolves to a private host (Ollama/LocalAI on LAN).
+- 💵 **Daily cost caps** — `VISION_DAILY_COST_CAP_USD` and `PRICING_DAILY_COST_CAP_USD` enforce per-(user, day) spend ceilings; over-cap returns HTTP 402.
 
 ## Screenshots
 
 <div align="center">
   <img src="images/screenshots/WHIS - Whole-Home Inventory System.jpeg" alt="WHIS Dashboard" width="800">
-  <p><em>Main Dashboard - Overview of your inventory items</em></p>
-  
+  <p><em>Main Dashboard — overview of your inventory items</em></p>
   <img src="images/screenshots/WHIS - Whole-Home Inventory System · 5.08pm · 12-22.jpeg" alt="WHIS Item Details" width="800">
-  <p><em>Item Details View - Comprehensive information about each item</em></p>
-  
+  <p><em>Item Details View — comprehensive information about each item</em></p>
   <img src="images/screenshots/WHIS - Whole-Home Inventory System · 5.08pm · 12-22 (1).jpeg" alt="WHIS Add Item" width="800">
-  <p><em>Add Item Form - Easy item entry with custom fields</em></p>
-  
+  <p><em>Add Item Form — easy item entry with custom fields</em></p>
   <img src="images/screenshots/WHIS - Whole-Home Inventory System · 5.08pm · 12-22 (2).jpeg" alt="WHIS Reports" width="800">
-  <p><em>Analytics Dashboard - Detailed insights about your inventory</em></p>
+  <p><em>Analytics Dashboard — detailed insights about your inventory</em></p>
 </div>
 
-## Documentation Suite
-
-WHIS provides comprehensive documentation to help you understand, use, and contribute to the project:
-
-### For Users
-
-- **[User Guide](docs/USER_GUIDE.md)**: Complete guide to using WHIS
-- **[Installation Guide](#installation)**: Step-by-step installation instructions
-- **[Deployment Guide](DEPLOYMENT.md)**: Production deployment instructions
-- **[Security Policy](SECURITY.md)**: Security information and best practices
-- **[Changelog](CHANGELOG.md)**: Version history and updates
-
-### For Developers
-
-- **[Architecture Overview](ARCHITECTURE.md)**: System design and technical decisions
-- **[Development Guide](DEVELOPMENT.md)**: Setting up development environment
-- **[Contributing Guidelines](CONTRIBUTING.md)**: How to contribute to WHIS
-- **[Testing Guide](TESTING.md)**: Testing procedures and guidelines
-- **[API Documentation](API.md)**: Complete API reference
-
-## Tech Stack
+## Tech stack
 
 ### Backend
-- Python 3.11+ (CI tests 3.11 and 3.12)
-- FastAPI 0.115
-- SQLAlchemy 2.0 + SQLite
-- Uvicorn
-- Alembic (database migrations — sole source of truth for schema)
-- PyJWT + passlib/bcrypt for auth
-- pydantic-settings for env-driven config
+- **Python** 3.11 / 3.12 (CI matrix)
+- **FastAPI** (>=0.115)
+- **SQLAlchemy 2.x**, **Pydantic v2**, **pydantic-settings**
+- **SQLite** by default; **Postgres 16** opt-in via `DATABASE_URL`
+- **Alembic** — sole source of truth for schema (the `Base.metadata.create_all()` path was removed in 2.0.0)
+- **PyJWT** + **passlib/bcrypt** for auth
+- **ARQ** + **Redis** (v3.0) — optional background job queue
+- **OpenAI Python SDK** (v3.1) — talks to any OpenAI-compatible LLM (OpenRouter, Venice.ai, Ollama, LocalAI)
+- **structlog**, **slowapi** (per-route rate limiting), **OpenTelemetry** (opt-in)
 
 ### Frontend
-- React 19
-- TypeScript 5.6
-- Tailwind CSS 3.4
-- Vite 6
-- PWA Support (`vite-plugin-pwa`)
-- TanStack Query, Formik + Yup, React Router v7
+- **React 19**, **TypeScript 5**, **Vite 6**
+- **Tailwind CSS v4** (`@tailwindcss/vite`, config in CSS via `@theme` block — no `tailwind.config.js`/`postcss.config.js`)
+- **React Router v7** (data router with loaders)
+- **TanStack Query 5**
+- **react-hook-form** + **zod** (Formik + Yup were removed in v2.3)
+- **Vitest** (Jest was removed in v2.4)
+- **vite-plugin-pwa** for service worker / installability
+- **`@zxing/browser`** for barcode scanning
+
+### Infrastructure
+- **Docker Compose** with profiles (`worker` for Redis+ARQ, `postgres` for the Postgres service)
+- **Caddy** for the NAS deployment (auto-TLS, replaces the v2.3-and-prior nginx setup)
 
 ## Prerequisites
 
 - Python 3.11 or higher
-- Node.js 20 or higher (CI uses 20)
+- Node.js 20 or higher
 - npm
 - Git
 - Optional: Docker + Docker Compose for the containerized stack
 
-## Installation
+## Installation (local dev)
 
-1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/whole-home-inventory-system.git
+git clone https://github.com/sethbang/whole-home-inventory-system.git
 cd whole-home-inventory-system
 ```
 
-2. Set up the backend:
+### Backend
+
 ```bash
 cd backend
 python -m venv venv
-source venv/bin/activate  # On Windows use: venv\Scripts\activate
+source venv/bin/activate                       # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
-# Copy the env template and set a SECRET_KEY (required when BYPASS_AUTH=false).
 cp .env.example .env
-python -c "import secrets; print(secrets.token_urlsafe(64))"   # paste into SECRET_KEY in .env
+python -c "import secrets; print(secrets.token_urlsafe(64))"
+# paste the output into SECRET_KEY in .env
 
-# Apply migrations. Use bootstrap.py (not bare alembic) so legacy
-# stamps from pre-2.0.0 databases are reconciled automatically.
+# Apply migrations. Use bootstrap.py — it reconciles legacy stamps
+# from pre-2.0.0 databases automatically.
 python scripts/bootstrap.py
 ```
 
-3. Set up the frontend:
+### Frontend
+
 ```bash
 cd frontend
 npm install
-cp .env.example .env   # optional — override VITE_BACKEND_URL if running backend outside Docker
+cp .env.example .env   # optional — only needed if backend runs outside compose
 ```
 
-## Development Setup
+### Certificates (required — app is HTTPS-only, even in dev)
 
-### Certificate Setup (Required)
-
-> ⚠️ **Important**: WHIS uses HTTPS for secure communication. You must set up the development certificates before running the application.
-
-1. Generate the development certificates:
 ```bash
 cd frontend
 node scripts/generate-certs.js
 ```
-This will create:
-- A root Certificate Authority (CA) certificate
-- Server certificates for local development
-- All certificates are stored in the `certs` directory
 
-2. Install the CA certificate on your development machine:
+This produces:
+- `frontend/certs/cert.pem` + `key.pem` — server cert (SANs cover localhost + LAN IPs)
+- `frontend/certs/whis-dev-ca.crt` — root CA you install on each device
 
-#### macOS:
+Install the CA cert per OS — see `frontend/certs/CERTIFICATE-SETUP.md` (the generator produces it automatically). Quick reference:
+
+#### macOS
 ```bash
-cd ../certs
-sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain whis-dev-ca.crt
+sudo security add-trusted-cert -d -r trustRoot \
+  -k /Library/Keychains/System.keychain frontend/certs/whis-dev-ca.crt
 ```
 
-#### Linux:
+#### Linux
 ```bash
-cd ../certs
-sudo cp whis-dev-ca.crt /usr/local/share/ca-certificates/
+sudo cp frontend/certs/whis-dev-ca.crt /usr/local/share/ca-certificates/
 sudo update-ca-certificates
 ```
 
-#### Windows:
-1. Navigate to the `certs` directory
-2. Double-click `whis-dev-ca.crt`
-3. Click "Install Certificate"
-4. Select "Local Machine"
-5. Choose "Trusted Root Certification Authorities"
-6. Complete the installation wizard
+#### Windows
+Double-click `whis-dev-ca.crt` → Install Certificate → Local Machine → Trusted Root Certification Authorities.
 
-For detailed instructions including mobile devices and NAS setup, see `certs/CERTIFICATE-SETUP.md`.
+### Run the dev servers
 
-> 📝 **Note**: The certificate needs to be installed on each device that will access WHIS.
-
-3. Start the backend server:
 ```bash
+# Backend (HTTPS on 27182)
 cd backend
-source venv/bin/activate  # On Windows use: venv\Scripts\activate
+source venv/bin/activate
 uvicorn app.main:app --reload --port 27182 \
   --ssl-keyfile ../frontend/certs/key.pem \
   --ssl-certfile ../frontend/certs/cert.pem
-```
 
-4. Start the frontend development server:
-```bash
+# Frontend (HTTPS on 5173, regenerates certs on start, proxies /api + /uploads)
 cd frontend
 npm run dev
 ```
 
-The application will be available at:
-- Local development: https://localhost:5173
-- Network access: https://[your-ip]:5173 or https://[your-nas]:5173
+App is at https://localhost:5173 (LAN: https://&lt;your-ip&gt;:5173).
 
-### Docker (recommended for local testing)
+## Docker (recommended for testing the full stack)
 
 ```bash
-# at the repo root — generate a SECRET_KEY once, shared by both compose files
+# At the repo root — generate a SECRET_KEY once.
 cat > .env <<EOF
 SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(64))')
 EOF
 grep -q '^\.env$' .gitignore || echo '.env' >> .gitignore
 
+# Default profile: backend + frontend + SQLite, jobs run synchronously.
 docker compose up --build
+
+# Async-jobs profile: + Redis + ARQ worker. Heavy ops (backup, vision,
+# pricing) run on the worker; the API responds with a JobReference and
+# the frontend polls /api/jobs/{id}.
+docker compose --profile worker up --build
+
+# Postgres profile: + Postgres 16 service.
+docker compose --profile postgres up --build
+
+# Full v3.0 stack: Postgres + Redis + worker.
+docker compose --profile postgres --profile worker up --build
 ```
 
-The backend container's startup script (`scripts/bootstrap.py`) runs `alembic upgrade head` automatically and reconciles any legacy migration stamps from pre-2.0.0 databases.
+The backend container's startup script (`scripts/bootstrap.py`) runs `alembic upgrade head` on every boot and reconciles legacy migration stamps from pre-2.0.0 databases.
 
-## Quick Start Guide
+For NAS / production deployment, see [DEPLOYMENT.md](DEPLOYMENT.md) — uses `docker-compose.nas.yml` with Caddy fronting the stack and Redis + worker always on.
 
-1. **First Time Setup**
-   - Create an admin account using the registration page
-   - Log in to access the dashboard
+## Quick start
 
-2. **Adding Items**
-   - Click the "Add Item" button
-   - Fill in the item details
-   - Add photos using upload or camera capture
-   - Use barcode scanner for quick entry
-   - Save the item
-
-3. **Managing Items**
-   - Browse items from the dashboard
-   - Use search and filters to find specific items
-   - Click on items to view/edit details
-   - Add custom fields as needed
-
-4. **Data Management**
-    - Create automatic backups of your data
-    - Download backups for safekeeping
-    - Upload backup files to restore data
-    - Import/export data using migration tools
-    - Generate reports and analytics
+1. **First-time setup**
+   - Open https://localhost:5173 → Register an account → log in.
+2. **Adding items**
+   - Click **Add Item**. Optionally upload/take a photo and click **Auto-fill from image** (requires vision feature flagged on).
+   - Fill remaining fields, save.
+3. **Pricing an item** (optional, requires `PRICING_ENABLED=true`)
+   - Open the item → **Get price estimate**. Falls through providers per `PRICING_PROVIDERS` (default `ebay,llm`).
+4. **Marketplace export**
+   - Open an item → **Marketplace** tab → eBay (CSV) or Facebook (copy-paste + Meta Commerce CSV). Bulk variants live on the Dashboard.
+5. **Backups**
+   - Backups page → **Create backup**. Download / restore from the same page.
 
 ## Contributing
 
-We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details on:
-- Code of Conduct
-- Development process
-- Pull request procedure
-- Coding standards
+We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for development workflow, style guidelines, testing requirements, and PR process.
 
 ## Support
 
-- 📖 [Documentation](#documentation-suite)
-- 🐛 [Issue Tracker](https://github.com/yourusername/whole-home-inventory-system/issues)
-- 💬 [Discussions](https://github.com/yourusername/whole-home-inventory-system/discussions)
+- 🐛 [Issue Tracker](https://github.com/sethbang/whole-home-inventory-system/issues)
+- 💬 [Discussions](https://github.com/sethbang/whole-home-inventory-system/discussions)
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT — see [LICENSE](LICENSE).
 
 ## Acknowledgments
 
-- Built with [FastAPI](https://fastapi.tiangolo.com/)
-- UI powered by [React](https://reactjs.org/)
-- Styled with [Tailwind CSS](https://tailwindcss.com/)
+- [FastAPI](https://fastapi.tiangolo.com/) — backend framework
+- [React](https://react.dev/) — UI library
+- [Tailwind CSS](https://tailwindcss.com/) — styling
+- [Vite](https://vite.dev/) — frontend build tool
+- [ARQ](https://arq-docs.helpmanual.io/) — background job queue
+- [OpenRouter](https://openrouter.ai/) — primary LLM gateway used in v3.1
