@@ -10,11 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added — dev-DB seeding via Venice.ai nano-banana-2
 
 - **`backend/scripts/seed_items.py`.** One-shot dev-only seeder that drops
-  a curated dozen of diverse `Item` rows (Electronics / Furniture /
-  Kitchen / Tools / Clothing across realistic household locations) with
-  1–3 product photos each generated on the fly via Venice.ai's
-  `nano-banana-2` image model. Idempotent: each seeded item is tagged
-  with `custom_fields.user_defined.seeded="v1"` so re-runs are no-ops.
+  a curated set of 60 diverse `Item` rows spanning Appliances /
+  Electronics / Furniture / Kitchen / Tools / Clothing / Sports /
+  Outdoor across realistic household locations (Living Room, Master
+  Bedroom, Home Office, Kitchen, Garage, Basement, Shed, Front Porch,
+  Mudroom, etc.) with 1–3 product photos each generated on the fly via
+  Venice.ai's `nano-banana-2` image model. Per-name idempotency: each
+  seeded item carries `custom_fields.user_defined.seeded="v1"`, and the
+  script skips items already present by name so the list stays additive
+  — appending more entries and re-running picks up just the new ones.
   Resolves the seed user via `SEED_USER=<username>`, falling back to a
   `developer` user, then to a single-user fallback when only one user
   exists. Mirrors the on-disk + DB conventions in
