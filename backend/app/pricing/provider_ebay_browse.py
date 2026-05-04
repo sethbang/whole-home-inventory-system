@@ -202,7 +202,17 @@ class EbayBrowseProvider(PriceProvider):
 
 
 def _parse_item_summaries(summaries: List[Dict[str, Any]]) -> List[PriceSource]:
-    """Convert eBay's itemSummaries into our PriceSource shape."""
+    """Convert eBay's itemSummaries into our PriceSource shape.
+
+    We deliberately extract only listing/catalog fields (title, url,
+    price, condition) and ignore the eBay ``seller`` object (username,
+    userId, feedbackPercentage, etc.). This is load-bearing for the
+    Marketplace Account Deletion exemption: WHIS persists no eBay user
+    data, so we are exempt from running the deletion-notification
+    callback. If you ever need seller info, you must first reverse the
+    exemption via the eBay developer portal and stand up the callback
+    listener — see docs/EBAY_INTEGRATION.md.
+    """
     parsed: List[PriceSource] = []
     for summary in summaries:
         price_obj = summary.get("price") or {}

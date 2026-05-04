@@ -216,6 +216,28 @@ any Postgres deployment takes real traffic.
   **CVE-2026-28684** (previously pinned at 1.0.1). CI's
   `pip-audit --strict` leg would otherwise block the push.
 
+### Compliance
+
+- **eBay Marketplace Account Deletion exemption — regression-tested**
+  (`backend/app/pricing/provider_ebay_browse.py::_parse_item_summaries`,
+  `backend/tests/test_pricing_providers.py::test_ebay_parser_drops_seller_pii_for_deletion_exemption`).
+  WHIS holds an exemption from eBay's deletion-notification system on
+  the basis that we persist no eBay user data. The exemption is
+  load-bearing — the new test feeds the parser a Browse response laden
+  with seller PII (`username`, `userId`, `eiasToken`,
+  `feedbackPercentage`, seller email, buyer block) and asserts none of
+  it survives into the `PriceSource` list (which is what lands in
+  `PriceCache.payload` and gets serialized to clients). A code-comment
+  block on `_parse_item_summaries` documents the exemption commitment.
+  See `docs/EBAY_INTEGRATION.md` for the full audit trail.
+
+### Test counts (current Unreleased)
+
+- Backend: **336 tests** (up from 315 at v3.1.0 release):
+  +12 from F6/F10a/F10b/F11/F12 fixes, +1 deletion-exemption
+  regression, all green on SQLite + Postgres 16.
+- Frontend: **95 vitest** tests, 0 ESLint errors.
+
 
 ## [3.1.0] - 2026-04-23
 

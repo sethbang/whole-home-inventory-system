@@ -268,6 +268,83 @@ def test_ebay_token_cache_skips_second_oauth():
     assert call_count["search"] == 2
 
 
+def test_ebay_parser_drops_seller_pii_for_deletion_exemption():
+    """Regression guard for the eBay Marketplace Account Deletion exemption.
+
+    WHIS holds an exemption on the basis that we persist no eBay user
+    data. This test feeds the parser a Browse response laden with
+    seller PII (username, userId, eiasToken, feedbackPercentage,
+    seller email) and asserts that none of it survives into the
+    PriceSource list — which is what eventually lands in
+    ``PriceCache.payload`` and gets serialized to clients.
+
+    If this test ever fails, the exemption is invalidated and the
+    deletion-notification callback (see docs/EBAY_INTEGRATION.md) must
+    be stood up before the change ships.
+    """
+    pii_markers = {
+        "username": "ebayUserNameXyz",
+        "userId": "12345-immutable-userid",
+        "eiasToken": "nY+sHZ2PrBmdj6wVnY+seQ==",
+        "email": "seller@example.com",
+        "feedbackPercentage": "99.9",
+    }
+    listings = {
+        "itemSummaries": [
+            {
+                "title": "Canon EOS R5 body",
+                "itemWebUrl": "https://ebay.com/itm/1",
+                "price": {"value": "2400.00", "currency": "USD"},
+                "condition": "Used",
+                # Everything below is what we MUST NOT persist.
+                "seller": {
+                    "username": pii_markers["username"],
+                    "userId": pii_markers["userId"],
+                    "feedbackPercentage": pii_markers["feedbackPercentage"],
+                    "feedbackScore": 4823,
+                    "email": pii_markers["email"],
+                },
+                "eiasToken": pii_markers["eiasToken"],
+                "buyer": {"username": "ignoreThisToo"},
+            },
+        ]
+    }
+    transport = _mock_transport(
+        {
+            "/identity/v1/oauth2/token": _oauth_ok(),
+            "/buy/browse/v1/item_summary/search": httpx.Response(200, json=listings),
+        }
+    )
+
+    import asyncio
+
+    async def run():
+        http = httpx.AsyncClient(transport=transport)
+        try:
+            provider = EbayBrowseProvider(http=http)
+            return await provider.lookup(_ebay_identity())
+        finally:
+            await http.aclose()
+
+    estimate = asyncio.run(run())
+
+    # Serialize the entire estimate (this is what hits PriceCache.payload).
+    serialized = json.dumps([s.__dict__ for s in estimate.sources])
+    for label, marker in pii_markers.items():
+        assert marker not in serialized, (
+            f"eBay {label} ({marker!r}) leaked into PriceSource — the "
+            f"Marketplace Account Deletion exemption requires that no "
+            f"eBay user data be persisted. See docs/EBAY_INTEGRATION.md."
+        )
+    # Also belt-and-suspenders: assert the field names themselves don't
+    # appear, in case a future refactor renames the marker values.
+    for forbidden_key in ("seller", "userId", "username", "eiasToken", "buyer"):
+        assert forbidden_key not in serialized, (
+            f"PriceSource contains forbidden key {forbidden_key!r}; "
+            f"deletion-exemption regression."
+        )
+
+
 # ---------------------------------------------------------------------------
 # LLM pricing provider
 # ---------------------------------------------------------------------------
