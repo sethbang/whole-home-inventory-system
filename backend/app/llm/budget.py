@@ -20,7 +20,8 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Literal
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .. import models
@@ -114,7 +115,15 @@ class DailyBudgetGuard:
         return self.db.execute(stmt).scalar_one_or_none()
 
     def check_or_raise(self, feature: Feature) -> None:
-        """Raise HTTPException 402 when today's spend exceeds the cap."""
+        """Raise HTTPException 402 when today's spend exceeds the cap.
+
+        Best-effort: a call's cost is only known *after* the provider
+        responds, so the cap blocks the *next* call once a recorded row
+        crosses it — it cannot pre-empt a call already in flight. Two
+        requests that pass this check concurrently will both run; the
+        overshoot is bounded to those in-flight calls. The cap is a
+        spend signal, not a hard billing limit.
+        """
         cap = _cap_for(feature, db=self.db)
         if cap <= 0:
             return
@@ -163,9 +172,39 @@ class DailyBudgetGuard:
         )
 
         today = _floor_to_utc_day(datetime.now(timezone.utc))
-        row = self._row(feature, today)
-        if row is None:
-            row = models.LLMUsage(
+
+        # Accumulate atomically. A read-modify-write in Python loses
+        # updates when two calls for the same (user, day, feature) race;
+        # an in-DB ``SET col = col + :delta`` cannot. The day's first
+        # call finds no row to UPDATE and falls through to INSERT; if a
+        # concurrent call wins that INSERT, the unique index
+        # ``ix_llm_usage_user_date_feature`` rejects ours and we retry
+        # the now-present UPDATE.
+        def _accumulate() -> int:
+            result = self.db.execute(
+                update(models.LLMUsage)
+                .where(
+                    models.LLMUsage.user_id == self.user.id,
+                    models.LLMUsage.usage_date == today,
+                    models.LLMUsage.feature == feature,
+                )
+                .values(
+                    tokens_in=models.LLMUsage.tokens_in + tokens_in,
+                    tokens_out=models.LLMUsage.tokens_out + tokens_out,
+                    cost_usd=models.LLMUsage.cost_usd + computed_cost,
+                    request_count=models.LLMUsage.request_count + 1,
+                )
+                .execution_options(synchronize_session=False)
+            )
+            return result.rowcount
+
+        if _accumulate() > 0:
+            self.db.commit()
+            return
+
+        # No row for today yet — insert the first one.
+        self.db.add(
+            models.LLMUsage(
                 user_id=self.user.id,
                 usage_date=today,
                 feature=feature,
@@ -174,11 +213,12 @@ class DailyBudgetGuard:
                 cost_usd=computed_cost,
                 request_count=1,
             )
-            self.db.add(row)
-        else:
-            row.tokens_in = (row.tokens_in or 0) + tokens_in
-            row.tokens_out = (row.tokens_out or 0) + tokens_out
-            row.cost_usd = (row.cost_usd or 0.0) + computed_cost
-            row.request_count = (row.request_count or 0) + 1
-        self.db.commit()
-        self.db.refresh(row)
+        )
+        try:
+            self.db.commit()
+        except IntegrityError:
+            # A concurrent call inserted the row between our UPDATE and
+            # our INSERT — fold our counts into the now-existing row.
+            self.db.rollback()
+            _accumulate()
+            self.db.commit()

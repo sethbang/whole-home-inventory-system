@@ -107,6 +107,30 @@ def test_login_throttles_after_five_attempts(client):
 
 
 # ---------------------------------------------------------------------------
+# Registration throttle (5/min/IP)
+# ---------------------------------------------------------------------------
+
+
+def test_register_throttles_after_five_attempts(client):
+    """Registration must be IP-throttled like login, so an attacker can't
+    spam the endpoint to enumerate accounts or flood the user table."""
+    payload = {
+        "email": "ratetest@example.com",
+        "username": "ratetest",
+        "password": "correct-horse-battery-staple",
+    }
+    # First create succeeds; the next four collide on the unique check
+    # (400) — but every request still counts toward the limit.
+    for _ in range(5):
+        resp = client.post("/api/register", json=payload)
+        assert resp.status_code in (200, 400)
+
+    resp = client.post("/api/register", json=payload)
+    assert resp.status_code == 429
+    assert "try again later" in resp.json()["detail"].lower()
+
+
+# ---------------------------------------------------------------------------
 # Items export throttle (10/hour/user)
 # ---------------------------------------------------------------------------
 

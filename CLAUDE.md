@@ -21,7 +21,7 @@ alembic downgrade -1                          # revert last
 python create_dev_user.py                     # seed dev user (only useful when BYPASS_AUTH=false)
 python scripts/test_venice_image.py           # smoke test the Venice.ai image-gen endpoint (writes one JPG)
 SEED_USER=<u> python scripts/seed_items.py    # seed dev DB with 12 curated items + Venice.ai-generated photos
-pytest                                        # run tests (408 tests, all passing on SQLite)
+pytest                                        # run tests (409 tests, all passing on SQLite)
 TEST_DATABASE_URL=postgresql+psycopg://... pytest  # run against Postgres (subset — LLM/pricing tests are mock-heavy and SQLite-only)
 pytest tests/test_items.py::test_item_crud_round_trip  # single test
 pytest --cov=app tests/                       # with coverage
@@ -35,7 +35,7 @@ npm run dev             # starts Vite on :5173 (HTTPS). Cert generation now live
                         # container's bridge IP instead of the host's LAN IP.
 npm run build           # tsc --noEmit + vite build
 npm run lint            # eslint . (0 errors; CI blocks on errors)
-npm test                # vitest run (128 tests, all passing)
+npm test                # vitest run (129 tests, all passing)
 npm test -- src/path/to/file.test.tsx   # single test file
 npm run test:watch      # vitest in watch mode
 npm run codegen:api     # regenerate src/api/openapi.d.ts from the backend schema
@@ -102,7 +102,7 @@ Browser (HTTPS :5173) → Vite dev server → proxies `/api` and `/uploads` to `
 - `ebay/`, `facebook/` — marketplace subpackages with their own `schemas.py`, `category_mapping.py`, and `formatter.py`. Both are assist-only: eBay emits CSV, Facebook emits copy-paste blocks + Meta Commerce catalog CSV (Meta has no public listing API for individual sellers).
 - `alembic/versions/` — migrations. `20260420_0001_baseline.py` is idempotent (checks existing tables/indexes), safe against both fresh DBs and DBs previously bootstrapped via `create_all()`. Later migrations (v2.2 pricing columns, v3.0 Postgres compat, items FTS, image thumbnails) stack on top and use `op.get_bind().dialect.name` for dialect branching where needed.
 - `scripts/bootstrap.py` — runtime startup script (invoked by the Dockerfile CMD before uvicorn). Asserts the shared `certs/` volume is populated, clears any unknown Alembic revision stamp (e.g., the pre-2.0.0 `cafb3d2c47a1`), then runs `alembic upgrade head`.
-- `tests/` — pytest suite with `conftest.py` that honors `TEST_DATABASE_URL` (defaults to in-memory SQLite + StaticPool). 408 tests on SQLite (v3.1: adds coverage for the LLM client, budget guard, schemas_llm, vision service/router, pricing normalizer/cache/aggregator, and both providers + the pricing service/router; v3.2 adds the LLM-config service/router + capabilities). Postgres matrix runs the subset that doesn't rely on provider mocks.
+- `tests/` — pytest suite with `conftest.py` that honors `TEST_DATABASE_URL` (defaults to in-memory SQLite + StaticPool). 409 tests on SQLite (v3.1: adds coverage for the LLM client, budget guard, schemas_llm, vision service/router, pricing normalizer/cache/aggregator, and both providers + the pricing service/router; v3.2 adds the LLM-config service/router + capabilities). Postgres matrix runs the subset that doesn't rely on provider mocks.
 - Upload dir is `settings.UPLOAD_DIR` (default `./uploads`, overridden to `/app/backend/uploads` in compose).
 
 ### Frontend layout (`frontend/src/`)

@@ -151,7 +151,9 @@ export default function ItemDetail() {
   const updateItemMutation = useMutation({
     mutationFn: async (values: AddItemSubmitValues) => items.update(id!, values),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.items.detail(id!) });
+      // Invalidate the whole items namespace (detail + list + category /
+      // location facets) so Dashboard and Browse don't render stale cards.
+      queryClient.invalidateQueries({ queryKey: queryKeys.items.all });
       navigate('/');
     },
     onError: (err) => {
@@ -162,7 +164,8 @@ export default function ItemDetail() {
   const uploadImageMutation = useMutation({
     mutationFn: async (file: File) => images.upload(id!, file),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.items.detail(id!) });
+      // Thumbnails surface on list cards — invalidate lists too.
+      queryClient.invalidateQueries({ queryKey: queryKeys.items.all });
     },
     onError: (err) => {
       setServerError(apiErrorMessage(err, 'Failed to upload image'));
@@ -172,7 +175,8 @@ export default function ItemDetail() {
   const deleteImageMutation = useMutation({
     mutationFn: (imageId: string) => images.delete(imageId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.items.detail(id!) });
+      // Thumbnails surface on list cards — invalidate lists too.
+      queryClient.invalidateQueries({ queryKey: queryKeys.items.all });
     },
     onError: (err) => {
       setServerError(apiErrorMessage(err, 'Failed to delete image'));
@@ -181,7 +185,12 @@ export default function ItemDetail() {
 
   const deleteItemMutation = useMutation({
     mutationFn: () => items.delete(id!),
-    onSuccess: () => navigate('/'),
+    onSuccess: () => {
+      // A deleted item must vanish from Dashboard/Browse immediately, not
+      // linger as a ghost card until the next refetch.
+      queryClient.invalidateQueries({ queryKey: queryKeys.items.all });
+      navigate('/');
+    },
     onError: (err) => {
       setServerError(apiErrorMessage(err, 'Failed to delete item'));
     },

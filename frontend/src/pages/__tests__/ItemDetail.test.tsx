@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import ItemDetail from '../ItemDetail';
 import { items, ebay } from '../../api/client';
+import { queryKeys } from '../../api/queryKeys';
 import type { Item, EbayCategoryResponse } from '../../api/client';
 
 // Mock the API client modules
@@ -224,5 +225,28 @@ describe('ItemDetail', () => {
         })
       }));
     });
+  });
+
+  it('invalidates the items list cache after a successful save', async () => {
+    // Regression: editing an item used to invalidate only items.detail,
+    // leaving Dashboard/Browse showing stale cards until a manual refetch.
+    queryClient.setQueryData(queryKeys.items.lists(), []);
+    (items.update as ReturnType<typeof vi.fn>).mockResolvedValue(mockItem);
+
+    renderComponent();
+    await waitFor(() => {
+      expect(screen.getByText('Save')).toBeInTheDocument();
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('Save'));
+    });
+
+    await waitFor(() => {
+      expect(items.update).toHaveBeenCalled();
+    });
+    expect(
+      queryClient.getQueryState(queryKeys.items.lists())?.isInvalidated,
+    ).toBe(true);
   });
 });

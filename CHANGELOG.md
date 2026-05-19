@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Concurrent LLM usage accounting could lose spend.** `record_usage`
+  did a read-modify-write in Python, so two calls landing together for
+  the same (user, day, feature) could overwrite each other's totals. It
+  now uses an atomic in-DB increment. The daily-cap *check* remains
+  best-effort by nature — a call's cost is unknowable until it
+  completes — which is now documented in `SECURITY.md` alongside the
+  `SECRET_KEY`-derived LLM-key encryption trade-offs.
+
+- **`POST /api/register` is now rate-limited** (5/min/IP), matching the
+  existing throttle on `/api/token`. Registration was previously
+  unthrottled, leaving it open to account-enumeration probing and
+  user-table flooding.
+- **Editing, deleting, or changing images on an item now refreshes the
+  Dashboard and Browse lists.** `ItemDetail` mutations previously
+  invalidated only the item-detail query, so list cards could show a
+  stale name/value/thumbnail — or a deleted item could linger as a
+  ghost card — until the next manual refetch. The mutations now
+  invalidate the whole `items` query namespace.
+
 ## [3.3.0] - 2026-05-04
 
 ### Added — Day / Night / System-sync theming

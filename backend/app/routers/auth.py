@@ -17,8 +17,11 @@ router = APIRouter(tags=["authentication"])
 
 
 @router.post("/register", response_model=schemas.User)
+@limiter.limit("5/minute")
 def register_user(
-    user: schemas.UserCreate, db: Session = Depends(database.get_db)
+    request: Request,  # required by slowapi's request-bound rate limiter
+    user: schemas.UserCreate,
+    db: Session = Depends(database.get_db),
 ) -> Any:
     db_user = (
         db.query(models.User)
