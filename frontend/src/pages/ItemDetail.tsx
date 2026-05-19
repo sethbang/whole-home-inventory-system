@@ -1,18 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Controller, useForm } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Tab } from '@headlessui/react';
 import { format } from 'date-fns';
 import { CameraIcon } from '@heroicons/react/24/outline';
 
-import CustomFields from '../components/CustomFields';
+import ItemFormFields from '../components/ItemFormFields';
 import CameraCapture from '../components/CameraCapture';
 import ImageGallery from '../components/ImageGallery';
-import EbayFields, { EbayFieldsData } from '../components/EbayFields';
-import FacebookFields from '../components/FacebookFields';
-import FacebookCopyPasteDialog from '../components/FacebookCopyPasteDialog';
+import { EbayFieldsData } from '../components/EbayFields';
+import MarketplacePanels from '../components/MarketplacePanels';
 import PriceEstimateCard from '../components/PriceEstimateCard';
 import { items, images, ebay, facebook } from '../api/client';
 import { apiErrorMessage } from '../api/errors';
@@ -59,8 +57,6 @@ export default function ItemDetail() {
     queryFn: facebook.getCategories,
   });
   const fbCategories = fbCategoriesData?.categories ?? [];
-
-  const [showFbDialog, setShowFbDialog] = useState(false);
 
   // v3.1: pricing estimate + refresh. estimate() respects the cache;
   // refresh() forces a fresh provider round-trip.
@@ -328,223 +324,44 @@ export default function ItemDetail() {
           )}
 
           <div className="grid grid-cols-1 gap-y-6 sm:grid-cols-6 sm:gap-x-6">
-            <div className="sm:col-span-4">
-              <label htmlFor="name" className="block text-sm font-medium text-muted">
-                Name
-              </label>
-              <input
-                id="name"
-                type="text"
-                aria-invalid={errors.name ? 'true' : 'false'}
-                {...register('name')}
-                className="mt-1 block w-full rounded-md border-line-strong shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-              />
-              {errors.name && (
-                <p className="mt-2 text-sm text-danger">{errors.name.message}</p>
-              )}
-            </div>
-
-            <div className="sm:col-span-3">
-              <label htmlFor="category" className="block text-sm font-medium text-muted">
-                Category
-              </label>
-              <select
-                id="category"
-                aria-invalid={errors.category ? 'true' : 'false'}
-                {...register('category')}
-                className="mt-1 block w-full rounded-md border-line-strong shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-              >
-                <option value="">Select a category</option>
-                {categories.map((category: string) => (
-                  <option key={category} value={category}>
-                    {category}
-                  </option>
-                ))}
-              </select>
-              {errors.category && (
-                <p className="mt-2 text-sm text-danger">{errors.category.message}</p>
-              )}
-            </div>
-
-            <div className="sm:col-span-3">
-              <label htmlFor="location" className="block text-sm font-medium text-muted">
-                Location
-              </label>
-              <select
-                id="location"
-                aria-invalid={errors.location ? 'true' : 'false'}
-                {...register('location')}
-                className="mt-1 block w-full rounded-md border-line-strong shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-              >
-                <option value="">Select a location</option>
-                {locations.map((location: string) => (
-                  <option key={location} value={location}>
-                    {location}
-                  </option>
-                ))}
-              </select>
-              {errors.location && (
-                <p className="mt-2 text-sm text-danger">{errors.location.message}</p>
-              )}
-            </div>
-
-            <div className="sm:col-span-3">
-              <label htmlFor="brand" className="block text-sm font-medium text-muted">
-                Brand
-              </label>
-              <input
-                id="brand"
-                type="text"
-                {...register('brand')}
-                className="mt-1 block w-full rounded-md border-line-strong shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-              />
-            </div>
-
-            <div className="sm:col-span-3">
-              <label htmlFor="model_number" className="block text-sm font-medium text-muted">
-                Model Number
-              </label>
-              <input
-                id="model_number"
-                type="text"
-                {...register('model_number')}
-                className="mt-1 block w-full rounded-md border-line-strong shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-              />
-            </div>
-
-            <div className="sm:col-span-3">
-              <label htmlFor="serial_number" className="block text-sm font-medium text-muted">
-                Serial Number
-              </label>
-              <input
-                id="serial_number"
-                type="text"
-                {...register('serial_number')}
-                className="mt-1 block w-full rounded-md border-line-strong shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-              />
-            </div>
-
-            <div className="sm:col-span-3">
-              <label htmlFor="purchase_date" className="block text-sm font-medium text-muted">
-                Purchase Date
-              </label>
-              <input
-                id="purchase_date"
-                type="date"
-                {...register('purchase_date')}
-                className="mt-1 block w-full rounded-md border-line-strong shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-              />
-            </div>
-
-            <div className="sm:col-span-3">
-              <label htmlFor="purchase_price" className="block text-sm font-medium text-muted">
-                Purchase Price
-              </label>
-              <div className="mt-1 relative rounded-md shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <span className="text-subtle sm:text-sm">$</span>
-                </div>
-                <input
-                  id="purchase_price"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  {...register('purchase_price')}
-                  className="mt-1 block w-full pl-7 rounded-md border-line-strong shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                />
-              </div>
-              {errors.purchase_price && (
-                <p className="mt-2 text-sm text-danger">
-                  {errors.purchase_price.message}
-                </p>
-              )}
-            </div>
-
-            <div className="sm:col-span-3">
-              <label htmlFor="current_value" className="block text-sm font-medium text-muted">
-                Current Value
-              </label>
-              <div className="mt-1 relative rounded-md shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <span className="text-subtle sm:text-sm">$</span>
-                </div>
-                <input
-                  id="current_value"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  {...register('current_value')}
-                  className="mt-1 block w-full pl-7 rounded-md border-line-strong shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                />
-              </div>
-              {errors.current_value && (
-                <p className="mt-2 text-sm text-danger">
-                  {errors.current_value.message}
-                </p>
-              )}
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => estimatePrice.mutate()}
-                  disabled={pricingBusy}
-                  className="inline-flex items-center gap-2 rounded-md border border-primary bg-primary-subtle px-3 py-1 text-xs font-medium text-primary hover:bg-primary-subtle-hover disabled:opacity-60"
-                >
-                  {pricingBusy ? 'Checking…' : 'Estimate value with AI'}
-                </button>
-              </div>
-              {priceEnvelope && (
-                <div className="mt-3">
-                  <PriceEstimateCard
-                    envelope={priceEnvelope}
-                    refreshing={refreshPrice.isPending || priceJobId !== null}
-                    onRefresh={() => refreshPrice.mutate()}
-                    onApplyMedian={(median) => {
-                      setValue('current_value', String(median.toFixed(2)));
-                    }}
-                  />
-                </div>
-              )}
-            </div>
-
-            <div className="sm:col-span-3">
-              <label htmlFor="warranty_expiration" className="block text-sm font-medium text-muted">
-                Warranty Expiration
-              </label>
-              <input
-                id="warranty_expiration"
-                type="date"
-                {...register('warranty_expiration')}
-                className="mt-1 block w-full rounded-md border-line-strong shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-              />
-            </div>
-
-            <div className="sm:col-span-6">
-              <label htmlFor="notes" className="block text-sm font-medium text-muted">
-                Notes
-              </label>
-              <textarea
-                id="notes"
-                rows={3}
-                {...register('notes')}
-                className="mt-1 block w-full rounded-md border-line-strong shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-              />
-            </div>
-
-            <div className="sm:col-span-6">
-              <label className="block text-sm font-medium text-muted mb-4">
-                Custom Fields
-              </label>
-              <Controller
-                control={control}
-                name="custom_fields"
-                render={({ field }) => (
-                  <CustomFields
-                    fields={field.value}
-                    onChange={(fields) => field.onChange(fields)}
-                  />
-                )}
-              />
-            </div>
+            <ItemFormFields
+              register={register}
+              errors={errors}
+              control={control}
+              categories={categories}
+              locations={locations}
+              currentValueExtra={
+                <>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => estimatePrice.mutate()}
+                      disabled={pricingBusy}
+                      className="inline-flex items-center gap-2 rounded-md border border-primary bg-primary-subtle px-3 py-1 text-xs font-medium text-primary hover:bg-primary-subtle-hover disabled:opacity-60"
+                    >
+                      {pricingBusy ? 'Checking…' : 'Estimate value with AI'}
+                    </button>
+                  </div>
+                  {priceEnvelope && (
+                    <div className="mt-3">
+                      <PriceEstimateCard
+                        envelope={priceEnvelope}
+                        refreshing={
+                          refreshPrice.isPending || priceJobId !== null
+                        }
+                        onRefresh={() => refreshPrice.mutate()}
+                        onApplyMedian={(median) => {
+                          setValue(
+                            'current_value',
+                            String(median.toFixed(2)),
+                          );
+                        }}
+                      />
+                    </div>
+                  )}
+                </>
+              }
+            />
 
             <div className="sm:col-span-6">
               <div>
@@ -581,63 +398,19 @@ export default function ItemDetail() {
               )}
             </div>
 
-            <div className="sm:col-span-6 pt-8">
-              <h3 className="text-lg font-medium leading-6 text-fg mb-4">
-                Marketplace Integrations
-              </h3>
-              <Tab.Group>
-                <Tab.List className="flex gap-2 border-b border-line">
-                  {['eBay', 'Facebook Marketplace'].map((label) => (
-                    <Tab
-                      key={label}
-                      className={({ selected }) =>
-                        `px-4 py-2 text-sm font-medium border-b-2 focus:outline-none ${
-                          selected
-                            ? 'border-primary text-primary-hover'
-                            : 'border-transparent text-subtle hover:text-muted'
-                        }`
-                      }
-                    >
-                      {label}
-                    </Tab>
-                  ))}
-                </Tab.List>
-                <Tab.Panels className="mt-6">
-                  <Tab.Panel>
-                    <EbayFields
-                      fields={ebayFieldsValue ?? {}}
-                      onChange={handleEbayFieldsChange}
-                      onCategoryLookup={() => lookupEbayCategoryMutation.mutate()}
-                    />
-                  </Tab.Panel>
-                  <Tab.Panel>
-                    <FacebookFields
-                      fields={fbFieldsValue ?? {}}
-                      categories={fbCategories}
-                      onChange={handleFbFieldsChange}
-                    />
-                    <div className="mt-4 flex justify-end">
-                      <button
-                        type="button"
-                        onClick={() => setShowFbDialog(true)}
-                        className="rounded-md border border-transparent bg-primary px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-primary-hover"
-                      >
-                        Generate copy-paste block
-                      </button>
-                    </div>
-                  </Tab.Panel>
-                </Tab.Panels>
-              </Tab.Group>
-            </div>
+            {id && (
+              <MarketplacePanels
+                itemId={id}
+                ebayFields={ebayFieldsValue ?? {}}
+                fbFields={fbFieldsValue ?? {}}
+                fbCategories={fbCategories}
+                onEbayChange={handleEbayFieldsChange}
+                onFbChange={handleFbFieldsChange}
+                onEbayCategoryLookup={() => lookupEbayCategoryMutation.mutate()}
+              />
+            )}
           </div>
         </div>
-
-        {showFbDialog && id && (
-          <FacebookCopyPasteDialog
-            itemId={id}
-            onClose={() => setShowFbDialog(false)}
-          />
-        )}
 
         <div className="pt-5">
           <div className="flex justify-end">

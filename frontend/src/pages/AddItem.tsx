@@ -1,11 +1,11 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Controller, useForm } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { CameraIcon, QrCodeIcon } from '@heroicons/react/24/outline';
 
-import CustomFields from '../components/CustomFields';
+import ItemFormFields from '../components/ItemFormFields';
 import { SectionErrorBoundary } from '../components/ErrorBoundary';
 import PriceEstimateCard from '../components/PriceEstimateCard';
 import VisionIdentifyButton from '../components/VisionIdentifyButton';
@@ -13,14 +13,9 @@ import VisionSuggestionPanel from '../components/VisionSuggestionPanel';
 import { useDevMode } from '../contexts/useDevMode';
 import { items, images } from '../api/client';
 import { apiErrorMessage } from '../api/errors';
-import { isJobReference, useJobPoll } from '../api/jobs';
-import { pricing } from '../api/pricing';
 import { queryKeys } from '../api/queryKeys';
-import type {
-  PriceEstimateEnvelope,
-  VisionResult,
-  VisionSuggestion,
-} from '../api/types';
+import type { VisionResult, VisionSuggestion } from '../api/types';
+import { useVisionPricingChain } from '../hooks/useVisionPricingChain';
 import {
   type AddItemFormValues,
   type AddItemSubmitValues,
@@ -47,10 +42,10 @@ export default function AddItem() {
   const [aiFields, setAiFields] = useState<Set<string>>(() => new Set());
   // Vision → pricing chain. After the user applies suggestions we
   // fire a metadata-based pricing lookup so the "current value"
-  // input gets a suggested value too.
-  const [priceEnvelope, setPriceEnvelope] =
-    useState<PriceEstimateEnvelope | null>(null);
-  const [priceJobId, setPriceJobId] = useState<string | null>(null);
+  // input gets a suggested value too. The chain (mutation + job poll +
+  // stale-response guard) lives in this hook.
+  const { priceEnvelope, isPricing, estimateFromMetadata } =
+    useVisionPricingChain();
 
   // Warm the autocomplete caches on mount — loader also preloads them but
   // these hooks give React Query a live subscription.
@@ -95,33 +90,6 @@ export default function AddItem() {
     mutationFn: async ({ itemId, file }: { itemId: string; file: File }) =>
       images.upload(itemId, file),
   });
-
-  // v3.1: pricing chain. Triggered from the vision "Apply selected"
-  // handler with the just-applied metadata — no item yet, so we
-  // send metadata (not item_id).
-  const estimatePriceFromMetadata = useMutation({
-    mutationFn: (metadata: Record<string, unknown>) =>
-      pricing.estimate({ metadata }),
-    onSuccess: (response) => {
-      if (isJobReference(response)) {
-        setPriceJobId(response.job_id);
-        return;
-      }
-      setPriceEnvelope(response as PriceEstimateEnvelope);
-    },
-  });
-
-  const priceJob = useJobPoll(priceJobId);
-  useEffect(() => {
-    if (!priceJobId || !priceJob.data) return;
-    const { status, result } = priceJob.data;
-    if (status === 'complete' && result) {
-      setPriceJobId(null);
-      setPriceEnvelope(result as unknown as PriceEstimateEnvelope);
-    } else if (status === 'failed' || status === 'not_found') {
-      setPriceJobId(null);
-    }
-  }, [priceJob.data, priceJobId]);
 
   const createItemMutation = useMutation({
     mutationFn: async (params: {
@@ -197,203 +165,11 @@ export default function AddItem() {
 
         <div className="space-y-8 divide-y divide-line">
           <div className="grid grid-cols-1 gap-y-6 sm:grid-cols-6 sm:gap-x-6">
-            <div className="sm:col-span-4">
-              <label htmlFor="name" className="block text-sm font-medium text-muted">
-                Name
-              </label>
-              <input
-                id="name"
-                type="text"
-                aria-invalid={errors.name ? 'true' : 'false'}
-                {...register('name')}
-                className="mt-1 block w-full rounded-md border-line-strong shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-              />
-              {errors.name && (
-                <p className="mt-2 text-sm text-danger">{errors.name.message}</p>
-              )}
-            </div>
-
-            <div className="sm:col-span-3">
-              <label htmlFor="category" className="block text-sm font-medium text-muted">
-                Category
-              </label>
-              <input
-                id="category"
-                type="text"
-                aria-invalid={errors.category ? 'true' : 'false'}
-                {...register('category')}
-                className="mt-1 block w-full rounded-md border-line-strong shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                placeholder="Enter a category"
-              />
-              {errors.category && (
-                <p className="mt-2 text-sm text-danger">{errors.category.message}</p>
-              )}
-            </div>
-
-            <div className="sm:col-span-3">
-              <label htmlFor="location" className="block text-sm font-medium text-muted">
-                Location
-              </label>
-              <input
-                id="location"
-                type="text"
-                aria-invalid={errors.location ? 'true' : 'false'}
-                {...register('location')}
-                className="mt-1 block w-full rounded-md border-line-strong shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                placeholder="Enter a location"
-              />
-              {errors.location && (
-                <p className="mt-2 text-sm text-danger">{errors.location.message}</p>
-              )}
-            </div>
-
-            <div className="sm:col-span-3">
-              <label htmlFor="brand" className="block text-sm font-medium text-muted">
-                Brand
-              </label>
-              <input
-                id="brand"
-                type="text"
-                {...register('brand')}
-                className="mt-1 block w-full rounded-md border-line-strong shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-              />
-            </div>
-
-            <div className="sm:col-span-3">
-              <label htmlFor="model_number" className="block text-sm font-medium text-muted">
-                Model Number
-              </label>
-              <input
-                id="model_number"
-                type="text"
-                {...register('model_number')}
-                className="mt-1 block w-full rounded-md border-line-strong shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-              />
-            </div>
-
-            <div className="sm:col-span-3">
-              <label htmlFor="serial_number" className="block text-sm font-medium text-muted">
-                Serial Number
-              </label>
-              <input
-                id="serial_number"
-                type="text"
-                {...register('serial_number')}
-                className="mt-1 block w-full rounded-md border-line-strong shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-              />
-            </div>
-
-            <div className="sm:col-span-3">
-              <label htmlFor="barcode" className="block text-sm font-medium text-muted">
-                Barcode
-              </label>
-              <input
-                id="barcode"
-                type="text"
-                {...register('barcode')}
-                className="mt-1 block w-full rounded-md border-line-strong shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-              />
-            </div>
-
-            <div className="sm:col-span-3">
-              <label htmlFor="purchase_date" className="block text-sm font-medium text-muted">
-                Purchase Date
-              </label>
-              <input
-                id="purchase_date"
-                type="date"
-                {...register('purchase_date')}
-                className="mt-1 block w-full rounded-md border-line-strong shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-              />
-            </div>
-
-            <div className="sm:col-span-3">
-              <label htmlFor="purchase_price" className="block text-sm font-medium text-muted">
-                Purchase Price
-              </label>
-              <div className="mt-1 relative rounded-md shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <span className="text-subtle sm:text-sm">$</span>
-                </div>
-                <input
-                  id="purchase_price"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  {...register('purchase_price')}
-                  className="mt-1 block w-full pl-7 rounded-md border-line-strong shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                />
-              </div>
-              {errors.purchase_price && (
-                <p className="mt-2 text-sm text-danger">
-                  {errors.purchase_price.message}
-                </p>
-              )}
-            </div>
-
-            <div className="sm:col-span-3">
-              <label htmlFor="current_value" className="block text-sm font-medium text-muted">
-                Current Value
-              </label>
-              <div className="mt-1 relative rounded-md shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <span className="text-subtle sm:text-sm">$</span>
-                </div>
-                <input
-                  id="current_value"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  {...register('current_value')}
-                  className="mt-1 block w-full pl-7 rounded-md border-line-strong shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                />
-              </div>
-              {errors.current_value && (
-                <p className="mt-2 text-sm text-danger">
-                  {errors.current_value.message}
-                </p>
-              )}
-            </div>
-
-            <div className="sm:col-span-3">
-              <label htmlFor="warranty_expiration" className="block text-sm font-medium text-muted">
-                Warranty Expiration
-              </label>
-              <input
-                id="warranty_expiration"
-                type="date"
-                {...register('warranty_expiration')}
-                className="mt-1 block w-full rounded-md border-line-strong shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-              />
-            </div>
-
-            <div className="sm:col-span-6">
-              <label htmlFor="notes" className="block text-sm font-medium text-muted">
-                Notes
-              </label>
-              <textarea
-                id="notes"
-                rows={3}
-                {...register('notes')}
-                className="mt-1 block w-full rounded-md border-line-strong shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-              />
-            </div>
-
-            <div className="sm:col-span-6">
-              <label className="block text-sm font-medium text-muted mb-4">
-                Custom Fields
-              </label>
-              <Controller
-                control={control}
-                name="custom_fields"
-                render={({ field }) => (
-                  <CustomFields
-                    fields={field.value}
-                    onChange={(fields) => field.onChange(fields)}
-                  />
-                )}
-              />
-            </div>
+            <ItemFormFields
+              register={register}
+              errors={errors}
+              control={control}
+            />
 
             <div className="sm:col-span-6">
               <div>
@@ -470,7 +246,7 @@ export default function AddItem() {
                       // doesn't have enough identity (brand +
                       // model_number), skip — pricing needs them.
                       if (accepted.brand && accepted.model_number) {
-                        estimatePriceFromMetadata.mutate({
+                        estimateFromMetadata({
                           brand: accepted.brand,
                           model_number: accepted.model_number,
                           name: accepted.name ?? undefined,
@@ -506,7 +282,7 @@ export default function AddItem() {
                 </div>
               )}
 
-              {(estimatePriceFromMetadata.isPending || priceJobId) && !priceEnvelope && (
+              {isPricing && !priceEnvelope && (
                 <p className="mt-3 text-xs text-muted">
                   Looking up resale value from vision metadata…
                 </p>
@@ -516,9 +292,7 @@ export default function AddItem() {
                 <div className="mt-4">
                   <PriceEstimateCard
                     envelope={priceEnvelope}
-                    refreshing={
-                      estimatePriceFromMetadata.isPending || priceJobId !== null
-                    }
+                    refreshing={isPricing}
                     onApplyMedian={(median) => {
                       setValue('current_value', String(median.toFixed(2)));
                       setAiFields((prev) => {

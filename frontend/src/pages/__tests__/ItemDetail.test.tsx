@@ -4,7 +4,7 @@ import '@testing-library/jest-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import ItemDetail from '../ItemDetail';
-import { items, ebay } from '../../api/client';
+import { items, ebay, images } from '../../api/client';
 import { queryKeys } from '../../api/queryKeys';
 import type { Item, EbayCategoryResponse } from '../../api/client';
 
@@ -248,5 +248,115 @@ describe('ItemDetail', () => {
     expect(
       queryClient.getQueryState(queryKeys.items.lists())?.isInvalidated,
     ).toBe(true);
+  });
+
+  it('deletes the item and invalidates the items list cache', async () => {
+    // Delete must clear Dashboard/Browse cards immediately — assert the
+    // items.lists() query is marked invalidated after a successful delete.
+    queryClient.setQueryData(queryKeys.items.lists(), []);
+    (items.delete as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+    const confirmSpy = vi
+      .spyOn(window, 'confirm')
+      .mockReturnValue(true);
+
+    renderComponent();
+    await waitFor(() => {
+      expect(screen.getByText('Delete Item')).toBeInTheDocument();
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('Delete Item'));
+    });
+
+    await waitFor(() => {
+      expect(items.delete).toHaveBeenCalledWith('123');
+    });
+    expect(
+      queryClient.getQueryState(queryKeys.items.lists())?.isInvalidated,
+    ).toBe(true);
+
+    confirmSpy.mockRestore();
+  });
+
+  it('does not delete the item when the confirm dialog is cancelled', async () => {
+    const confirmSpy = vi
+      .spyOn(window, 'confirm')
+      .mockReturnValue(false);
+
+    renderComponent();
+    await waitFor(() => {
+      expect(screen.getByText('Delete Item')).toBeInTheDocument();
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('Delete Item'));
+    });
+
+    expect(items.delete).not.toHaveBeenCalled();
+    confirmSpy.mockRestore();
+  });
+
+  it('uploads a selected image and invalidates the items cache', async () => {
+    // Thumbnails surface on list cards, so a successful upload must
+    // invalidate the items namespace.
+    queryClient.setQueryData(queryKeys.items.lists(), []);
+    (images.upload as ReturnType<typeof vi.fn>).mockResolvedValue({});
+
+    renderComponent();
+    await waitFor(() => {
+      expect(screen.getByLabelText(/add images/i)).toBeInTheDocument();
+    });
+
+    const file = new File(['x'], 'photo.png', { type: 'image/png' });
+    const input = screen.getByLabelText(/add images/i) as HTMLInputElement;
+
+    await act(async () => {
+      fireEvent.change(input, { target: { files: [file] } });
+    });
+
+    await waitFor(() => {
+      expect(images.upload).toHaveBeenCalledWith('123', file);
+    });
+    expect(
+      queryClient.getQueryState(queryKeys.items.lists())?.isInvalidated,
+    ).toBe(true);
+  });
+
+  it('deletes an image after confirmation', async () => {
+    (items.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ...mockItem,
+      images: [
+        {
+          id: 'img-1',
+          item_id: '123',
+          file_path: 'uploads/img-1.jpg',
+          thumbnail_path: null,
+          created_at: '2023-01-01T00:00:00Z',
+        },
+      ],
+    });
+    (images.delete as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+    const confirmSpy = vi
+      .spyOn(window, 'confirm')
+      .mockReturnValue(true);
+
+    renderComponent();
+    await waitFor(() => {
+      expect(screen.getByText('Current Images')).toBeInTheDocument();
+    });
+
+    const deleteButton = screen.getByRole('button', {
+      name: /delete image/i,
+    });
+
+    await act(async () => {
+      fireEvent.click(deleteButton);
+    });
+
+    await waitFor(() => {
+      expect(images.delete).toHaveBeenCalledWith('img-1');
+    });
+
+    confirmSpy.mockRestore();
   });
 });

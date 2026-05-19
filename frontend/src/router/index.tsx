@@ -51,6 +51,7 @@ export const router = createBrowserRouter([
           {
             index: true,
             loader: dashboardLoader,
+            errorElement: <RouteErrorBoundary />,
             lazy: async () => {
               const mod = await import('../pages/Dashboard');
               return { Component: mod.default };
@@ -59,6 +60,7 @@ export const router = createBrowserRouter([
           {
             path: 'browse',
             loader: browseLoader,
+            errorElement: <RouteErrorBoundary />,
             lazy: async () => {
               const mod = await import('../pages/Browse');
               return { Component: mod.default };
@@ -67,6 +69,7 @@ export const router = createBrowserRouter([
           {
             path: 'items/new',
             loader: addItemLoader,
+            errorElement: <RouteErrorBoundary />,
             lazy: async () => {
               const mod = await import('../pages/AddItem');
               return { Component: mod.default };
@@ -75,6 +78,7 @@ export const router = createBrowserRouter([
           {
             path: 'items/:id',
             loader: itemDetailLoader,
+            errorElement: <RouteErrorBoundary />,
             lazy: async () => {
               const mod = await import('../pages/ItemDetail');
               return { Component: mod.default };
@@ -83,6 +87,7 @@ export const router = createBrowserRouter([
           {
             path: 'reports',
             loader: reportsLoader,
+            errorElement: <RouteErrorBoundary />,
             lazy: async () => {
               const mod = await import('../pages/Reports');
               return { Component: mod.default };
@@ -91,6 +96,7 @@ export const router = createBrowserRouter([
           {
             path: 'backups',
             loader: backupsLoader,
+            errorElement: <RouteErrorBoundary />,
             lazy: async () => {
               const mod = await import('../pages/Backups');
               return { Component: mod.default };
@@ -103,6 +109,7 @@ export const router = createBrowserRouter([
               {
                 path: 'settings',
                 loader: settingsLoader,
+                errorElement: <RouteErrorBoundary />,
                 lazy: async () => {
                   const mod = await import('../pages/Settings');
                   return { Component: mod.default };

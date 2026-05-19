@@ -18,9 +18,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `app/utctime.py` helper (`utcnow()` — a naive UTC datetime,
   behaviour-identical to the old call). The backend test run dropped
   from ~976 deprecation warnings to 2.
+- **Frontend structural refactor.** Extracted the vision→pricing
+  orchestration into a `useVisionPricingChain` hook, the eBay/Facebook
+  panels into a `MarketplacePanels` component, the shared item form
+  into an `ItemFormFields` component used by both Add Item and Item
+  Detail, the Dashboard filter state into a reducer, and split the
+  837-line Settings page into focused tab components, plus a reusable
+  accessible `ConfirmDialog`. Page sizes dropped sharply — Settings
+  837→306, ItemDetail 654→436, AddItem 612→386, Dashboard 566→446
+  lines — and new unit/component tests bring the frontend suite to 159.
+- **Accessibility pass.** Confirmation dialogs now use `role="dialog"`
+  + `aria-modal` with focus trapping and Escape-to-close; list
+  checkboxes and the view-mode toggle got accessible names /
+  `aria-pressed`; every route now declares its own `errorElement` so a
+  loader/render failure stays localized to the page area instead of
+  blanking the navigation shell.
 
 ### Fixed
 
+- **Vision→pricing race in Add Item.** A slow pricing response kicked
+  off by an earlier vision suggestion could overwrite a newer one. The
+  `useVisionPricingChain` hook now guards every result with a
+  generation counter, so only the most recent request can set the
+  estimate.
 - **Concurrent LLM usage accounting could lose spend.** `record_usage`
   did a read-modify-write in Python, so two calls landing together for
   the same (user, day, feature) could overwrite each other's totals. It

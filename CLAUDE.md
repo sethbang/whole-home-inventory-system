@@ -35,7 +35,7 @@ npm run dev             # starts Vite on :5173 (HTTPS). Cert generation now live
                         # container's bridge IP instead of the host's LAN IP.
 npm run build           # tsc --noEmit + vite build
 npm run lint            # eslint . (0 errors; CI blocks on errors)
-npm test                # vitest run (129 tests, all passing)
+npm test                # vitest run (159 tests, all passing)
 npm test -- src/path/to/file.test.tsx   # single test file
 npm run test:watch      # vitest in watch mode
 npm run codegen:api     # regenerate src/api/openapi.d.ts from the backend schema
@@ -127,7 +127,6 @@ Browser (HTTPS :5173) → Vite dev server → proxies `/api` and `/uploads` to `
 `CORS_ORIGINS` env var (comma-separated) controls allowed origins. Default dev is HTTPS-only: `https://localhost:5173,https://192.168.1.122:5173`. The NAS compose file derives `CORS_ORIGINS` from `WHIS_DOMAIN` (`https://${WHIS_DOMAIN}`) by default since Caddy serves same-origin; `NAS_ORIGINS` overrides this for operators who front the stack with an additional upstream reverse proxy.
 
 ## Known deferred work
-- `createBrowserRouter` route-level `errorElement` wiring for every route (v2.3 introduced the data router + loaders; a few routes still rely on the top-level error boundary).
 - Analytics response models aren't Pydantic yet — those endpoints return plain dicts, so analytics TS types are hand-written in `api/types.ts` (not generated). Migration → typed response_models is future cleanup.
 - LLM usage accounting stamps a nominal (zero-token) usage entry for non-LLM provider calls — should thread real numbers back from the provider wrapper. Low priority since only the LLM provider actually costs money.
 - Nightly contract test that hits a real LLM to catch provider API drift (gated by a CI secret).
