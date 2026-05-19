@@ -38,13 +38,14 @@ from __future__ import annotations
 import logging
 import threading
 from dataclasses import dataclass
-from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .. import database, models, security_crypto
 from ..settings import _is_private_llm_host, settings
+from ..utctime import utcnow
 
 logger = logging.getLogger(__name__)
 audit_logger = logging.getLogger("app.llm_config")
@@ -91,7 +92,9 @@ def invalidate_cache() -> None:
 
 def load_db_row(db: Session) -> Optional[models.LLMConfig]:
     """Return the singleton row, or None if the table is empty."""
-    return db.query(models.LLMConfig).filter(models.LLMConfig.id == 1).first()
+    return db.execute(
+        select(models.LLMConfig).where(models.LLMConfig.id == 1)
+    ).scalar_one_or_none()
 
 
 def _decrypt_or_none(ciphertext: Optional[str]) -> Optional[str]:
@@ -325,7 +328,7 @@ def apply_update(
 
     row = load_db_row(db)
     if row is None:
-        row = models.LLMConfig(id=1, updated_at=datetime.utcnow())
+        row = models.LLMConfig(id=1, updated_at=utcnow())
         db.add(row)
 
     fields_changed: List[str] = []
@@ -358,7 +361,7 @@ def apply_update(
             fields_changed.append("api_key")
             key_rotated = True
 
-    row.updated_at = datetime.utcnow()
+    row.updated_at = utcnow()
     if actor is not None:
         row.updated_by = actor.id
 

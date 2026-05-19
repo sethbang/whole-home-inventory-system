@@ -1,13 +1,15 @@
 import os
 import sys
 import uuid
-from datetime import datetime
 
 # Add the parent directory to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from sqlalchemy import select
+
 from app import models, security
 from app.database import SQLALCHEMY_DATABASE_URL, SessionLocal, engine
+from app.utctime import utcnow
 
 
 def create_test_item():
@@ -23,9 +25,9 @@ def create_test_item():
     try:
         print("Checking database connection...")
         # Check if item already exists
-        existing_item = (
-            db.query(models.Item).filter(models.Item.barcode == "9780262529846").first()
-        )
+        existing_item = db.execute(
+            select(models.Item).where(models.Item.barcode == "9780262529846")
+        ).scalar_one_or_none()
 
         if existing_item:
             print(
@@ -48,7 +50,7 @@ def create_test_item():
             location="Office",
             brand="MIT Press",
             barcode="9780262529846",
-            purchase_date=datetime.utcnow(),
+            purchase_date=utcnow(),
             purchase_price=59.99,
             current_value=59.99,
             notes="An introduction to a broad range of topics in deep learning by Ian Goodfellow, Yoshua Bengio, and Aaron Courville",

@@ -23,6 +23,7 @@ from typing import Any, Dict, Optional, Union
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .. import database, models, schemas
@@ -212,11 +213,11 @@ async def _enqueue_or_run(
 def _resolve_item_or_404(
     db: Session, user: models.User, item_id: str
 ) -> models.Item:
-    item = (
-        db.query(models.Item)
-        .filter(models.Item.id == item_id, models.Item.owner_id == user.id)
-        .one_or_none()
-    )
+    item = db.execute(
+        select(models.Item).where(
+            models.Item.id == item_id, models.Item.owner_id == user.id
+        )
+    ).scalar_one_or_none()
     if item is None:
         raise HTTPException(status_code=404, detail="Item not found")
     return item

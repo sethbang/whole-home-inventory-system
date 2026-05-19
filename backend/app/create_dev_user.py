@@ -1,5 +1,7 @@
 import uuid
 
+from sqlalchemy import select
+
 from . import models
 from .database import SessionLocal, engine
 from .security import get_password_hash
@@ -14,9 +16,9 @@ def create_dev_user():
     db = SessionLocal()
     try:
         # Check if user already exists
-        existing_user = (
-            db.query(models.User).filter(models.User.username == DEV_USERNAME).first()
-        )
+        existing_user = db.execute(
+            select(models.User).where(models.User.username == DEV_USERNAME)
+        ).scalar_one_or_none()
 
         if existing_user:
             print(f"Developer user '{DEV_USERNAME}' already exists")

@@ -9,6 +9,7 @@ from typing import Optional
 import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .. import database, models, security
@@ -39,11 +40,12 @@ async def list_categories(
 
     suggested_category = None
     if item_id:
-        item = (
-            db.query(models.Item)
-            .filter(models.Item.id == item_id, models.Item.owner_id == current_user.id)
-            .first()
-        )
+        item = db.execute(
+            select(models.Item).where(
+                models.Item.id == item_id,
+                models.Item.owner_id == current_user.id,
+            )
+        ).scalar_one_or_none()
 
         if not item:
             raise HTTPException(status_code=404, detail="Item not found")
@@ -76,11 +78,13 @@ async def export_to_ebay(
         raise HTTPException(status_code=400, detail="No items selected")
 
     items = (
-        db.query(models.Item)
-        .filter(
-            models.Item.id.in_(request.item_ids),
-            models.Item.owner_id == current_user.id,
+        db.execute(
+            select(models.Item).where(
+                models.Item.id.in_(request.item_ids),
+                models.Item.owner_id == current_user.id,
+            )
         )
+        .scalars()
         .all()
     )
 
@@ -177,11 +181,12 @@ async def update_ebay_fields(
     current_user: models.User = Depends(security.get_current_active_user),
 ) -> EbayFields:
     """Update eBay-specific fields for an item."""
-    item = (
-        db.query(models.Item)
-        .filter(models.Item.id == item_id, models.Item.owner_id == current_user.id)
-        .first()
-    )
+    item = db.execute(
+        select(models.Item).where(
+            models.Item.id == item_id,
+            models.Item.owner_id == current_user.id,
+        )
+    ).scalar_one_or_none()
 
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")

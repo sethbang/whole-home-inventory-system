@@ -127,7 +127,6 @@ Browser (HTTPS :5173) → Vite dev server → proxies `/api` and `/uploads` to `
 `CORS_ORIGINS` env var (comma-separated) controls allowed origins. Default dev is HTTPS-only: `https://localhost:5173,https://192.168.1.122:5173`. The NAS compose file derives `CORS_ORIGINS` from `WHIS_DOMAIN` (`https://${WHIS_DOMAIN}`) by default since Caddy serves same-origin; `NAS_ORIGINS` overrides this for operators who front the stack with an additional upstream reverse proxy.
 
 ## Known deferred work
-- SQLAlchemy 2.x `select()` style migration across all routers (a handful of analytics/backups paths still use `db.query()`).
 - `createBrowserRouter` route-level `errorElement` wiring for every route (v2.3 introduced the data router + loaders; a few routes still rely on the top-level error boundary).
 - Analytics response models aren't Pydantic yet — those endpoints return plain dicts, so analytics TS types are hand-written in `api/types.ts` (not generated). Migration → typed response_models is future cleanup.
 - LLM usage accounting stamps a nominal (zero-token) usage entry for non-LLM provider calls — should thread real numbers back from the provider wrapper. Low priority since only the LLM provider actually costs money.

@@ -24,11 +24,12 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session, selectinload
 
 from .. import models
 from ..settings import settings
+from ..utctime import utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -158,7 +159,7 @@ class BackupService:
         try:
             backup_data = {
                 "items": [],
-                "created_at": datetime.utcnow().isoformat(),
+                "created_at": utcnow().isoformat(),
                 "version": "1.0",
             }
             images_dir = os.path.join(temp_dir, "images")
@@ -201,7 +202,7 @@ class BackupService:
             with open(os.path.join(temp_dir, "data.json"), "w") as f:
                 json.dump(backup_data, f, indent=2)
 
-            timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+            timestamp = utcnow().strftime("%Y%m%d_%H%M%S")
             zip_filename = f"backup_{owner_id}_{timestamp}.zip"
             zip_path = os.path.join(backup_dir, zip_filename)
 
@@ -344,12 +345,16 @@ class BackupService:
                 .where(models.Item.owner_id == self.user.id)
                 .scalar_subquery()
             )
-            self.db.query(models.ItemImage).filter(
-                models.ItemImage.item_id.in_(item_id_subq)
-            ).delete(synchronize_session=False)
-            self.db.query(models.Item).filter(
-                models.Item.owner_id == self.user.id
-            ).delete(synchronize_session=False)
+            self.db.execute(
+                delete(models.ItemImage)
+                .where(models.ItemImage.item_id.in_(item_id_subq))
+                .execution_options(synchronize_session=False)
+            )
+            self.db.execute(
+                delete(models.Item)
+                .where(models.Item.owner_id == self.user.id)
+                .execution_options(synchronize_session=False)
+            )
 
             upload_dir = str(settings.upload_path)
             os.makedirs(upload_dir, exist_ok=True)

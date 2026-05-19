@@ -1,16 +1,18 @@
 import logging
 import uuid
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Optional
 
 import jwt
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from passlib.context import CryptContext
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from . import database, models
 from .settings import settings
+from .utctime import utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +26,7 @@ DEV_USER = models.User(
     hashed_password="",
     is_active=True,
     is_admin=True,
-    created_at=datetime.utcnow(),
+    created_at=utcnow(),
 )
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -54,7 +56,7 @@ def get_password_hash(password: str) -> str:
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
-    expire = datetime.utcnow() + (
+    expire = utcnow() + (
         expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
     to_encode.update({"exp": expire})
@@ -90,7 +92,9 @@ async def get_current_user(
     if username is None:
         raise _credentials_error()
 
-    user = db.query(models.User).filter(models.User.username == username).first()
+    user = db.execute(
+        select(models.User).where(models.User.username == username)
+    ).scalar_one_or_none()
     if user is None:
         raise _credentials_error("User not found")
     return user
@@ -144,7 +148,9 @@ async def get_current_active_user_or_none(
     if not username:
         return None
 
-    user = db.query(models.User).filter(models.User.username == username).first()
+    user = db.execute(
+        select(models.User).where(models.User.username == username)
+    ).scalar_one_or_none()
     if not user or not user.is_active:
         return None
     return user

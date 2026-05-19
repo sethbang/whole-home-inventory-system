@@ -8,7 +8,6 @@ focused on request/response shape.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
 
 from app import models
 from app.facebook.category_mapping import FALLBACK_CATEGORY, suggest_fb_category
@@ -19,6 +18,7 @@ from app.facebook.formatter import (
     build_copy_paste_block,
 )
 from app.facebook.schemas import FbAvailability, FbCondition, FbFields
+from app.utctime import utcnow
 
 
 def _item(**overrides) -> models.Item:
@@ -38,8 +38,8 @@ def _item(**overrides) -> models.Item:
         "warranty_expiration": None,
         "notes": "Barely used.",
         "custom_fields": None,
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow(),
+        "created_at": utcnow(),
+        "updated_at": utcnow(),
     }
     defaults.update(overrides)
     item = models.Item(**defaults)

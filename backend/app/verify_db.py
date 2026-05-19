@@ -1,14 +1,14 @@
 import os
 import sys
-from datetime import datetime
 
 # Add the parent directory to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from sqlalchemy import inspect
+from sqlalchemy import inspect, select
 
 from app import models, security
 from app.database import SQLALCHEMY_DATABASE_URL, SessionLocal, engine
+from app.utctime import utcnow
 
 
 def verify_database():
@@ -33,9 +33,9 @@ def verify_database():
     db = SessionLocal()
     try:
         print("\nChecking dev user...")
-        dev_user = (
-            db.query(models.User).filter(models.User.id == security.DEV_USER_ID).first()
-        )
+        dev_user = db.execute(
+            select(models.User).where(models.User.id == security.DEV_USER_ID)
+        ).scalar_one_or_none()
 
         if dev_user:
             print("Dev user found:")
@@ -52,7 +52,7 @@ def verify_database():
                 username="admin",
                 hashed_password="",
                 is_active=True,
-                created_at=datetime.utcnow(),
+                created_at=utcnow(),
             )
             db.add(dev_user)
             db.commit()

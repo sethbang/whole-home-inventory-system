@@ -1,3 +1,5 @@
+from sqlalchemy import select
+
 from . import models
 from .database import SessionLocal
 
@@ -6,9 +8,9 @@ def verify_test_item():
     db = SessionLocal()
     try:
         # Try to find the item
-        item = (
-            db.query(models.Item).filter(models.Item.barcode == "9780262529846").first()
-        )
+        item = db.execute(
+            select(models.Item).where(models.Item.barcode == "9780262529846")
+        ).scalar_one_or_none()
 
         if item:
             print("Found item:")

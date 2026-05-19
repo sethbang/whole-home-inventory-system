@@ -4,6 +4,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .. import database, models, schemas, security
@@ -23,13 +24,11 @@ def register_user(
     user: schemas.UserCreate,
     db: Session = Depends(database.get_db),
 ) -> Any:
-    db_user = (
-        db.query(models.User)
-        .filter(
+    db_user = db.execute(
+        select(models.User).where(
             (models.User.email == user.email) | (models.User.username == user.username)
         )
-        .first()
-    )
+    ).scalar_one_or_none()
     if db_user:
         raise HTTPException(
             status_code=400, detail="Email or username already registered"
@@ -38,7 +37,9 @@ def register_user(
     # First successfully registered user gets promoted to admin so the
     # household setup flow has someone who can edit /api/llm-config.
     # Subsequent registrations default to is_admin=False.
-    is_first_user = db.query(models.User).count() == 0
+    is_first_user = (
+        db.execute(select(func.count()).select_from(models.User)).scalar_one() == 0
+    )
 
     db_user = models.User(
         email=user.email,
@@ -64,9 +65,9 @@ async def login_for_access_token(
     if settings.BYPASS_AUTH:
         return {"access_token": "dev_token", "token_type": "bearer"}
 
-    user = (
-        db.query(models.User).filter(models.User.username == form_data.username).first()
-    )
+    user = db.execute(
+        select(models.User).where(models.User.username == form_data.username)
+    ).scalar_one_or_none()
     if not user or not security.verify_password(
         form_data.password, user.hashed_password
     ):

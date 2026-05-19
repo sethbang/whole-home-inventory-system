@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Completed the SQLAlchemy 2.x `select()` migration.** Every remaining
+  legacy `db.query()` call site (auth, security, analytics, pricing,
+  eBay, the ARQ job tasks, the backup / LLM-config services, and the dev
+  scripts) now uses `select()` / `db.execute(...)`. The codebase is now
+  ready for SQLAlchemy 3.x, where the `Query` API is removed.
+- **Replaced the deprecated `datetime.utcnow()`** with a new
+  `app/utctime.py` helper (`utcnow()` — a naive UTC datetime,
+  behaviour-identical to the old call). The backend test run dropped
+  from ~976 deprecation warnings to 2.
+
 ### Fixed
 
 - **Concurrent LLM usage accounting could lose spend.** `record_usage`

@@ -180,13 +180,14 @@ def test_backup_restore_throttles_after_three_requests(
     import json
     import os
     import zipfile
-    from datetime import datetime
+
+    from app.utctime import utcnow
 
     # Seed a real backup so restore can find it.
     backup_dir = os.environ["BACKUP_DIR"]
     payload = {
         "items": [],
-        "created_at": datetime.utcnow().isoformat(),
+        "created_at": utcnow().isoformat(),
         "version": "1.0",
     }
     buf = io.BytesIO()

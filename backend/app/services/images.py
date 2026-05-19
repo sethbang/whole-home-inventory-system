@@ -18,7 +18,6 @@ import io
 import logging
 import os
 import uuid
-from datetime import datetime
 from typing import List
 
 from fastapi import HTTPException
@@ -28,6 +27,7 @@ from sqlalchemy.orm import Session
 
 from .. import models
 from ..settings import settings
+from ..utctime import utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -199,7 +199,7 @@ class ImageService:
 
         pil_format = validate_image_bytes(data)
         extension = EXT_BY_FORMAT.get(pil_format, ".bin")
-        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        timestamp = utcnow().strftime("%Y%m%d_%H%M%S")
         filename = f"{timestamp}_{uuid.uuid4()}{extension}"
 
         upload_dir = str(settings.upload_path)
@@ -302,7 +302,7 @@ class ImageService:
             return False
 
         image.thumbnail_path = os.path.join("uploads", thumbnail_filename)
-        image.thumbnail_generated_at = datetime.utcnow()
+        image.thumbnail_generated_at = utcnow()
         self.db.commit()
         return True
 

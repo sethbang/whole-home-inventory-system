@@ -13,6 +13,7 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from fastapi import HTTPException
+from sqlalchemy import select
 
 from ... import models
 from ...database import SessionLocal
@@ -34,7 +35,9 @@ async def vision_identify(
     )
     db = SessionLocal()
     try:
-        user = db.query(models.User).filter(models.User.id == user_id).one_or_none()
+        user = db.execute(
+            select(models.User).where(models.User.id == user_id)
+        ).scalar_one_or_none()
         if user is None:
             return {"ok": False, "error": "user_not_found", "status_code": 404}
         image_bytes = [base64.b64decode(b) for b in images_b64]

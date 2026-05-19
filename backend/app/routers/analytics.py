@@ -1,11 +1,11 @@
-from datetime import datetime
 from typing import Any, Dict, List
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import func
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .. import database, models, security
+from ..utctime import utcnow
 
 router = APIRouter(tags=["analytics"])
 
@@ -15,16 +15,15 @@ def get_value_by_category(
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(security.get_current_active_user),
 ) -> List[Dict[str, Any]]:
-    results = (
-        db.query(
+    results = db.execute(
+        select(
             models.Item.category,
             func.count(models.Item.id).label("item_count"),
             func.sum(models.Item.current_value).label("total_value"),
         )
-        .filter(models.Item.owner_id == current_user.id)
+        .where(models.Item.owner_id == current_user.id)
         .group_by(models.Item.category)
-        .all()
-    )
+    ).all()
 
     return [
         {
@@ -41,16 +40,15 @@ def get_value_by_location(
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(security.get_current_active_user),
 ) -> List[Dict[str, Any]]:
-    results = (
-        db.query(
+    results = db.execute(
+        select(
             models.Item.location,
             func.count(models.Item.id).label("item_count"),
             func.sum(models.Item.current_value).label("total_value"),
         )
-        .filter(models.Item.owner_id == current_user.id)
+        .where(models.Item.owner_id == current_user.id)
         .group_by(models.Item.location)
-        .all()
-    )
+    ).all()
 
     return [
         {
@@ -67,18 +65,16 @@ def get_value_trends(
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(security.get_current_active_user),
 ) -> Dict[str, Any]:
-    items = (
-        db.query(
+    items = db.execute(
+        select(
             models.Item.purchase_date,
             models.Item.purchase_price,
             models.Item.current_value,
-        )
-        .filter(
+        ).where(
             models.Item.owner_id == current_user.id,
             models.Item.purchase_date.isnot(None),
         )
-        .all()
-    )
+    ).all()
 
     total_purchase = sum(item.purchase_price or 0 for item in items)
     total_current = sum(item.current_value or 0 for item in items)
@@ -102,35 +98,41 @@ def get_warranty_status(
 ) -> Dict[str, Any]:
     from dateutil.relativedelta import relativedelta
 
-    now = datetime.utcnow()
+    now = utcnow()
     three_months_later = now + relativedelta(months=3)
 
     expiring_soon = (
-        db.query(models.Item)
-        .filter(
-            models.Item.owner_id == current_user.id,
-            models.Item.warranty_expiration > now,
-            models.Item.warranty_expiration <= three_months_later,
+        db.execute(
+            select(models.Item).where(
+                models.Item.owner_id == current_user.id,
+                models.Item.warranty_expiration > now,
+                models.Item.warranty_expiration <= three_months_later,
+            )
         )
+        .scalars()
         .all()
     )
 
     expired = (
-        db.query(models.Item)
-        .filter(
-            models.Item.owner_id == current_user.id,
-            models.Item.warranty_expiration <= now,
-            models.Item.warranty_expiration.isnot(None),
+        db.execute(
+            select(models.Item).where(
+                models.Item.owner_id == current_user.id,
+                models.Item.warranty_expiration <= now,
+                models.Item.warranty_expiration.isnot(None),
+            )
         )
+        .scalars()
         .all()
     )
 
     active = (
-        db.query(models.Item)
-        .filter(
-            models.Item.owner_id == current_user.id,
-            models.Item.warranty_expiration > three_months_later,
+        db.execute(
+            select(models.Item).where(
+                models.Item.owner_id == current_user.id,
+                models.Item.warranty_expiration > three_months_later,
+            )
         )
+        .scalars()
         .all()
     )
 
@@ -167,13 +169,15 @@ def get_age_analysis(
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(security.get_current_active_user),
 ) -> Dict[str, Any]:
-    now = datetime.utcnow()
+    now = utcnow()
     items = (
-        db.query(models.Item)
-        .filter(
-            models.Item.owner_id == current_user.id,
-            models.Item.purchase_date.isnot(None),
+        db.execute(
+            select(models.Item).where(
+                models.Item.owner_id == current_user.id,
+                models.Item.purchase_date.isnot(None),
+            )
         )
+        .scalars()
         .all()
     )
 

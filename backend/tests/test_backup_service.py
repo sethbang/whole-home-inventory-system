@@ -11,7 +11,6 @@ import io
 import json
 import os
 import zipfile
-from datetime import datetime
 
 import pytest
 from fastapi import HTTPException
@@ -21,12 +20,13 @@ from app.services.backups import (
     BackupService,
     inspect_backup_zip,
 )
+from app.utctime import utcnow
 
 
 def _build_backup_zip(items=None) -> bytes:
     payload = {
         "items": items or [],
-        "created_at": datetime.utcnow().isoformat(),
+        "created_at": utcnow().isoformat(),
         "version": "1.0",
     }
     buf = io.BytesIO()
@@ -49,8 +49,8 @@ def _item_dict(**overrides):
         "warranty_expiration": None,
         "notes": None,
         "custom_fields": None,
-        "created_at": datetime.utcnow().isoformat(),
-        "updated_at": datetime.utcnow().isoformat(),
+        "created_at": utcnow().isoformat(),
+        "updated_at": utcnow().isoformat(),
         "images": [],
     }
     base.update(overrides)

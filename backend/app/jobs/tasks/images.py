@@ -16,6 +16,8 @@ import logging
 import uuid
 from typing import Any, Dict
 
+from sqlalchemy import select
+
 from ... import models
 from ...database import SessionLocal
 from ...services.images import ImageService
@@ -31,7 +33,9 @@ async def thumbnail_generate(
 
     db = SessionLocal()
     try:
-        user = db.query(models.User).filter(models.User.id == user_id).one_or_none()
+        user = db.execute(
+            select(models.User).where(models.User.id == user_id)
+        ).scalar_one_or_none()
         if user is None:
             # Stale task (user deleted between enqueue and run). Log but
             # don't raise — nothing the operator can fix downstream.

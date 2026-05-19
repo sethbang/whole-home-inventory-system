@@ -15,6 +15,7 @@ import logging
 from typing import Any, Dict, Optional
 
 from fastapi import HTTPException
+from sqlalchemy import select
 
 from ... import models
 from ...database import SessionLocal
@@ -30,7 +31,9 @@ def _open_service(user_id: str) -> tuple[BackupService, Any]:
     (in a ``finally``) so the connection returns to the pool.
     """
     db = SessionLocal()
-    user = db.query(models.User).filter(models.User.id == user_id).one_or_none()
+    user = db.execute(
+        select(models.User).where(models.User.id == user_id)
+    ).scalar_one_or_none()
     if user is None:
         db.close()
         raise RuntimeError(f"user {user_id!r} not found when rehydrating task")

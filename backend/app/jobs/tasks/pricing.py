@@ -12,6 +12,7 @@ import logging
 from typing import Any, Dict, Optional
 
 from fastapi import HTTPException
+from sqlalchemy import select
 
 from ... import models
 from ...database import SessionLocal
@@ -37,7 +38,9 @@ async def pricing_refresh(
     )
     db = SessionLocal()
     try:
-        user = db.query(models.User).filter(models.User.id == user_id).one_or_none()
+        user = db.execute(
+            select(models.User).where(models.User.id == user_id)
+        ).scalar_one_or_none()
         if user is None:
             return {"ok": False, "error": "user_not_found", "status_code": 404}
         service = PricingService(db=db, user=user)

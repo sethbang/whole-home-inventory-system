@@ -1,6 +1,5 @@
 import logging
 import uuid
-from datetime import datetime
 
 from sqlalchemy import (
     JSON,
@@ -17,6 +16,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import expression
 
 from app.database import Base
+from app.utctime import utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +80,7 @@ class User(Base):
     is_admin = Column(
         Boolean, nullable=False, default=False, server_default=expression.false()
     )
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
     items = relationship("Item", back_populates="owner")
     backups = relationship("Backup", back_populates="owner")
 
@@ -102,8 +102,8 @@ class Item(Base):
     warranty_expiration = Column(DateTime)
     notes = Column(String)
     custom_fields = Column(JSON)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
 
     # --- v2.2 pre-wire for the v3.1 pricing feature ------------------------
     # Dedicated columns (rather than hiding these in ``custom_fields``) so
@@ -130,7 +130,7 @@ class ItemImage(Base):
     item_id = Column(UUID, ForeignKey("items.id", ondelete="CASCADE"))
     filename = Column(String)
     file_path = Column(String)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
     # v3.0: populated by the ARQ thumbnail_generate task after upload.
     # Remains NULL while the job is in flight (or when the worker isn't
     # active and the fallback path runs thumbnails inline in the
@@ -151,7 +151,7 @@ class Backup(Base):
     size_bytes = Column(Integer)
     item_count = Column(Integer)
     image_count = Column(Integer)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
     status = Column(String)  # 'completed', 'failed', 'in_progress'
     error_message = Column(String, nullable=True)
 
@@ -177,7 +177,7 @@ class PriceCache(Base):
     identity_hash = Column(String(64), primary_key=True)
     provider = Column(String(32), primary_key=True)
     payload = Column(JSON, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
     expires_at = Column(DateTime, nullable=False, index=True)
 
 
@@ -211,7 +211,7 @@ class LLMConfig(Base):
     vision_daily_cap_usd = Column(Float, nullable=True)
     pricing_daily_cap_usd = Column(Float, nullable=True)
     updated_at = Column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+        DateTime, default=utcnow, onupdate=utcnow, nullable=False
     )
     # Convenience: who saved last. Not enforced by the schema (the
     # actor is also written to the audit log).
