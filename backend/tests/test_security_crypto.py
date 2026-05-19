@@ -51,9 +51,8 @@ def test_decrypt_with_wrong_secret_raises() -> None:
     # Fernet builds with a different derived key.
     with patch.object(
         security_crypto.settings, "SECRET_KEY", "a-completely-different-secret-x" * 2
-    ):
-        with pytest.raises(DecryptionError):
-            decrypt(cipher)
+    ), pytest.raises(DecryptionError):
+        decrypt(cipher)
 
 
 def test_decrypt_empty_ciphertext_raises() -> None:

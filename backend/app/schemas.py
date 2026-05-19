@@ -11,7 +11,7 @@ from .facebook.schemas import FbFields
 # same ``components/schemas/<Name>`` namespace. Frontend call sites
 # will import them from the generated `api/types.ts` without needing
 # to know they originated in app.schemas_llm.
-from .schemas_llm import (
+from .schemas_llm import (  # noqa: F401 — intentional re-export for OpenAPI
     PriceEstimate,
     PriceEstimateEnvelope,
     PriceSource,

@@ -14,7 +14,8 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from arq.jobs import DeserializationError, JobStatus as ArqJobStatus
+from arq.jobs import DeserializationError
+from arq.jobs import JobStatus as ArqJobStatus
 
 from app.jobs.client import _redis_settings_from_url
 from app.main import app

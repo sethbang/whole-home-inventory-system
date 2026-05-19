@@ -118,12 +118,11 @@ def detect_vision(model_obj: Any) -> Optional[bool]:
     """
     explicit_false_seen = False
     for k, v in _walk(model_obj):
-        if k in _VISION_BOOL_KEYS:
-            if isinstance(v, bool):
-                if v:
-                    return True
-                explicit_false_seen = True
-                continue
+        if k in _VISION_BOOL_KEYS and isinstance(v, bool):
+            if v:
+                return True
+            explicit_false_seen = True
+            continue
         if k in _MODALITY_LIST_KEYS:
             decision = _modality_list_says_vision(v)
             if decision is True:

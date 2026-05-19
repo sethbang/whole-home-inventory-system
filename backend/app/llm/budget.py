@@ -25,7 +25,6 @@ from sqlalchemy.orm import Session
 
 from .. import models
 from ..services import llm_config as llm_config_service
-from ..settings import settings
 
 logger = logging.getLogger(__name__)
 

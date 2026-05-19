@@ -13,7 +13,6 @@ from typing import List, Sequence
 
 from ..schemas_llm import PriceEstimate, PriceSource
 
-
 # Below this sample size we fall back to min/median/max rather than
 # P10/P50/P90 — percentiles are meaningless at N=3 and actively
 # misleading at N=2.

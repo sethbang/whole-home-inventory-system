@@ -233,12 +233,15 @@ class Settings(BaseSettings):
         # LLM_ALLOW_CLOUD=false means the base URL must point at something
         # local — belt-and-suspenders privacy guard that catches the
         # common "meant to use Ollama but left OpenRouter set" mistake.
-        if self.LLM_BASE_URL and not self.LLM_ALLOW_CLOUD:
-            if not _is_private_llm_host(self.LLM_BASE_URL):
-                raise RuntimeError(
-                    f"LLM_ALLOW_CLOUD=false but LLM_BASE_URL ({self.LLM_BASE_URL}) "
-                    "does not resolve to localhost or a private-range IP."
-                )
+        if (
+            self.LLM_BASE_URL
+            and not self.LLM_ALLOW_CLOUD
+            and not _is_private_llm_host(self.LLM_BASE_URL)
+        ):
+            raise RuntimeError(
+                f"LLM_ALLOW_CLOUD=false but LLM_BASE_URL ({self.LLM_BASE_URL}) "
+                "does not resolve to localhost or a private-range IP."
+            )
 
     def pricing_model(self) -> str:
         """Resolve the pricing model, defaulting to LLM_MODEL."""

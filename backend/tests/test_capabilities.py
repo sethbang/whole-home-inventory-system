@@ -6,7 +6,6 @@ import pytest
 
 from app.llm.capabilities import detect_strict_json, detect_vision
 
-
 # ---- Vision detection ----------------------------------------------------
 
 

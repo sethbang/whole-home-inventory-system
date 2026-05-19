@@ -274,12 +274,15 @@ class ConfigUpdateError(ValueError):
 def _validate_payload(payload: Dict[str, Any]) -> None:
     """Cross-cutting validation: privacy guard + numeric ranges."""
     base_url = payload.get("base_url")
-    if base_url and not settings.LLM_ALLOW_CLOUD:
-        if not _is_private_llm_host(base_url):
-            raise ConfigUpdateError(
-                "LLM_ALLOW_CLOUD=false in env: base_url must point at "
-                "localhost or a private-range IP."
-            )
+    if (
+        base_url
+        and not settings.LLM_ALLOW_CLOUD
+        and not _is_private_llm_host(base_url)
+    ):
+        raise ConfigUpdateError(
+            "LLM_ALLOW_CLOUD=false in env: base_url must point at "
+            "localhost or a private-range IP."
+        )
     timeout = payload.get("timeout_seconds")
     if timeout is not None and (timeout <= 0 or timeout > 600):
         raise ConfigUpdateError("timeout_seconds must be between 1 and 600")

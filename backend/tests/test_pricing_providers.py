@@ -8,7 +8,7 @@ the network. LLM provider: exercised with a stub OpenAICompatibleClient.
 from __future__ import annotations
 
 import json
-from typing import Any, Dict
+from typing import Dict
 from unittest.mock import AsyncMock, MagicMock
 
 import httpx
@@ -24,7 +24,6 @@ from app.pricing import (
     normalize_identity,
 )
 from app.settings import settings
-
 
 # ---------------------------------------------------------------------------
 # eBay Browse provider

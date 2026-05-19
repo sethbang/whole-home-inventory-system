@@ -37,7 +37,6 @@ from ..llm import (
 from ..llm.prompts import PRICING_EXTRACTION_PROMPT, PRICING_RESEARCH_PROMPT
 from ..schemas_llm import PRICE_ESTIMATE_SCHEMA, PriceEstimate
 from ..services import llm_config as llm_config_service
-from ..settings import settings
 from .normalizer import ItemIdentity
 from .provider_base import (
     PriceProvider,

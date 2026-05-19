@@ -14,7 +14,8 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 
-from arq.jobs import DeserializationError, Job, JobStatus as ArqJobStatus
+from arq.jobs import DeserializationError, Job
+from arq.jobs import JobStatus as ArqJobStatus
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from .. import models, schemas

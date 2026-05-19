@@ -14,7 +14,6 @@ from __future__ import annotations
 
 from sqlalchemy.engine import Connection
 
-
 # Columns covered by FTS. Mirrors the old ILIKE fan-out in
 # ``ItemService.list()`` (pre-v3.0).
 FTS_COLUMNS: tuple[str, ...] = (

@@ -17,13 +17,13 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict
 
+from ..logging_config import setup_logging
+from ..settings import settings
 from .client import _redis_settings_from_url
 from .tasks.backups import backup_create, backup_restore
 from .tasks.images import thumbnail_generate
 from .tasks.pricing import pricing_refresh
 from .tasks.vision import vision_identify
-from ..logging_config import setup_logging
-from ..settings import settings
 
 logger = logging.getLogger(__name__)
 

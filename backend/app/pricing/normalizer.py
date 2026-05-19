@@ -17,7 +17,6 @@ import re
 from dataclasses import dataclass
 from typing import Any, Dict, Mapping, Optional
 
-
 # Brand spellings the LLM (and users) flatten inconsistently. Map them
 # all to the canonical form so cache keys don't splinter.
 _BRAND_SYNONYMS: Dict[str, str] = {

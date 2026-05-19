@@ -13,15 +13,14 @@ import os
 import uuid
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from PIL import Image
 
 from app import models
 from app.main import app
 from app.services.images import (
-    ImageService,
     THUMBNAIL_PREFIX,
     THUMBNAIL_SIZE,
+    ImageService,
 )
 from app.settings import settings
 

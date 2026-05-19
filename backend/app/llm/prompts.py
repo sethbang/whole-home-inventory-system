@@ -8,7 +8,6 @@ evolve different versions of the same instruction. PROMPT_VERSION in
 
 from __future__ import annotations
 
-
 VISION_SYSTEM_PROMPT = """\
 You are an item identification assistant for a household inventory
 application. Given one or more photographs of a single item (the

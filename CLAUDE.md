@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 WHIS (Whole-Home Inventory System) — self-hosted household inventory. FastAPI + SQLite backend, React 19 + TypeScript + Tailwind + Vite PWA frontend. Served over HTTPS only (even in dev).
 
-Current version: **3.1.0** (see `CHANGELOG.md`).
+Current version: **3.3.0** (see `CHANGELOG.md`).
 
 ## Common commands
 
@@ -21,7 +21,7 @@ alembic downgrade -1                          # revert last
 python create_dev_user.py                     # seed dev user (only useful when BYPASS_AUTH=false)
 python scripts/test_venice_image.py           # smoke test the Venice.ai image-gen endpoint (writes one JPG)
 SEED_USER=<u> python scripts/seed_items.py    # seed dev DB with 12 curated items + Venice.ai-generated photos
-pytest                                        # run tests (315 tests, all passing on SQLite)
+pytest                                        # run tests (408 tests, all passing on SQLite)
 TEST_DATABASE_URL=postgresql+psycopg://... pytest  # run against Postgres (subset — LLM/pricing tests are mock-heavy and SQLite-only)
 pytest tests/test_items.py::test_item_crud_round_trip  # single test
 pytest --cov=app tests/                       # with coverage
@@ -35,7 +35,7 @@ npm run dev             # starts Vite on :5173 (HTTPS). Cert generation now live
                         # container's bridge IP instead of the host's LAN IP.
 npm run build           # tsc --noEmit + vite build
 npm run lint            # eslint . (0 errors; CI blocks on errors)
-npm test                # vitest run (95 tests, all passing)
+npm test                # vitest run (128 tests, all passing)
 npm test -- src/path/to/file.test.tsx   # single test file
 npm run test:watch      # vitest in watch mode
 npm run codegen:api     # regenerate src/api/openapi.d.ts from the backend schema
@@ -102,7 +102,7 @@ Browser (HTTPS :5173) → Vite dev server → proxies `/api` and `/uploads` to `
 - `ebay/`, `facebook/` — marketplace subpackages with their own `schemas.py`, `category_mapping.py`, and `formatter.py`. Both are assist-only: eBay emits CSV, Facebook emits copy-paste blocks + Meta Commerce catalog CSV (Meta has no public listing API for individual sellers).
 - `alembic/versions/` — migrations. `20260420_0001_baseline.py` is idempotent (checks existing tables/indexes), safe against both fresh DBs and DBs previously bootstrapped via `create_all()`. Later migrations (v2.2 pricing columns, v3.0 Postgres compat, items FTS, image thumbnails) stack on top and use `op.get_bind().dialect.name` for dialect branching where needed.
 - `scripts/bootstrap.py` — runtime startup script (invoked by the Dockerfile CMD before uvicorn). Asserts the shared `certs/` volume is populated, clears any unknown Alembic revision stamp (e.g., the pre-2.0.0 `cafb3d2c47a1`), then runs `alembic upgrade head`.
-- `tests/` — pytest suite with `conftest.py` that honors `TEST_DATABASE_URL` (defaults to in-memory SQLite + StaticPool). 315 tests on SQLite (v3.1: adds coverage for the LLM client, budget guard, schemas_llm, vision service/router, pricing normalizer/cache/aggregator, and both providers + the pricing service/router). Postgres matrix runs the subset that doesn't rely on provider mocks.
+- `tests/` — pytest suite with `conftest.py` that honors `TEST_DATABASE_URL` (defaults to in-memory SQLite + StaticPool). 408 tests on SQLite (v3.1: adds coverage for the LLM client, budget guard, schemas_llm, vision service/router, pricing normalizer/cache/aggregator, and both providers + the pricing service/router; v3.2 adds the LLM-config service/router + capabilities). Postgres matrix runs the subset that doesn't rely on provider mocks.
 - Upload dir is `settings.UPLOAD_DIR` (default `./uploads`, overridden to `/app/backend/uploads` in compose).
 
 ### Frontend layout (`frontend/src/`)
@@ -114,7 +114,8 @@ Browser (HTTPS :5173) → Vite dev server → proxies `/api` and `/uploads` to `
 - `api/types.ts` — re-exports `openapi.d.ts` schemas as ergonomic shorthands (e.g. `Item`, `Backup`, `JobDetail`). Also the home for the handful of types the backend doesn't emit (auth form shapes, analytics response shapes).
 - `pages/` — one file per route (`Dashboard`, `AddItem`, `ItemDetail`, `Reports`, `Backups`, `Login`, `Register`). Each has a colocated `<Name>.schema.ts` Zod schema where relevant. Forms use `react-hook-form` + `@hookform/resolvers/zod` (Formik + Yup were removed in v2.3).
 - `components/` — shared UI: `Layout`, `BarcodeScanner` (lazy-loaded, `@zxing/browser`), `CameraCapture`, `CustomFields`, `DataMigration`, `EbayFields`, `FacebookFields`, `FacebookCopyPasteDialog`, `ImageGallery`, `ErrorBoundary` (react-error-boundary wrapper).
-- Styling is Tailwind v4 via `@tailwindcss/vite`, config lives in `src/index.css`'s `@theme` block (semantic tokens: `primary`, `primary-hover`, `primary-accent`, `primary-subtle`, `primary-subtle-hover`). No `postcss.config.js` or `tailwind.config.js` — v4 reads config from CSS.
+- Styling is Tailwind v4 via `@tailwindcss/vite`, config lives in `src/index.css`'s `@theme` block. Two semantic-token groups: **primary** (`primary`, `primary-hover`, `primary-accent`, `primary-subtle`, `primary-subtle-hover`) and **neutrals + status** introduced in v3.3 (`fg`, `muted`, `subtle`, `inverse`, `surface`, `surface-raised`, `surface-muted`, `line`, `line-strong`, `overlay`, plus `danger`/`success`/`warning` with matching `-subtle` variants). The neutral + status tokens swap values inside `:root.dark { ... }` to deliver the Day / Night theme — components must use these tokens rather than `gray-*` / `dark:*` prefixes. `text-white` is intentionally still raw on primary/danger/success surfaces (fixed contrast). No `postcss.config.js` or `tailwind.config.js` — v4 reads config from CSS.
+- Theme switcher (Day / Night / System-sync, v3.3) lives in `src/contexts/ThemeContext.tsx` + `useTheme.ts` (split provider/hook, like `DevModeContext`). Persists `mode` to `localStorage['whis-theme']`, applies `.dark` to `<html>`, syncs `<meta name="theme-color">`, and subscribes to `prefers-color-scheme` `change` events when in System-sync. The matching FOUC-prevention inline script in `frontend/index.html` applies the resolved class before React mounts.
 - PWA is enabled via `vite-plugin-pwa` with `registerType: 'autoUpdate'`. **Service worker is disabled in dev** (`devOptions.enabled: false`) to prevent stale-asset bugs. Workbox `runtimeCaching` uses a function matcher (`url.pathname.startsWith('/api/')`).
 
 ### Data model quirks

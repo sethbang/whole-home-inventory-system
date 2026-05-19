@@ -7,6 +7,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.3.0] - 2026-05-04
+
+### Added — Day / Night / System-sync theming
+
+- **Three-mode theme switcher** in the user-menu dropdown (and mobile
+  disclosure panel) of `frontend/src/components/Layout.tsx`. The control
+  is a segmented radiogroup with **Day**, **Night**, and **System-sync**
+  options, each with a Heroicons glyph (sun, moon, computer-desktop).
+  Selection persists in `localStorage` under the key `whis-theme`;
+  default is `system`.
+- **`ThemeProvider` / `useTheme`** at
+  `frontend/src/contexts/ThemeContext.tsx` and `useTheme.ts`, following
+  the existing split provider/hook pattern (`DevModeContext`). Owns the
+  `mode → resolvedMode` resolution, applies the `.dark` class to
+  `<html>`, mirrors the active surface color into the
+  `<meta name="theme-color">` tag, and subscribes to
+  `prefers-color-scheme` `change` events when in System-sync mode so the
+  app follows the OS toggle without a reload. Wrapped over
+  `DevModeProvider` + `AuthProvider` in `router/layouts.tsx` so Login /
+  Register inherit the theme.
+- **FOUC-prevention inline script** in `frontend/index.html` resolves
+  the same logic synchronously before React mounts, so a hard-reload in
+  Night mode never flashes white. Also adds
+  `<meta name="color-scheme" content="light dark">` so native form
+  controls and scrollbars adopt the right palette pre-paint.
+- **Neutral-token palette** in `frontend/src/index.css` (`--color-fg`,
+  `--color-muted`, `--color-subtle`, `--color-inverse`,
+  `--color-surface`, `--color-surface-raised`, `--color-surface-muted`,
+  `--color-line`, `--color-line-strong`, `--color-overlay`) plus a
+  status palette (`--color-danger`, `--color-success`, `--color-warning`
+  with matching `-subtle` variants). All tokens swap values inside
+  `:root.dark { ... }`, and `--color-primary-subtle` /
+  `--color-primary-subtle-hover` are tuned to desaturated dark blues so
+  the existing primary tints don't glow on a dark background.
+- **9 new vitest cases** at
+  `frontend/src/contexts/__tests__/ThemeContext.test.tsx` covering
+  default-mode, persistence round-trip, malformed-storage fallback,
+  system-mode pickup at mount, system-mode reaction to
+  `matchMedia('change')` events, override-stickiness when the user
+  picks Day or Night explicitly, and listener cleanup on unmount.
+
+### Changed — Day / Night / System-sync theming
+
+- **Tailwind v4 dark variant** wired up via
+  `@custom-variant dark (&:where(.dark, .dark *));` in `index.css` and a
+  `.dark` class toggle on `<html>`. Components do **not** use `dark:*`
+  prefixes — the new neutral tokens swap values automatically.
+- **~700 hardcoded color callsites** across 22 component / page files
+  migrated from raw `bg-gray-*` / `text-gray-*` / `border-gray-*` /
+  `bg-white` / `bg-black` / `bg-red-*` / `text-red-*` / `bg-green-*` /
+  `text-green-*` / `bg-yellow-*` / `bg-blue-*` / `text-blue-*` /
+  `bg-indigo-*` / etc. to the new semantic tokens
+  (`bg-surface-raised`, `text-fg`, `text-muted`, `text-subtle`,
+  `border-line`, `border-line-strong`, `bg-danger-subtle`,
+  `text-warning`, `bg-primary` for ad-hoc blue/indigo buttons, etc.).
+  `text-white` is preserved on primary/danger/success surfaces because
+  contrast is fixed there.
+- **`@tailwindcss/forms` plugin override.** The plugin's base reset
+  hard-codes `background-color: #fff` on every text-style input,
+  textarea, and select, which would have made them white-on-white in
+  Night mode. `index.css` now ships an explicit override using the
+  same `[type='text']` / `[multiple]` / `textarea` / `select` selector
+  set the plugin uses (matching specificity 0,1,0 — a bare `input`
+  selector loses to the plugin), driving the controls off
+  `--color-surface-raised` / `--color-fg`. Disabled state uses
+  `--color-surface-muted` / `--color-subtle`. Status colors retuned
+  for night mode so `bg-danger text-white` / `bg-success text-white`
+  buttons keep AA contrast.
+- **`color-scheme` follows the resolved theme.** `html { color-scheme:
+  light }` / `html.dark { color-scheme: dark }` so native widgets
+  (scrollbars, date pickers, autofill highlights) match the user's
+  picked theme regardless of OS preference.
+
 ### Added — dev-DB seeding via Venice.ai nano-banana-2
 
 - **`backend/scripts/seed_items.py`.** One-shot dev-only seeder that drops
@@ -95,6 +168,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Compose v2.16+ is required for the multi-`--env-file` flag the
   wrapper uses. The wrapper version-checks and bails clearly on older
   versions.
+
+## [3.2.0] - 2026-05-04
 
 ### Added — v3.2 LLM operator dashboard
 
@@ -199,7 +274,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   non-LLM provider paths (eBay Browse). Threading real numbers from the
   provider wrapper is still the deferred-work item it was in v3.1.
 
-## [3.1.0] — pre-v3.2 baseline
+## [3.1.1] - 2026-04-23 — pre-v3.2 baseline
 
 Four fixes surfaced by the v3.1 pre-push validation pass. All four ship
 together — the restore path fix is a data-loss guard that must land before

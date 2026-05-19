@@ -8,15 +8,15 @@ guard. No network.
 from __future__ import annotations
 
 import asyncio
+import io
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi import HTTPException
 from PIL import Image as PILImage
-import io
 
 from app import models
-from app.schemas_llm import VisionResult, VisionSuggestion
+from app.schemas_llm import VisionResult
 from app.settings import settings
 from app.vision import VisionService
 

@@ -50,6 +50,12 @@ jobs:
           pip install -r requirements.txt
           pip install pytest pytest-cov httpx
 
+      - name: Lint (ruff)
+        if: matrix.python-version == '3.12' && matrix.database == 'sqlite'
+        run: |
+          pip install ruff
+          ruff check .
+
       - name: Apply migrations (baseline)
         env:
           BYPASS_AUTH: "true"
@@ -179,3 +185,29 @@ jobs:
           severity: CRITICAL,HIGH
           exit-code: "1"
           ignore-unfixed: true
+
+  version-check:
+    # Fail the build if the version stamp diverges across the FastAPI app,
+    # the /health endpoint, frontend/package.json, and CLAUDE.md. Drift
+    # between these is what let the docs claim 3.1.0 while the code shipped
+    # 3.3.0 — this guard prevents a repeat.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check version stamps are consistent
+        run: |
+          pkg=$(grep -m1 '"version"' frontend/package.json \
+            | sed -E 's/.*"version": *"([^"]+)".*/\1/')
+          api=$(grep -m1 'version="' backend/app/main.py \
+            | sed -E 's/.*version="([^"]+)".*/\1/')
+          health=$(grep -m1 '"version":' backend/app/main.py \
+            | sed -E 's/.*"version": *"([^"]+)".*/\1/')
+          doc=$(grep -m1 'Current version' CLAUDE.md \
+            | sed -E 's/.*\*\*([^*]+)\*\*.*/\1/')
+          echo "package.json=$pkg  main.py=$api  /health=$health  CLAUDE.md=$doc"
+          if [ "$pkg" != "$api" ] || [ "$pkg" != "$health" ] || [ "$pkg" != "$doc" ]; then
+            echo "::error::Version stamps diverge — keep package.json, main.py, /health, and CLAUDE.md in sync."
+            exit 1
+          fi
+          echo "All version stamps agree: $pkg"

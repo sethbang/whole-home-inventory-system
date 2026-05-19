@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from app import models, security_crypto
+from app import security_crypto
 from app.services import llm_config as svc
 
 

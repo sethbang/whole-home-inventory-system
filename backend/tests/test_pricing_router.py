@@ -32,12 +32,13 @@ def stub_arq_pool():
 
 
 def _fake_envelope():
+    from datetime import datetime, timezone
+
     from app.schemas_llm import (
         PriceEstimate,
         PriceEstimateEnvelope,
         PriceSource,
     )
-    from datetime import datetime, timezone
 
     return PriceEstimateEnvelope(
         estimate=PriceEstimate(

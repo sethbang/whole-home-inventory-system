@@ -13,10 +13,10 @@ pin down the contract.
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 
 import pytest
-
-from datetime import datetime, timezone
+from pydantic import ValidationError
 
 from app.schemas_llm import (
     PRICE_ESTIMATE_SCHEMA,
@@ -58,14 +58,14 @@ def test_vision_suggestion_accepts_minimum_payload():
 
 
 def test_vision_suggestion_rejects_out_of_range_confidence():
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         VisionSuggestion.model_validate({"confidence": 1.5})
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         VisionSuggestion.model_validate({"confidence": -0.1})
 
 
 def test_vision_suggestion_forbids_extra_fields():
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         VisionSuggestion.model_validate({"confidence": 0.5, "surprise": True})
 
 

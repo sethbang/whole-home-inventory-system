@@ -309,7 +309,7 @@ def test_vision_completion_requires_at_least_one_image():
 
 def test_parse_response_surfaces_invalid_json_as_provider_error():
     client = OpenAICompatibleClient()
-    create = _install_stub(client, "this is not { valid json")
+    _install_stub(client, "this is not { valid json")
 
     import asyncio
 
