@@ -188,9 +188,9 @@ jobs:
 
   version-check:
     # Fail the build if the version stamp diverges across the FastAPI app,
-    # the /health endpoint, frontend/package.json, and CLAUDE.md. Drift
-    # between these is what let the docs claim 3.1.0 while the code shipped
-    # 3.3.0 — this guard prevents a repeat.
+    # the /health endpoint, frontend/package.json, and CLAUDE.md. These all
+    # sat at 3.1.0 while the 3.2 and 3.3 work shipped unversioned — this
+    # guard keeps them moving together.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

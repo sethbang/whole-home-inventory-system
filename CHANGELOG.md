@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.3.1] - 2026-10-06
+
+### Security
+
+- **Patched four high-severity frontend dependency advisories**
+  (`npm audit fix`): `axios` 1.15.1 → 1.20.0 (prototype-pollution
+  gadgets), `react-router` / `react-router-dom` → 7.18.4
+  (turbo-stream deserialization, `__manifest` DoS), and `form-data` →
+  4.0.6 (CRLF injection in multipart field names). The production
+  dependency audit (`npm audit --omit=dev`) is clean again.
+
 ### Changed
 
 - **Completed the SQLAlchemy 2.x `select()` migration.** Every remaining
@@ -60,7 +71,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ghost card — until the next manual refetch. The mutations now
   invalidate the whole `items` query namespace.
 
+### CI
+
+- **Backend lint gate.** `ruff check` now runs in CI alongside the
+  existing ESLint gate.
+- **Version-stamp guard.** A new `version-check` job fails the build if
+  `frontend/package.json`, the FastAPI app version, the `/api/health`
+  payload, and `CLAUDE.md` disagree. On `main` these had all stayed at
+  3.1.0 while the 3.2 and 3.3 work shipped; they were brought up to
+  3.3.0 in this release cycle.
+
 ## [3.3.0] - 2026-05-04
+
+### Added — Browse page
+
+- **`/browse` page** with a room sidebar showing per-location item
+  counts; selecting a room filters the inventory. Includes a reusable
+  `ItemCard` (card and list layouts), debounced search, category /
+  value filters, and a view-mode toggle. Linked from the main
+  navigation.
+- **`GET /api/locations/counts`** returns per-location item counts for
+  the authenticated user (null / empty locations excluded, sorted by
+  name), backed by `ItemService.location_counts()` and a new
+  `LocationCount` schema.
+
+### Fixed
+
+- **Backup downloads no longer fail with 401.** The Backups page opened
+  download URLs with `window.open`, which drops the JWT
+  `Authorization` header. Downloads now go through the authenticated
+  API client and save via a blob, using the filename from
+  `Content-Disposition`.
 
 ### Added — Day / Night / System-sync theming
 
@@ -553,7 +594,7 @@ any Postgres deployment takes real traffic.
   block on `_parse_item_summaries` documents the exemption commitment.
   See `docs/EBAY_INTEGRATION.md` for the full audit trail.
 
-### Test counts (current Unreleased)
+### Test counts (at 3.1.1)
 
 - Backend: **335 tests** (up from 315 at v3.1.0 release):
   fixes for F6/F10a/F10b/F11/F12 + deletion-exemption regression,
