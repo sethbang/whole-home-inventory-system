@@ -14,7 +14,10 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 WORKDIR /build
 COPY requirements.txt .
-RUN pip install -r requirements.txt
+# Python 3.11's venv seeds an old setuptools whose vendored jaraco.context
+# and wheel carry HIGH CVEs (Trivy); 84+ vendors patched copies.
+RUN pip install --upgrade "setuptools>=84" \
+    && pip install -r requirements.txt
 
 # ---------------------------------------------------------------------------
 # Stage 2 — runtime. Non-root, minimal deps, healthcheck.
@@ -26,9 +29,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PATH="/opt/venv/bin:$PATH"
 
 # curl is needed by HEALTHCHECK; everything else is in the venv.
+# The base image's system setuptools has the same vendored-CVE problem as
+# the venv's (see builder stage), so upgrade it here too.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install --no-cache-dir --upgrade "setuptools>=84"
 
 # Non-root runtime user. The compose file mounts uploads / backups / certs
 # volumes which must be writable by uid 1000.

@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   -2281) and `cryptography` to 50.x (PYSEC-2026-3552/-3553/-3554,
   GHSA-537c-gmf6-5ccf). Starlette 1.0 only removed APIs WHIS doesn't
   use; no code changes were needed.
+- **Backend image: upgraded setuptools to 84+** in both the app venv
+  and the base image's system Python. The setuptools seeded by Python
+  3.11 vendors `jaraco.context` 5.3.0 (CVE-2026-23949) and `wheel`
+  0.45.1 (CVE-2026-24049), which failed the CI Trivy scan.
 
 ### Changed
 
