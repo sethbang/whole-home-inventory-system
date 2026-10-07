@@ -1,8 +1,8 @@
 # WHIS Architecture
 
-This document covers WHIS (Whole-Home Inventory System) v3.1.0 — system design, components, data model, security boundaries, deployment topology, and the architecture decisions that got us here.
+This document covers WHIS (Whole-Home Inventory System) as of v3.1.0 — system design, components, data model, security boundaries, deployment topology, and the architecture decisions that got us here.
 
-For the conventions and engineering discipline, see [CLAUDE.md](CLAUDE.md). For per-API contracts, see [API.md](API.md). For deployment, see [DEPLOYMENT.md](DEPLOYMENT.md).
+Later releases (v3.2 admin role + in-app LLM config, v3.3 theming + Browse page) are not yet folded in here — see [CHANGELOG.md](CHANGELOG.md). For the conventions and engineering discipline, see [CLAUDE.md](CLAUDE.md). For per-API contracts, see [API.md](API.md). For deployment, see [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## Table of Contents
 

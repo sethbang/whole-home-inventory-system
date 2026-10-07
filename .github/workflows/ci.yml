@@ -188,7 +188,7 @@ jobs:
 
   version-check:
     # Fail the build if the version stamp diverges across the FastAPI app,
-    # the /health endpoint, frontend/package.json, and CLAUDE.md. These all
+    # the /health endpoint, frontend/package.json, CLAUDE.md, and README.md. These all
     # sat at 3.1.0 while the 3.2 and 3.3 work shipped unversioned — this
     # guard keeps them moving together.
     runs-on: ubuntu-latest
@@ -205,9 +205,11 @@ jobs:
             | sed -E 's/.*"version": *"([^"]+)".*/\1/')
           doc=$(grep -m1 'Current version' CLAUDE.md \
             | sed -E 's/.*\*\*([^*]+)\*\*.*/\1/')
-          echo "package.json=$pkg  main.py=$api  /health=$health  CLAUDE.md=$doc"
-          if [ "$pkg" != "$api" ] || [ "$pkg" != "$health" ] || [ "$pkg" != "$doc" ]; then
-            echo "::error::Version stamps diverge — keep package.json, main.py, /health, and CLAUDE.md in sync."
+          readme=$(grep -m1 'Current version:' README.md \
+            | sed -E 's/.*Current version: ([0-9][^*]*)\*\*.*/\1/')
+          echo "package.json=$pkg  main.py=$api  /health=$health  CLAUDE.md=$doc  README.md=$readme"
+          if [ "$pkg" != "$api" ] || [ "$pkg" != "$health" ] || [ "$pkg" != "$doc" ] || [ "$pkg" != "$readme" ]; then
+            echo "::error::Version stamps diverge — keep package.json, main.py, /health, CLAUDE.md, and README.md in sync."
             exit 1
           fi
           echo "All version stamps agree: $pkg"

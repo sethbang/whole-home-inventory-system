@@ -1,6 +1,6 @@
 # WHIS Development Guide
 
-This guide provides detailed information for developers working on WHIS (Whole-Home Inventory System), currently at v3.1.0.
+This guide provides detailed information for developers working on WHIS (Whole-Home Inventory System). It was last fully reviewed against v3.1.0; for later changes (the v3.2 LLM Settings page, v3.3 theming and Browse page, 3.3.1 refactors) see [CHANGELOG.md](CHANGELOG.md).
 
 ## Table of Contents
 

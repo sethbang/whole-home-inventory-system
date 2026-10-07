@@ -1,6 +1,6 @@
 # WHIS API Documentation
 
-REST API reference for **WHIS 3.1.0**. All routes are mounted under `/api` in `backend/app/main.py`. Routers themselves do not carry the `/api` prefix — `main.py` adds it.
+REST API reference for **WHIS 3.3.1**. All routes are mounted under `/api` in `backend/app/main.py`. Routers themselves do not carry the `/api` prefix — `main.py` adds it.
 
 ## Base URL
 
@@ -114,6 +114,7 @@ Response (200): the `User` schema above. Returns 401 if the token is missing, ex
 | `POST` | `/api/items/import` | Upload a CSV or JSON file (`multipart/form-data`, field `file`) |
 | `GET`  | `/api/categories` | Distinct categories currently in use |
 | `GET`  | `/api/locations` | Distinct locations currently in use |
+| `GET`  | `/api/locations/counts` | Per-location item counts for the caller (v3.3, drives the Browse page's room sidebar): `[{"location": "Kitchen", "count": 12}, ...]`. Null/empty locations excluded; sorted by name |
 
 #### `GET /api/items` query parameters
 
@@ -381,6 +382,22 @@ Errors:
 - `429` — exceeded `/api/pricing/refresh/{item_id}` rate limit (5/min per IP)
 - `503` — `PRICING_ENABLED=false`
 
+## LLM config API (v3.2 — admin only)
+
+Backs the in-app Settings page. Every route requires an admin user
+(the first registered account is promoted to admin); others get `403`.
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET`  | `/api/llm-config` | Effective LLM config (`LLMConfigRead`). Never returns the plaintext key — only `api_key_set` + `api_key_last4`. `sources` gives per-field provenance (`db` / `env` / `default`); `today_*_cost_usd` report the caller's spend today |
+| `PUT`  | `/api/llm-config` | Partial update (`LLMConfigUpdate`) — every field optional; `null` leaves a field unchanged, empty string / `0` clears it back to the env value. `api_key`: omitted = keep, `""` = clear, non-empty = encrypt and store. `400` on invalid values. Returns the new `LLMConfigRead` |
+| `GET`  | `/api/llm-config/models` | Models listed by the configured provider, annotated for the UI |
+| `POST` | `/api/llm-config/test` | Quick check: URL + key reachable, configured models exist. Optional `LLMConfigUpdate` body tests unsaved values. Returns `{ok, base_url, model, detail, checks}` |
+| `POST` | `/api/llm-config/test-vision` | Deep check: sends a tiny image through the vision path with a strict schema. Same optional body. Returns `{ok, model, detail, parsed_response, usage, cost_usd}` |
+
+See [SECURITY.md](SECURITY.md) for how the stored key is encrypted and
+what rotating `SECRET_KEY` does to it.
+
 ## eBay API (v2.3 — CSV listing assist)
 
 | Method | Path | Purpose |
@@ -407,7 +424,7 @@ Assist-only — Meta has no public listing API for individual sellers. Output is
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/api/health` | `{"status": "healthy", "version": "3.1.0"}` — unauthenticated |
+| `GET` | `/api/health` | `{"status": "healthy", "version": "3.3.1"}` — unauthenticated |
 | `OPTIONS` | `/{any}` | CORS preflight handler |
 
 ## Error responses
@@ -571,3 +588,6 @@ See [CHANGELOG.md](CHANGELOG.md) for the full history. Breaking API-visible chan
 - **2.2.0** — Per-route rate limits introduced via slowapi; affected endpoints now return 429.
 - **3.0.0** — Backup create/restore + thumbnail generation can return a `JobReference` instead of the full resource when the worker profile is active. Frontend should branch on `kind: "job"`. New `/api/jobs/{job_id}` endpoint.
 - **3.1.0** — `Item` shape gains `estimated_value_*`, `price_last_checked`, `price_provider`. `ItemImage` gains `thumbnail_path` + `thumbnail_generated_at`. New routers: `/api/vision/...`, `/api/pricing/...`. New error codes: 402 (cost cap), 503 (feature disabled).
+- **3.2.0** — `User` gains `is_admin`; the first registered user becomes admin. New admin-only `/api/llm-config/...` routers.
+- **3.3.0** — New `GET /api/locations/counts`.
+- **3.3.1** — `POST /api/register` is now rate-limited (5/min/IP) and can return 429.

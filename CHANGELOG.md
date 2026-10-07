@@ -59,7 +59,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   best-effort by nature — a call's cost is unknowable until it
   completes — which is now documented in `SECURITY.md` alongside the
   `SECRET_KEY`-derived LLM-key encryption trade-offs.
-
 - **`POST /api/register` is now rate-limited** (5/min/IP), matching the
   existing throttle on `/api/token`. Registration was previously
   unthrottled, leaving it open to account-enumeration probing and
@@ -77,9 +76,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   existing ESLint gate.
 - **Version-stamp guard.** A new `version-check` job fails the build if
   `frontend/package.json`, the FastAPI app version, the `/api/health`
-  payload, and `CLAUDE.md` disagree. On `main` these had all stayed at
-  3.1.0 while the 3.2 and 3.3 work shipped; they were brought up to
-  3.3.0 in this release cycle.
+  payload, `CLAUDE.md`, and `README.md` disagree. On `main` these had
+  all stayed at 3.1.0 while the 3.2 and 3.3 work shipped; they were
+  brought up to 3.3.0 in this release cycle.
+
+### Documentation
+
+- **Corrected stale and false statements.** `README.md`, `API.md`,
+  `TESTING.md`, and `DEPLOYMENT.md` now report 3.3.1 and current test
+  counts (409 backend / 159 frontend). `API.md` now documents the v3.2
+  admin-only `/api/llm-config` routes and `GET /api/locations/counts`.
+  `SECURITY.md` no longer claims the app has no rate limiting or a
+  single user role. `ARCHITECTURE.md` and `DEVELOPMENT.md` are now
+  labelled as last reviewed against v3.1.0.
 
 ## [3.3.0] - 2026-05-04
 

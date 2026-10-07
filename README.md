@@ -4,7 +4,7 @@
 
 # Whole-Home Inventory System (WHIS)
 
-**Current version: 3.1.0** — see [CHANGELOG.md](CHANGELOG.md).
+**Current version: 3.3.1** — see [CHANGELOG.md](CHANGELOG.md).
 
 WHIS is a self-hosted platform for managing household inventories. It centralizes item information — descriptions, photos, locations, purchase details, valuations, warranties — into a local database accessible from multiple devices via a web interface. The v3.x line adds optional AI-assisted item identification (vision auto-fill) and resale-value pricing (eBay Browse + LLM), all while keeping your data local.
 

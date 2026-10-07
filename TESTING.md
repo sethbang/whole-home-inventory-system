@@ -1,11 +1,11 @@
 # WHIS Testing Guide
 
-This document describes the testing strategy, current test surface, and conventions for WHIS (Whole-Home Inventory System). Current as of v3.1.0.
+This document describes the testing strategy, current test surface, and conventions for WHIS (Whole-Home Inventory System). Current as of v3.3.1.
 
 ## Current state
 
-- **Backend:** 335 pytest tests (315 shipped with v3.1.0; +19 added by the F6/F10a/F10b/F11/F12 fixes; +1 deletion-exemption regression). Default run uses in-memory SQLite via `conftest.py`. Postgres 16 matrix is opt-in via `TEST_DATABASE_URL`.
-- **Frontend:** 95 vitest tests across components, API client modules, contexts, and pages.
+- **Backend:** 409 pytest tests. Default run uses in-memory SQLite via `conftest.py`. Postgres 16 matrix is opt-in via `TEST_DATABASE_URL`.
+- **Frontend:** 159 vitest tests across components, hooks, API client modules, contexts, and pages.
 - **CI:** GitHub Actions at `.github/workflows/ci.yml`. 4-leg backend matrix (Python 3.11/3.12 × SQLite/Postgres). Frontend ESLint is **blocking** (0 errors). Three additional gates: `pip-audit --strict`, `npm audit --omit=dev --audit-level=high`, Trivy image scan (HIGH/CRITICAL fail), and a `contract-check` job that re-runs `npm run codegen:api` and fails if `frontend/src/api/openapi.d.ts` is out of sync.
 - **Not yet present:** Playwright / E2E browser tests, Locust load tests, formal coverage gates. Coverage is reported in the job log but not failed-under.
 

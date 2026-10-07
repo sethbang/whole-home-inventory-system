@@ -149,11 +149,11 @@ WHIS v3.1 introduces optional intelligence features that depend on a third-party
 
 1. **Local Network**
    - Designed for local network use
-   - Remote access requires VPN or reverse proxy with operator-provided TLS + rate limiting
-   - No built-in abuse protection
+   - Remote access requires a VPN or a reverse proxy with operator-provided TLS
+   - Built-in protection is limited to per-route rate limits (slowapi); there is no WAF or IP-level abuse protection
 
 2. **Authentication**
-   - Single user-role model (no role-based access control)
+   - Two roles only: admin (the first registered user; gates the LLM Settings page) and regular user — no fine-grained role-based access control
    - No OAuth / OIDC / MFA integration
    - No password complexity enforcement
    - No refresh-token flow — sessions hard-expire after `ACCESS_TOKEN_EXPIRE_MINUTES`
@@ -169,7 +169,7 @@ WHIS v3.1 introduces optional intelligence features that depend on a third-party
 A: No, WHIS stores all data locally on your host.
 
 **Q: Can I access WHIS remotely?**
-A: Yes, but only via VPN (e.g., Tailscale) or a reverse proxy (Synology DSM, Caddy, Traefik). The application does not include rate limiting, WAF, or abuse protection of its own.
+A: Yes, but only via VPN (e.g., Tailscale) or a reverse proxy (Synology DSM, Caddy, Traefik). The application enforces per-route rate limits (login, registration, vision, pricing) but has no WAF or IP-level abuse protection of its own — put those at the proxy.
 
 **Q: How are passwords stored?**
 A: Passwords are hashed with **bcrypt** via passlib. Configure rounds by swapping the passlib `CryptContext` arguments in `backend/app/security.py`.
