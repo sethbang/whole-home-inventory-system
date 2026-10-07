@@ -196,7 +196,11 @@ describe('Dashboard', () => {
     await waitFor(() => {
       expect(items.bulkDelete).toHaveBeenCalledWith(['i1']);
     });
-    expect(dialog).not.toBeInTheDocument();
+    // The dialog closes only after bulkDelete's promise resolves, so wait
+    // for it rather than asserting synchronously (flaky on slow CI).
+    await waitFor(() => {
+      expect(dialog).not.toBeInTheDocument();
+    });
   });
 
   it('closes the delete dialog on Escape without deleting', async () => {
