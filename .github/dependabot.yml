@@ -1,0 +1,84 @@
+# Dependabot keeps backend (pip), frontend (npm), and CI (github-actions)
+# dependencies up to date. Minor and patch updates are grouped into one PR
+# per ecosystem per week to keep review noise low; major bumps arrive as
+# individual PRs so they can be vetted one at a time.
+
+version: 2
+
+updates:
+  # --- Backend (FastAPI / SQLAlchemy / etc.) ---------------------------------
+  - package-ecosystem: pip
+    directory: "/backend"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "08:00"
+      timezone: "America/New_York"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "sethbangert"
+    labels:
+      - "dependencies"
+      - "backend"
+    groups:
+      backend-minor-and-patch:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
+      backend-security:
+        applies-to: security-updates
+        update-types:
+          - "minor"
+          - "patch"
+          - "major"
+
+  # --- Frontend (React / Vite / etc.) ----------------------------------------
+  - package-ecosystem: npm
+    directory: "/frontend"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "08:00"
+      timezone: "America/New_York"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "sethbangert"
+    labels:
+      - "dependencies"
+      - "frontend"
+    # Pin the React major to avoid unsolicited React 20 (or whatever comes
+    # after). Same for React Router, which has historically shipped breaking
+    # majors. Remove when the project is ready to move up.
+    ignore:
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-router-dom"
+        update-types: ["version-update:semver-major"]
+    groups:
+      frontend-minor-and-patch:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
+      frontend-security:
+        applies-to: security-updates
+        update-types:
+          - "minor"
+          - "patch"
+          - "major"
+
+  # --- GitHub Actions pinned by SHA or tag -----------------------------------
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    reviewers:
+      - "sethbangert"
+    labels:
+      - "dependencies"
+      - "ci"

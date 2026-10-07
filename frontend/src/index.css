@@ -1,3 +1,170 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@plugin "@tailwindcss/forms";
+
+/**
+ * Day / Night / System-sync (v3.3) — the v2.4 CSS-first theme block now
+ * exposes a full neutral palette in addition to the primary tokens. When
+ * ``.dark`` is on ``<html>`` (set by ThemeProvider or the FOUC inline script
+ * in index.html), every token below is overridden by the ``:root.dark``
+ * block. Components must use these semantic tokens (``bg-surface-raised``,
+ * ``text-fg``, ``border-line``, etc.) rather than raw ``gray-*`` /
+ * ``white`` / ``black`` classes — that's what makes the theme switch work
+ * without ``dark:`` prefixes anywhere in component code.
+ *
+ * Naming notes:
+ *   - ``fg`` (foreground) instead of ``base`` to avoid colliding with
+ *     Tailwind's built-in ``text-base`` font-size utility.
+ *   - ``line`` instead of ``border-*`` because ``--color-border-*`` would
+ *     generate awkward class names like ``border-border-base``.
+ *
+ * Sky palette baseline:
+ *   #f0f9ff  sky-50   (subtle tint background)
+ *   #e0f2fe  sky-100  (subtle tint hover)
+ *   #0ea5e9  sky-500  (legacy button baseline — kept as --color-primary-accent
+ *                      for the few spots that want the brighter shade)
+ *   #0284c7  sky-600  (default action color)
+ *   #0369a1  sky-700  (action hover, strong text)
+ */
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-primary: #0284c7;
+  --color-primary-hover: #0369a1;
+  --color-primary-accent: #0ea5e9;
+  --color-primary-subtle: #f0f9ff;
+  --color-primary-subtle-hover: #e0f2fe;
+
+  /* Neutral surfaces */
+  --color-surface: #ffffff;
+  --color-surface-raised: #ffffff;
+  --color-surface-muted: #f9fafb;
+
+  /* Neutral foreground (text) */
+  --color-fg: #111827;
+  --color-muted: #4b5563;
+  --color-subtle: #6b7280;
+  --color-inverse: #ffffff;
+
+  /* Neutral lines (borders, dividers) */
+  --color-line: #e5e7eb;
+  --color-line-strong: #d1d5db;
+
+  /* Overlays (alpha applied inline via /80 etc.) */
+  --color-overlay: #000000;
+
+  /* Status palette — kept on a similar muted/strong split so callers can
+     write bg-danger-subtle text-danger and have the pair stay legible in
+     either theme. */
+  --color-danger: #b91c1c;
+  --color-danger-subtle: #fef2f2;
+  --color-success: #15803d;
+  --color-success-subtle: #f0fdf4;
+  --color-warning: #b45309;
+  --color-warning-subtle: #fffbeb;
+}
+
+:root.dark {
+  /* Tune the primary tints so they don't glow on a dark surface */
+  --color-primary-subtle: #0c2236;
+  --color-primary-subtle-hover: #13314c;
+
+  --color-surface: #0b1220;
+  --color-surface-raised: #111827;
+  --color-surface-muted: #1f2937;
+
+  --color-fg: #f9fafb;
+  --color-muted: #cbd5e1;
+  --color-subtle: #94a3b8;
+  --color-inverse: #0b1220;
+
+  --color-line: #334155;
+  --color-line-strong: #475569;
+
+  --color-overlay: #000000;
+
+  /* Status — kept saturated in dark mode so ``bg-danger text-white`` and
+     friends still hit AA contrast on solid buttons. Only the ``-subtle``
+     backgrounds darken so error/warning panels read against the page. */
+  --color-danger: #dc2626;
+  --color-danger-subtle: #2a1414;
+  --color-success: #16a34a;
+  --color-success-subtle: #0f2418;
+  --color-warning: #d97706;
+  --color-warning-subtle: #2a1d0a;
+}
+
+/* Apply the surface + foreground to the document root so anything not
+   explicitly tokenized still inherits sane theme colors. */
+html,
+body {
+  background-color: var(--color-surface);
+  color: var(--color-fg);
+}
+
+/* Drive native form widgets (scrollbars, date pickers, autofill, etc.)
+   off our resolved theme rather than the OS preference, so a user who
+   picked Day on a Night-mode OS still gets light scrollbars and v.v. */
+html {
+  color-scheme: light;
+}
+html.dark {
+  color-scheme: dark;
+}
+
+/* The ``@tailwindcss/forms`` plugin sets a hard-coded white background on
+   text-style form controls, which makes them unreadable in Night mode
+   (white-on-near-white). Override here using the same attribute-selector
+   form the plugin uses (specificity (0,1,0) — a bare ``input`` selector
+   only has (0,0,1) and loses to the plugin's reset). Source order then
+   makes our rule win. We deliberately exclude checkbox / radio / range
+   / file / color since those rely on their own custom rendering that
+   the forms plugin owns. */
+[type='text'],
+[type='email'],
+[type='url'],
+[type='password'],
+[type='number'],
+[type='date'],
+[type='datetime-local'],
+[type='month'],
+[type='search'],
+[type='tel'],
+[type='time'],
+[type='week'],
+[multiple],
+textarea,
+select {
+  background-color: var(--color-surface-raised);
+  color: var(--color-fg);
+}
+
+/* Disabled state — slightly muted surface so it still reads as
+   interactive but visibly off. Specificity matches the rule above
+   thanks to the ``:disabled`` pseudo-class. */
+[type='text']:disabled,
+[type='email']:disabled,
+[type='url']:disabled,
+[type='password']:disabled,
+[type='number']:disabled,
+[type='date']:disabled,
+[type='datetime-local']:disabled,
+[type='month']:disabled,
+[type='search']:disabled,
+[type='tel']:disabled,
+[type='time']:disabled,
+[type='week']:disabled,
+[multiple]:disabled,
+textarea:disabled,
+select:disabled {
+  background-color: var(--color-surface-muted);
+  color: var(--color-subtle);
+}
+
+/* Placeholder text — anchor to subtle so any input without an explicit
+   ``placeholder:text-*`` utility still reads. */
+input::placeholder,
+textarea::placeholder {
+  color: var(--color-subtle);
+  opacity: 1;
+}

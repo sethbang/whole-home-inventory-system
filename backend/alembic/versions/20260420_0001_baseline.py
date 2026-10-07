@@ -15,7 +15,6 @@ from typing import Sequence, Union
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy import inspect
-from sqlalchemy.dialects import sqlite
 
 revision: str = "20260420_0001"
 down_revision: Union[str, None] = None
@@ -73,7 +72,7 @@ def upgrade() -> None:
             sa.Column("current_value", sa.Float(), nullable=True),
             sa.Column("warranty_expiration", sa.DateTime(), nullable=True),
             sa.Column("notes", sa.String(), nullable=True),
-            sa.Column("custom_fields", sqlite.JSON(), nullable=True),
+            sa.Column("custom_fields", sa.JSON(), nullable=True),
             sa.Column("created_at", sa.DateTime(), nullable=True),
             sa.Column("updated_at", sa.DateTime(), nullable=True),
             sa.Column("owner_id", sa.String(length=36), nullable=True),

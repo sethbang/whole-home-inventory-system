@@ -1,11 +1,13 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useEffect, useState } from 'react';
 
-interface DevModeContextType {
+export interface DevModeContextType {
   isDevMode: boolean;
   toggleDevMode: () => void;
 }
 
-const DevModeContext = createContext<DevModeContextType | undefined>(undefined);
+export const DevModeContext = createContext<DevModeContextType | undefined>(
+  undefined,
+);
 
 // Dev mode is only ever available in development builds. In production builds
 // (`import.meta.env.DEV === false`) the provider is a hard-off no-op so that
@@ -30,16 +32,10 @@ export function DevModeProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <DevModeContext.Provider value={{ isDevMode: DEV_BUILD && isDevMode, toggleDevMode }}>
+    <DevModeContext.Provider
+      value={{ isDevMode: DEV_BUILD && isDevMode, toggleDevMode }}
+    >
       {children}
     </DevModeContext.Provider>
   );
-}
-
-export function useDevMode() {
-  const context = useContext(DevModeContext);
-  if (context === undefined) {
-    throw new Error('useDevMode must be used within a DevModeProvider');
-  }
-  return context;
 }

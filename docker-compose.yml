@@ -5,16 +5,39 @@ services:
       dockerfile: Dockerfile
     ports:
       - "27182:27182"
+    # Load every var from the project-root `.env` into the container.
+    # The `environment:` block below only overrides / sets vars that
+    # need a compose-specific value (e.g. `UPLOAD_DIR` points to the
+    # mounted volume, `CORS_ORIGINS` has dev-LAN defaults). Pydantic
+    # settings in `app/settings.py` falls back to its own defaults for
+    # any var absent from `.env` — no need to declare empty overrides.
+    env_file:
+      - path: .env
+        required: false
     environment:
       # Auth — set BYPASS_AUTH=true for one-off dev usage only. For any shared
       # deployment, set SECRET_KEY to a real random value and keep BYPASS_AUTH=false.
       - BYPASS_AUTH=${BYPASS_AUTH:-false}
       - SECRET_KEY=${SECRET_KEY:?SECRET_KEY must be set (see backend/.env.example)}
       - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
-      - DATABASE_URL=sqlite:////app/database/whis.db
+      # Default is on-disk SQLite. Opt into Postgres with
+      # `DATABASE_URL=postgresql+psycopg://whis:whis@postgres:5432/whis`
+      # and `--profile postgres` so the postgres service below boots too.
+      - DATABASE_URL=${DATABASE_URL:-sqlite:////app/database/whis.db}
       - UPLOAD_DIR=/app/backend/uploads
       - BACKUP_DIR=/app/backend/backups
-      - CORS_ORIGINS=https://192.168.1.15:5173,https://localhost:5173,https://frontend:5173
+      # When REDIS_URL is unset (default dev stack) the backend's enqueuers
+      # fall back to synchronous execution — no worker required. Start the
+      # worker profile (`--profile worker`) to activate the async path.
+      - REDIS_URL=${REDIS_URL-}
+      # CORS allow-list. `WHIS_LAN_IP` is written into `.env.generated` by the
+      # `bin/whis` wrapper at startup (auto-detected from the host's primary
+      # interface). If you start compose without the wrapper the first entry
+      # falls back to `https://localhost:5173`, which is harmlessly redundant
+      # with the second entry — Pydantic's _split_csv doesn't dedupe but the
+      # CORS middleware's `in` check tolerates duplicates. `whis.local` is the
+      # canonical mDNS hostname (advertised by the `mdns` sidecar profile).
+      - CORS_ORIGINS=https://${WHIS_LAN_IP:-localhost}:5173,https://localhost:5173,https://whis.local:5173,https://frontend:5173
       - CORS_ALLOW_HEADERS=Content-Type,Authorization,Accept,Origin,X-Requested-With
       - CORS_ALLOW_METHODS=GET,POST,PUT,DELETE,OPTIONS,HEAD,PATCH
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
@@ -23,6 +46,31 @@ services:
       - ./backend/database:/app/database
       - ./backend/uploads:/app/backend/uploads
       - ./backend/backups:/app/backend/backups
+      # Certs written by `./bin/whis certs` on the host. Mounted read-only
+      # into the backend container so uvicorn can read them without needing
+      # its own openssl toolchain. The in-container path of generate-certs.js
+      # is now a no-op — only the host-side wrapper produces a SAN that
+      # matches the LAN.
+      - ./frontend/certs:/app/certs:ro
+    healthcheck:
+      test: ["CMD", "curl", "-kfsS", "https://localhost:27182/api/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    # Profile-aware optional dependencies. `required: false` (Compose v2.20+)
+    # lets the backend boot without postgres/redis when those profiles aren't
+    # active (default dev stack). When `--profile postgres` or `--profile worker`
+    # is passed, the backend waits for the dependency's healthcheck before
+    # trying to connect — fixes the race where backend crashed on startup
+    # before postgres finished initializing.
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
+      redis:
+        condition: service_healthy
+        required: false
     networks:
       - whole-home-inventory-system-network
 
@@ -35,15 +83,118 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
-      - ./certs:/root/certs:rw
+      - ./frontend/certs:/app/certs:rw
     environment:
       - NODE_ENV=development
       - VITE_API_URL=
-      - CERT_OUTPUT_DIR=/root/certs
+      - CERT_OUTPUT_DIR=/app/certs
+      # Surface the host's LAN IP so vite's startup banner prints a URL the
+      # other devices on the network can actually reach. Set by `bin/whis up`
+      # via `.env.generated`; empty when compose is run without the wrapper.
+      - WHIS_LAN_IP=${WHIS_LAN_IP-}
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-kfsS", "https://localhost:5173/"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
     networks:
       - whole-home-inventory-system-network
+
+  # ---------------------------------------------------------------------------
+  # Profile-gated services. `docker compose up` with no flags boots only
+  # backend + frontend — SQLite, synchronous. Opt in with:
+  #   --profile postgres   → Postgres 16 on port 5432
+  #   --profile worker     → Redis + the ARQ worker (v3.0 async job queue)
+  # ---------------------------------------------------------------------------
+
+  postgres:
+    image: postgres:16-alpine
+    profiles: ["postgres"]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-whis}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-whis}
+      POSTGRES_DB: ${POSTGRES_DB:-whis}
+    volumes:
+      - whis-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-whis} -d ${POSTGRES_DB:-whis}"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - whole-home-inventory-system-network
+
+  redis:
+    image: redis:7-alpine
+    profiles: ["worker"]
+    command: ["redis-server", "--save", "60", "1", "--appendonly", "yes"]
+    volumes:
+      - whis-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - whole-home-inventory-system-network
+
+  # mDNS sidecar — advertises `whis.local` on the LAN so any device can
+  # browse to https://whis.local:5173 without knowing the host's IP. Uses
+  # `network_mode: host` because multicast DNS doesn't traverse Docker's
+  # bridge driver. Profile-gated because `network_mode: host` is unreliable
+  # on Docker Desktop for Mac (multicast stays trapped inside the hidden
+  # Linux VM); the `bin/whis` wrapper publishes via `dns-sd -P` on Mac
+  # instead. Activate on Linux with `bin/whis up --mdns` or
+  # `docker compose --profile mdns up`.
+  mdns:
+    build:
+      context: ./mdns
+    profiles: ["mdns"]
+    network_mode: host
+    environment:
+      - WHIS_MDNS_PORT=5173
+      - WHIS_MDNS_HOSTNAME=${WHIS_MDNS_HOSTNAME:-whis}
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    profiles: ["worker"]
+    command: ["arq", "app.jobs.worker.WorkerSettings"]
+    # Load project-root .env so the worker sees the same settings the
+    # backend does — fail-fast guards and feature-flagged tasks need
+    # identical inputs or they behave asymmetrically across services.
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - BYPASS_AUTH=${BYPASS_AUTH:-false}
+      - SECRET_KEY=${SECRET_KEY:?SECRET_KEY must be set (see backend/.env.example)}
+      - DATABASE_URL=${DATABASE_URL:-sqlite:////app/database/whis.db}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - UPLOAD_DIR=/app/backend/uploads
+      - BACKUP_DIR=/app/backend/backups
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DEBUG=${DEBUG:-false}
+    volumes:
+      - ./backend/database:/app/database
+      - ./backend/uploads:/app/backend/uploads
+      - ./backend/backups:/app/backend/backups
+      - ./frontend/certs:/app/certs:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - whole-home-inventory-system-network
+
+volumes:
+  whis-postgres-data:
+  whis-redis-data:
 
 networks:
   whole-home-inventory-system-network:

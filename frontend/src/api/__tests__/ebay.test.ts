@@ -1,17 +1,27 @@
 import { ebay } from '../ebay';
-import { apiClient } from '../client';
-import type { EbayFields, EbayCategoryResponse, EbayExportResponse } from '../ebay';
+import { apiClient } from '../http';
+import type {
+  EbayFields,
+  EbayCategoryResponse,
+  EbayExportRequest,
+} from '../ebay';
 
-jest.mock('../client', () => ({
+vi.mock('../http', () => ({
   apiClient: {
-    get: jest.fn(),
-    post: jest.fn(),
+    get: vi.fn(),
+    post: vi.fn(),
   },
 }));
 
+// Stub URL + anchor APIs so the download helper can run in jsdom.
+beforeAll(() => {
+  (globalThis.URL.createObjectURL as unknown) = vi.fn(() => 'blob:stub');
+  (globalThis.URL.revokeObjectURL as unknown) = vi.fn();
+});
+
 describe('ebay API', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('getCategories', () => {
@@ -29,7 +39,7 @@ describe('ebay API', () => {
     };
 
     it('calls the correct endpoint without item ID', async () => {
-      (apiClient.get as jest.Mock).mockResolvedValue({ data: mockCategoryResponse });
+      (apiClient.get as ReturnType<typeof vi.fn>).mockResolvedValue({ data: mockCategoryResponse });
 
       const result = await ebay.getCategories();
 
@@ -38,7 +48,7 @@ describe('ebay API', () => {
     });
 
     it('includes item ID in params when provided', async () => {
-      (apiClient.get as jest.Mock).mockResolvedValue({ data: mockCategoryResponse });
+      (apiClient.get as ReturnType<typeof vi.fn>).mockResolvedValue({ data: mockCategoryResponse });
 
       const result = await ebay.getCategories('test-id');
 
@@ -58,7 +68,7 @@ describe('ebay API', () => {
     };
 
     it('calls the correct endpoint with data', async () => {
-      (apiClient.post as jest.Mock).mockResolvedValue({ data: mockFields });
+      (apiClient.post as ReturnType<typeof vi.fn>).mockResolvedValue({ data: mockFields });
 
       const result = await ebay.updateFields('test-id', mockFields);
 
@@ -71,14 +81,14 @@ describe('ebay API', () => {
 
     it('handles errors correctly', async () => {
       const error = new Error('API Error');
-      (apiClient.post as jest.Mock).mockRejectedValue(error);
+      (apiClient.post as ReturnType<typeof vi.fn>).mockRejectedValue(error);
 
       await expect(ebay.updateFields('test-id', mockFields)).rejects.toThrow('API Error');
     });
   });
 
-  describe('exportItems', () => {
-    const mockRequest = {
+  describe('exportItems (streams CSV via blob download)', () => {
+    const mockRequest: EbayExportRequest = {
       item_ids: ['1', '2'],
       default_fields: {
         condition: 'NEW',
@@ -86,36 +96,24 @@ describe('ebay API', () => {
       },
     };
 
-    const mockResponse: EbayExportResponse = {
-      success: true,
-      message: 'Export successful',
-      items_processed: 2,
-      file_url: 'http://example.com/export.csv',
-    };
+    it('POSTs with blob responseType and triggers a download', async () => {
+      const blob = new Blob(['id,title\n1,Drill'], { type: 'text/csv' });
+      (apiClient.post as ReturnType<typeof vi.fn>).mockResolvedValue({
+        data: blob,
+        headers: {
+          'content-disposition': 'attachment; filename="whis-ebay-export.csv"',
+        },
+      });
 
-    it('calls the correct endpoint with request data', async () => {
-      (apiClient.post as jest.Mock).mockResolvedValue({ data: mockResponse });
+      await ebay.exportItems(mockRequest);
 
-      const result = await ebay.exportItems(mockRequest);
-
-      expect(apiClient.post).toHaveBeenCalledWith('/api/ebay/export', mockRequest);
-      expect(result).toEqual(mockResponse);
-    });
-
-    it('handles export errors correctly', async () => {
-      const errorResponse: EbayExportResponse = {
-        success: false,
-        message: 'Export failed',
-        items_processed: 0,
-        errors: ['Invalid item data'],
-      };
-
-      (apiClient.post as jest.Mock).mockResolvedValue({ data: errorResponse });
-
-      const result = await ebay.exportItems(mockRequest);
-
-      expect(result.success).toBe(false);
-      expect(result.errors).toContain('Invalid item data');
+      expect(apiClient.post).toHaveBeenCalledWith(
+        '/api/ebay/export',
+        mockRequest,
+        expect.objectContaining({ responseType: 'blob' }),
+      );
+      // URL.createObjectURL is called on the blob to build the download link.
+      expect(globalThis.URL.createObjectURL).toHaveBeenCalled();
     });
   });
 });

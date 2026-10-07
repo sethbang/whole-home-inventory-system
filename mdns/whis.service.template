@@ -1,0 +1,10 @@
+<?xml version="1.0" standalone='no'?>
+<!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+<service-group>
+  <name replace-wildcards="yes">WHIS on %h</name>
+  <service>
+    <type>_https._tcp</type>
+    <port>__WHIS_MDNS_PORT__</port>
+    <txt-record>path=/</txt-record>
+  </service>
+</service-group>

@@ -1,192 +1,365 @@
-import React, { useEffect, useState } from 'react';
-import { backups, Backup } from '../api/client';
+import { useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 
-const Backups: React.FC = () => {
-  const [backupList, setBackupList] = useState<Backup[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [restoring, setRestoring] = useState(false);
-  const [selectedBackup, setSelectedBackup] = useState<string | null>(null);
+import { backups } from '../api/backups';
+import { apiErrorMessage } from '../api/errors';
+import { isJobReference, useJobPoll } from '../api/jobs';
+import { queryKeys } from '../api/queryKeys';
+import type { Backup, RestoreResult } from '../api/types';
 
-  const loadBackups = async () => {
-    try {
-      setLoading(true);
-      const response = await backups.list();
-      setBackupList(response.backups);
-      setError(null);
-    } catch (err) {
-      setError('Failed to load backups');
-      console.error('Error loading backups:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+// ---------------------------------------------------------------------------
+// Restore dialog — two-phase, matches the v2.1 server contract.
+// ---------------------------------------------------------------------------
+
+interface RestoreDialogProps {
+  backupId: string;
+  preview: RestoreResult;
+  onClose: () => void;
+  onCommitted: (result: RestoreResult) => void;
+}
+
+function makeConfirmSchema(expectedCount: number) {
+  return z.object({
+    confirm: z
+      .string()
+      .transform((v) => parseInt(v, 10))
+      .refine(
+        (n) => !Number.isNaN(n) && n === expectedCount,
+        { message: `Type ${expectedCount} to confirm.` },
+      ),
+  });
+}
+
+function RestoreDialog({
+  backupId,
+  preview,
+  onClose,
+  onCommitted,
+}: RestoreDialogProps) {
+  const [serverError, setServerError] = useState<string | null>(null);
+  const expected = preview.current_item_count ?? 0;
+
+  const confirmSchema = useMemo(() => makeConfirmSchema(expected), [expected]);
+  type ConfirmValues = z.infer<typeof confirmSchema>;
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<{ confirm: string }, unknown, ConfirmValues>({
+    resolver: zodResolver(confirmSchema),
+    defaultValues: { confirm: '' },
+  });
+
+  const [pendingJobId, setPendingJobId] = useState<string | null>(null);
+  const jobPoll = useJobPoll(pendingJobId);
 
   useEffect(() => {
-    loadBackups();
-  }, []);
-
-  const handleCreateBackup = async () => {
-    try {
-      setLoading(true);
-      await backups.create();
-      await loadBackups();
-    } catch (err) {
-      setError('Failed to create backup');
-      console.error('Error creating backup:', err);
-    } finally {
-      setLoading(false);
+    if (!pendingJobId || !jobPoll.data) return;
+    const { status, result, error } = jobPoll.data;
+    if (status === 'complete' && result) {
+      setPendingJobId(null);
+      onCommitted(result as unknown as RestoreResult);
+    } else if (status === 'failed') {
+      setPendingJobId(null);
+      setServerError(error ?? 'Restore job failed');
     }
-  };
+  }, [jobPoll.data, pendingJobId, onCommitted]);
 
-  const handleRestore = async (backupId: string) => {
-    if (!window.confirm('Are you sure you want to restore from this backup? This will replace all current data.')) {
-      return;
-    }
-
-    try {
-      setRestoring(true);
-      setSelectedBackup(backupId);
-      const result = await backups.restore(backupId);
-      if (result.success) {
-        alert(`Restore completed successfully!\nItems restored: ${result.items_restored}\nImages restored: ${result.images_restored}`);
-      } else {
-        throw new Error(result.message);
+  const commit = useMutation({
+    mutationFn: (values: ConfirmValues) =>
+      backups.commitRestore(backupId, values.confirm),
+    onSuccess: (response) => {
+      if (isJobReference(response)) {
+        // Async path — start polling; the effect above resolves once the
+        // worker reports complete/failed.
+        setPendingJobId(response.job_id);
+        return;
       }
-    } catch (err) {
-      setError('Failed to restore backup');
-      console.error('Error restoring backup:', err);
-    } finally {
-      setRestoring(false);
-      setSelectedBackup(null);
-    }
-  };
+      onCommitted(response);
+    },
+    onError: (err) => setServerError(apiErrorMessage(err, 'Restore failed')),
+  });
 
-  const handleDelete = async (backupId: string) => {
-    if (!window.confirm('Are you sure you want to delete this backup?')) {
-      return;
-    }
+  const isWorking = commit.isPending || pendingJobId !== null;
 
-    try {
-      await backups.delete(backupId);
-      await loadBackups();
-    } catch (err) {
-      setError('Failed to delete backup');
-      console.error('Error deleting backup:', err);
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="restore-title"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/40 p-4"
+    >
+      <div className="w-full max-w-md rounded-lg bg-surface-raised p-6 shadow-xl">
+        <h2 id="restore-title" className="text-lg font-semibold text-fg">
+          Restore backup?
+        </h2>
+        <p className="mt-2 text-sm text-muted">
+          This will <strong>delete {expected} existing item(s)</strong> and
+          replace them with{' '}
+          <strong>{preview.backup_item_count ?? 0} item(s)</strong> (plus{' '}
+          {preview.backup_image_count ?? 0} image(s)) from the archive. This
+          cannot be undone.
+        </p>
+        <p className="mt-3 text-sm text-muted">
+          Type <strong>{expected}</strong> below to confirm.
+        </p>
+
+        <form
+          className="mt-4 space-y-3"
+          onSubmit={handleSubmit((values) => {
+            setServerError(null);
+            commit.mutate(values);
+          })}
+          noValidate
+        >
+          {serverError && (
+            <div role="alert" className="rounded-md bg-danger-subtle p-3 text-sm text-danger">
+              {serverError}
+            </div>
+          )}
+
+          <input
+            type="number"
+            aria-label="Confirm item count"
+            aria-invalid={errors.confirm ? 'true' : 'false'}
+            {...register('confirm')}
+            className="block w-full rounded-md border-line-strong shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+          />
+          {errors.confirm && (
+            <p className="text-sm text-danger">{errors.confirm.message}</p>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-md border border-line-strong bg-surface-raised px-3 py-1.5 text-sm font-medium text-muted hover:bg-surface-muted"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting || isWorking}
+              className="rounded-md border border-transparent bg-danger px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-danger disabled:opacity-60"
+            >
+              {isSubmitting || isWorking ? 'Restoring…' : 'Restore'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Backups page
+// ---------------------------------------------------------------------------
+
+export default function Backups() {
+  const queryClient = useQueryClient();
+  const [serverError, setServerError] = useState<string | null>(null);
+  const [pending, setPending] = useState<{
+    backupId: string;
+    preview: RestoreResult;
+  } | null>(null);
+
+  const { data: backupList = [], isLoading } = useQuery({
+    queryKey: queryKeys.backups.list(),
+    queryFn: async () => (await backups.list()).backups,
+  });
+
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: queryKeys.backups.list() });
+
+  const [createJobId, setCreateJobId] = useState<string | null>(null);
+  const createJobPoll = useJobPoll(createJobId);
+
+  useEffect(() => {
+    if (!createJobId || !createJobPoll.data) return;
+    const { status, error } = createJobPoll.data;
+    if (status === 'complete') {
+      setCreateJobId(null);
+      invalidate();
+    } else if (status === 'failed') {
+      setCreateJobId(null);
+      setServerError(error ?? 'Backup job failed');
     }
+    // invalidate is stable across renders (created inline) — include in deps
+    // to satisfy exhaustive-deps without behavior change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [createJobPoll.data, createJobId]);
+
+  const createBackup = useMutation({
+    mutationFn: () => backups.create(),
+    onSuccess: (response) => {
+      if (isJobReference(response)) {
+        setCreateJobId(response.job_id);
+        return;
+      }
+      invalidate();
+    },
+    onError: (err) => setServerError(apiErrorMessage(err, 'Failed to create backup')),
+  });
+
+  const uploadBackup = useMutation({
+    mutationFn: (file: File) => backups.upload(file),
+    onSuccess: () => invalidate(),
+    onError: (err) => setServerError(apiErrorMessage(err, 'Failed to upload backup')),
+  });
+
+  const deleteBackup = useMutation({
+    mutationFn: (backupId: string) => backups.delete(backupId),
+    onSuccess: () => invalidate(),
+    onError: (err) => setServerError(apiErrorMessage(err, 'Failed to delete backup')),
+  });
+
+  const previewRestore = useMutation({
+    mutationFn: (backupId: string) => backups.previewRestore(backupId),
+    onSuccess: (preview, backupId) => setPending({ backupId, preview }),
+    onError: (err) => setServerError(apiErrorMessage(err, 'Failed to preview restore')),
+  });
+
+  const handleRestoreCommitted = (result: RestoreResult) => {
+    setPending(null);
+    // Inventory just changed — invalidate everything item-adjacent.
+    queryClient.invalidateQueries({ queryKey: queryKeys.items.all });
+    queryClient.invalidateQueries({ queryKey: queryKeys.analytics.all });
+    setServerError(null);
+    alert(
+      `Restore completed successfully!\nItems restored: ${result.items_restored}\nImages restored: ${result.images_restored}`,
+    );
   };
 
   const formatSize = (bytes: number): string => {
     const units = ['B', 'KB', 'MB', 'GB'];
     let size = bytes;
     let unitIndex = 0;
-    
     while (size >= 1024 && unitIndex < units.length - 1) {
       size /= 1024;
       unitIndex++;
     }
-    
     return `${size.toFixed(1)} ${units[unitIndex]}`;
   };
 
-  if (loading && !backupList.length) {
+  if (isLoading && backupList.length === 0) {
     return (
       <div className="p-6">
         <div className="flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-fg"></div>
         </div>
       </div>
     );
   }
+
+  const busy =
+    createBackup.isPending ||
+    uploadBackup.isPending ||
+    deleteBackup.isPending ||
+    previewRestore.isPending ||
+    createJobId !== null;
 
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Backups</h1>
         <div className="flex gap-4">
-          <label className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded cursor-pointer disabled:opacity-50">
+          <label className="bg-success hover:bg-success/85 text-white px-4 py-2 rounded cursor-pointer disabled:opacity-50">
             <input
               type="file"
               accept=".zip"
               className="hidden"
-              onChange={async (e) => {
+              onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
-                
-                try {
-                  setLoading(true);
-                  await backups.upload(file);
-                  await loadBackups();
-                  setError(null);
-                } catch (err) {
-                  setError('Failed to upload backup file');
-                  console.error('Error uploading backup:', err);
-                } finally {
-                  setLoading(false);
-                  // Clear the input
-                  e.target.value = '';
-                }
+                setServerError(null);
+                uploadBackup.mutate(file);
+                e.target.value = '';
               }}
-              disabled={loading}
+              disabled={busy}
             />
             Upload Backup
           </label>
           <button
-            onClick={handleCreateBackup}
-            disabled={loading}
-            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
+            onClick={() => {
+              setServerError(null);
+              createBackup.mutate();
+            }}
+            disabled={busy}
+            className="bg-primary-accent hover:bg-primary-hover text-white px-4 py-2 rounded disabled:opacity-50"
           >
             Create New Backup
           </button>
         </div>
       </div>
 
-      {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-          {error}
+      {serverError && (
+        <div
+          role="alert"
+          className="bg-danger-subtle border border-danger text-danger px-4 py-3 rounded mb-4"
+        >
+          {serverError}
         </div>
       )}
 
-      <div className="bg-white rounded-lg shadow overflow-x-auto">
-        <table className="min-w-[800px] w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+      {createJobId && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="mb-4 flex items-center gap-3 rounded border border-primary-subtle bg-primary-subtle px-4 py-3 text-sm text-primary"
+        >
+          <span
+            aria-hidden="true"
+            className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent"
+          />
+          Backup in progress in the background — this page will refresh
+          when it finishes.
+        </div>
+      )}
+
+      <div className="bg-surface-raised rounded-lg shadow overflow-x-auto">
+        <table className="min-w-[800px] w-full divide-y divide-line">
+          <thead className="bg-surface-muted">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-subtle uppercase tracking-wider">
                 Created At
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-subtle uppercase tracking-wider">
                 Size
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-subtle uppercase tracking-wider">
                 Items
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-subtle uppercase tracking-wider">
                 Status
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-subtle uppercase tracking-wider">
                 Actions
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {backupList.map((backup) => (
+          <tbody className="bg-surface-raised divide-y divide-line">
+            {backupList.map((backup: Backup) => (
               <tr key={backup.id}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-fg">
                   {format(new Date(backup.created_at), 'PPp')}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-fg">
                   {formatSize(backup.size_bytes)}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-fg">
                   {backup.item_count} items, {backup.image_count} images
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span
                     className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full
-                      ${backup.status === 'completed' ? 'bg-green-100 text-green-800' : ''}
-                      ${backup.status === 'failed' ? 'bg-red-100 text-red-800' : ''}
-                      ${backup.status === 'in_progress' ? 'bg-yellow-100 text-yellow-800' : ''}`}
+                      ${backup.status === 'completed' ? 'bg-success-subtle text-success' : ''}
+                      ${backup.status === 'failed' ? 'bg-danger-subtle text-danger' : ''}
+                      ${backup.status === 'in_progress' ? 'bg-warning-subtle text-warning' : ''}`}
                   >
                     {backup.status}
                   </span>
@@ -195,40 +368,66 @@ const Backups: React.FC = () => {
                   {backup.status === 'completed' && (
                     <>
                       <button
-                        onClick={() => handleRestore(backup.id)}
-                        disabled={restoring}
-                        className="text-indigo-600 hover:text-indigo-900 disabled:opacity-50"
+                        onClick={() => {
+                          setServerError(null);
+                          previewRestore.mutate(backup.id);
+                        }}
+                        disabled={busy}
+                        className="text-primary hover:text-primary-hover disabled:opacity-50"
                       >
-                        {restoring && selectedBackup === backup.id ? 'Restoring...' : 'Restore'}
+                        {previewRestore.isPending &&
+                        previewRestore.variables === backup.id
+                          ? 'Loading…'
+                          : 'Restore'}
                       </button>
                       <button
-                        onClick={() => backups.download(backup.id)}
-                        className="text-blue-600 hover:text-blue-900"
+                        onClick={() => {
+                          setServerError(null);
+                          backups
+                            .download(backup.id, backup.filename)
+                            .catch((err) =>
+                              setServerError(
+                                apiErrorMessage(err, 'Failed to download backup'),
+                              ),
+                            );
+                        }}
+                        className="text-primary hover:text-primary-hover"
                       >
                         Download
                       </button>
                       <button
-                        onClick={() => handleDelete(backup.id)}
-                        className="text-red-600 hover:text-red-900"
+                        onClick={() => {
+                          if (
+                            window.confirm(
+                              'Are you sure you want to delete this backup?',
+                            )
+                          ) {
+                            deleteBackup.mutate(backup.id);
+                          }
+                        }}
+                        className="text-danger hover:text-danger"
                       >
                         Delete
                       </button>
                     </>
                   )}
                   {backup.status === 'failed' && (
-                    <span className="text-red-600" title={backup.error_message}>
+                    <span
+                      className="text-danger"
+                      title={backup.error_message ?? undefined}
+                    >
                       Failed: {backup.error_message}
                     </span>
                   )}
                   {backup.status === 'in_progress' && (
-                    <span className="text-yellow-600">Processing...</span>
+                    <span className="text-warning">Processing...</span>
                   )}
                 </td>
               </tr>
             ))}
             {backupList.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
+                <td colSpan={5} className="px-6 py-4 text-center text-subtle">
                   No backups found. Create your first backup to protect your data.
                 </td>
               </tr>
@@ -236,8 +435,15 @@ const Backups: React.FC = () => {
           </tbody>
         </table>
       </div>
+
+      {pending && (
+        <RestoreDialog
+          backupId={pending.backupId}
+          preview={pending.preview}
+          onClose={() => setPending(null)}
+          onCommitted={handleRestoreCommitted}
+        />
+      )}
     </div>
   );
-};
-
-export default Backups;
+}

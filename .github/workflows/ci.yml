@@ -13,9 +13,27 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.11", "3.12"]
+        database: ["sqlite", "postgres"]
     defaults:
       run:
         working-directory: backend
+    services:
+      # Postgres service only consumed by the `database == postgres` legs,
+      # but GitHub Actions can't conditionally declare services — it's
+      # cheap enough to leave running for the SQLite legs too.
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: whis
+          POSTGRES_PASSWORD: whis
+          POSTGRES_DB: whis
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U whis -d whis"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
 
@@ -32,10 +50,16 @@ jobs:
           pip install -r requirements.txt
           pip install pytest pytest-cov httpx
 
+      - name: Lint (ruff)
+        if: matrix.python-version == '3.12' && matrix.database == 'sqlite'
+        run: |
+          pip install ruff
+          ruff check .
+
       - name: Apply migrations (baseline)
         env:
           BYPASS_AUTH: "true"
-          DATABASE_URL: "sqlite:///./ci.db"
+          DATABASE_URL: ${{ matrix.database == 'postgres' && 'postgresql+psycopg://whis:whis@localhost:5432/whis' || 'sqlite:///./ci.db' }}
         run: alembic upgrade head
 
       - name: Run tests
@@ -43,7 +67,14 @@ jobs:
           BYPASS_AUTH: "false"
           SECRET_KEY: "ci-secret-key-not-a-placeholder-0000000000000"
           LOG_LEVEL: "WARNING"
+          TEST_DATABASE_URL: ${{ matrix.database == 'postgres' && 'postgresql+psycopg://whis:whis@localhost:5432/whis' || 'sqlite:///:memory:' }}
         run: pytest --cov=app --cov-report=term-missing
+
+      - name: pip-audit (Python dep CVEs)
+        if: matrix.python-version == '3.12' && matrix.database == 'sqlite'
+        run: |
+          pip install pip-audit
+          pip-audit -r requirements.txt --strict
 
   frontend:
     runs-on: ubuntu-latest
@@ -63,9 +94,122 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Lint (advisory — does not block)
-        continue-on-error: true
+      - name: Lint
         run: npm run lint
 
       - name: Test
-        run: npm test -- --ci
+        run: npm test
+
+      - name: npm audit (runtime dep CVEs)
+        run: npm audit --omit=dev --audit-level=high
+
+  contract-check:
+    # Regenerate the OpenAPI-derived TS types and fail the job if the
+    # committed `frontend/src/api/openapi.d.ts` is out of date. Catches
+    # schema drift on every PR.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install backend deps
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm ci
+
+      - name: Verify openapi.d.ts matches the backend schema
+        working-directory: frontend
+        env:
+          BYPASS_AUTH: "true"
+        run: npm run codegen:check
+
+  image-scan:
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          file: backend/Dockerfile
+          load: true
+          tags: whis-backend:ci
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,scope=backend,mode=max
+
+      - name: Build frontend (Caddy) image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: frontend/Dockerfile.prod
+          load: true
+          tags: whis-frontend:ci
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,scope=frontend,mode=max
+
+      - name: Trivy scan — backend image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: whis-backend:ci
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          ignore-unfixed: true
+
+      - name: Trivy scan — frontend image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: whis-frontend:ci
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          ignore-unfixed: true
+
+  version-check:
+    # Fail the build if the version stamp diverges across the FastAPI app,
+    # the /health endpoint, frontend/package.json, CLAUDE.md, and README.md. These all
+    # sat at 3.1.0 while the 3.2 and 3.3 work shipped unversioned — this
+    # guard keeps them moving together.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check version stamps are consistent
+        run: |
+          pkg=$(grep -m1 '"version"' frontend/package.json \
+            | sed -E 's/.*"version": *"([^"]+)".*/\1/')
+          api=$(grep -m1 'version="' backend/app/main.py \
+            | sed -E 's/.*version="([^"]+)".*/\1/')
+          health=$(grep -m1 '"version":' backend/app/main.py \
+            | sed -E 's/.*"version": *"([^"]+)".*/\1/')
+          doc=$(grep -m1 'Current version' CLAUDE.md \
+            | sed -E 's/.*\*\*([^*]+)\*\*.*/\1/')
+          readme=$(grep -m1 'Current version:' README.md \
+            | sed -E 's/.*Current version: ([0-9][^*]*)\*\*.*/\1/')
+          echo "package.json=$pkg  main.py=$api  /health=$health  CLAUDE.md=$doc  README.md=$readme"
+          if [ "$pkg" != "$api" ] || [ "$pkg" != "$health" ] || [ "$pkg" != "$doc" ] || [ "$pkg" != "$readme" ]; then
+            echo "::error::Version stamps diverge — keep package.json, main.py, /health, CLAUDE.md, and README.md in sync."
+            exit 1
+          fi
+          echo "All version stamps agree: $pkg"

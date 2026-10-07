@@ -1,7 +1,10 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useEffect, useState } from 'react';
 import { User, auth } from '../api/client';
 import { useNavigate } from 'react-router-dom';
-import { useDevMode } from './DevModeContext';
+import { useAuth } from './useAuth';
+import { useDevMode } from './useDevMode';
+import { isDevBypassAllowed } from '../lib/devBypass';
+import { logger } from '../lib/logger';
 
 const DEV_BUILD = import.meta.env.DEV;
 
@@ -11,10 +14,35 @@ const DEV_USER: User = {
   email: 'admin@example.com',
   username: 'admin',
   is_active: true,
+  // v3.2: dev bypass user is admin so /settings is reachable without
+  // registering a real user.
+  is_admin: true,
   created_at: new Date().toISOString(),
 };
 
-interface AuthContextType {
+/**
+ * Compute whether dev bypass is active for this render.
+ *
+ * Even in a dev build, we refuse to trust localStorage state to impersonate
+ * the admin account if the app is being served from a host that isn't
+ * loopback or private-LAN — this guards against a dev build leaking onto the
+ * public internet via a tunnel / misconfigured reverse proxy.
+ */
+function resolveBypass(isDevMode: boolean): boolean {
+  if (!DEV_BUILD || !isDevMode) return false;
+  if (typeof window === 'undefined') return false;
+  const hostname = window.location?.hostname ?? '';
+  const allowed = isDevBypassAllowed(DEV_BUILD, hostname);
+  if (!allowed) {
+    logger.warn(
+      'dev bypass requested but hostname is not loopback/private; refusing.',
+      { hostname },
+    );
+  }
+  return allowed;
+}
+
+export interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   login: (username: string, password: string) => Promise<void>;
@@ -22,14 +50,14 @@ interface AuthContextType {
   logout: () => void;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
   const { isDevMode } = useDevMode();
-  const bypass = DEV_BUILD && isDevMode;
+  const bypass = resolveBypass(isDevMode);
 
   useEffect(() => {
     if (bypass) {
@@ -93,19 +121,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-}
-
 export function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
   const { isDevMode } = useDevMode();
   const navigate = useNavigate();
-  const bypass = DEV_BUILD && isDevMode;
+  const bypass = resolveBypass(isDevMode);
 
   useEffect(() => {
     if (!isLoading && !user && !bypass) {
@@ -116,7 +136,7 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
       </div>
     );
   }

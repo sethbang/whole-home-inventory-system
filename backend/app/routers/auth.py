@@ -2,11 +2,13 @@ import logging
 from datetime import timedelta
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .. import database, models, schemas, security
+from ..rate_limit import limiter
 from ..security import DEV_USER
 from ..settings import settings
 
@@ -16,34 +18,59 @@ router = APIRouter(tags=["authentication"])
 
 
 @router.post("/register", response_model=schemas.User)
-def register_user(user: schemas.UserCreate, db: Session = Depends(database.get_db)) -> Any:
-    db_user = db.query(models.User).filter(
-        (models.User.email == user.email) | (models.User.username == user.username)
-    ).first()
+@limiter.limit("5/minute")
+def register_user(
+    request: Request,  # required by slowapi's request-bound rate limiter
+    user: schemas.UserCreate,
+    db: Session = Depends(database.get_db),
+) -> Any:
+    db_user = db.execute(
+        select(models.User).where(
+            (models.User.email == user.email) | (models.User.username == user.username)
+        )
+    ).scalar_one_or_none()
     if db_user:
-        raise HTTPException(status_code=400, detail="Email or username already registered")
+        raise HTTPException(
+            status_code=400, detail="Email or username already registered"
+        )
+
+    # First successfully registered user gets promoted to admin so the
+    # household setup flow has someone who can edit /api/llm-config.
+    # Subsequent registrations default to is_admin=False.
+    is_first_user = (
+        db.execute(select(func.count()).select_from(models.User)).scalar_one() == 0
+    )
 
     db_user = models.User(
         email=user.email,
         username=user.username,
         hashed_password=security.get_password_hash(user.password),
+        is_admin=is_first_user,
     )
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
+    if is_first_user:
+        logger.info("first user registered as admin: username=%s", db_user.username)
     return db_user
 
 
 @router.post("/token", response_model=schemas.Token)
+@limiter.limit("5/minute")
 async def login_for_access_token(
+    request: Request,  # required by slowapi's request-bound rate limiter
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(database.get_db),
 ) -> Any:
     if settings.BYPASS_AUTH:
         return {"access_token": "dev_token", "token_type": "bearer"}
 
-    user = db.query(models.User).filter(models.User.username == form_data.username).first()
-    if not user or not security.verify_password(form_data.password, user.hashed_password):
+    user = db.execute(
+        select(models.User).where(models.User.username == form_data.username)
+    ).scalar_one_or_none()
+    if not user or not security.verify_password(
+        form_data.password, user.hashed_password
+    ):
         logger.info("failed login attempt for username=%s", form_data.username)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

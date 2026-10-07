@@ -1,14 +1,76 @@
-fastapi==0.115.4
+fastapi>=0.115.6,<1
+# Pin starlette explicitly — pulls newer than fastapi's transitive floor so
+# pip-audit sees a version with the CVE-2025-54121 + CVE-2025-62727 fixes.
+# 1.3.1+ resolves PYSEC-2026-161/-248/-249/-2280/-2281. Starlette 1.0 only
+# removed APIs WHIS doesn't use (FastAPI provides its own
+# @app.middleware / @app.exception_handler).
+starlette>=1.3.1,<2
 uvicorn[standard]==0.32.0
 sqlalchemy==2.0.36
-python-multipart==0.0.12
-pyjwt[crypto]==2.9.0
+# 0.0.26+ resolves CVE-2024-53981, CVE-2026-24486, CVE-2026-40347.
+python-multipart>=0.0.26,<1
+# 2.12.0+ resolves CVE-2026-32597.
+pyjwt[crypto]>=2.12.0,<3
 passlib[bcrypt]==1.7.4
 bcrypt>=3.2,<4
-python-dotenv==1.0.1
-pillow>=10.4,<12
+python-dotenv>=1.2.2,<2
+# Widened from <12 so 12.2.0+ (CVE-2026-25990 + CVE-2026-40192 fixes) can
+# resolve. The minor bump hasn't introduced breaking API usage in WHIS's
+# image pipeline.
+pillow>=10.4,<13
 pydantic[email]>=2.10,<3
 pydantic-settings>=2.6,<3
 pandas>=2.2,<3
 python-dateutil==2.9.0
 alembic==1.14.0
+
+# --- v2.2 additions -----------------------------------------------------------
+# Rate limiting (slowapi, in-memory limiter; Redis backend lands in v3.0).
+slowapi>=0.1.9,<1
+# Structured logging. LOG_FORMAT=json|console selects renderer at startup.
+structlog>=24.4,<26
+# OpenTelemetry skeleton — tracer provider always installed; exporter only
+# activates when OTEL_ENABLED=true. Gated so unconfigured deployments pay
+# nothing.
+opentelemetry-api>=1.28,<2
+opentelemetry-sdk>=1.28,<2
+opentelemetry-exporter-otlp>=1.28,<2
+opentelemetry-instrumentation-fastapi>=0.49b0,<1
+opentelemetry-instrumentation-sqlalchemy>=0.49b0,<1
+
+# --- v3.0 additions -----------------------------------------------------------
+# psycopg (v3) is the Postgres driver. [binary] pulls the precompiled wheel
+# so the image doesn't need libpq-dev. Ships by default even on SQLite
+# deployments — the 5MB overhead is acceptable to keep one image for both
+# dialects. Operators opt into Postgres by setting DATABASE_URL to
+# postgresql+psycopg://...
+psycopg[binary]>=3.2,<4
+
+# ARQ — Redis-backed async job queue. Ships by default; the enqueuer in
+# the service layer no-ops when REDIS_URL is unset, so SQLite-only
+# deployments pay only the import cost. `redis` is ARQ's runtime dep
+# (async client); pinned explicitly so npm-audit-style CVE tracking can
+# see it.
+arq>=0.26,<1
+redis>=5.0,<6
+
+# --- v3.1 additions -----------------------------------------------------------
+# httpx + tenacity underpin the LLM + pricing HTTP layers.
+httpx>=0.27,<1
+tenacity>=9,<10
+
+# OpenAI Python SDK — used as the client for any OpenAI-compatible
+# endpoint (OpenRouter, Venice.ai, LocalAI, Ollama's /v1). When
+# LLM_BASE_URL is unset, nothing imports it at runtime; the vision /
+# pricing features return 503 via the VISION_ENABLED / PRICING_ENABLED
+# gates. Ships by default so switching on the features is just a
+# config change.
+openai>=1.57,<2
+
+# --- v3.2 additions -----------------------------------------------------------
+# Fernet encryption + HKDF for the operator-editable LLM API key
+# (app/security_crypto.py). Already pulled in transitively by
+# pyjwt[crypto], but pinned explicitly so pip-audit sees it directly
+# and the dependency stays load-bearing-visible if pyjwt's extras change.
+# 50.0.0+ resolves PYSEC-2026-3552/-3553/-3554 and GHSA-537c-gmf6-5ccf.
+cryptography>=50,<51

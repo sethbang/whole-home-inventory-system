@@ -1,16 +1,18 @@
 import logging
 import uuid
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Optional
 
 import jwt
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from passlib.context import CryptContext
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from . import database, models
 from .settings import settings
+from .utctime import utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +25,8 @@ DEV_USER = models.User(
     username="admin",
     hashed_password="",
     is_active=True,
-    created_at=datetime.utcnow(),
+    is_admin=True,
+    created_at=utcnow(),
 )
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -53,7 +56,9 @@ def get_password_hash(password: str) -> str:
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
-    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
+    expire = utcnow() + (
+        expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
@@ -77,7 +82,9 @@ async def get_current_user(
         raise _credentials_error("Not authenticated")
 
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(
+            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+        )
         username: Optional[str] = payload.get("sub")
     except jwt.InvalidTokenError:
         raise _credentials_error()
@@ -85,7 +92,9 @@ async def get_current_user(
     if username is None:
         raise _credentials_error()
 
-    user = db.query(models.User).filter(models.User.username == username).first()
+    user = db.execute(
+        select(models.User).where(models.User.username == username)
+    ).scalar_one_or_none()
     if user is None:
         raise _credentials_error("User not found")
     return user
@@ -101,6 +110,23 @@ async def get_current_active_user(
     return current_user
 
 
+async def require_admin(
+    current_user: models.User = Depends(get_current_active_user),
+) -> models.User:
+    """Reject non-admin users with 403.
+
+    Used by the /api/llm-config router (and any future operator-only
+    surface). The bypass user is treated as admin so the dev experience
+    matches production. ``is_admin`` is a v3.2-introduced column —
+    older user rows that haven't been migrated default to False.
+    """
+    if settings.BYPASS_AUTH:
+        return DEV_USER
+    if not getattr(current_user, "is_admin", False):
+        raise HTTPException(status_code=403, detail="Admin privileges required")
+    return current_user
+
+
 async def get_current_active_user_or_none(
     token: Optional[str] = Depends(oauth2_scheme_optional),
     db: Session = Depends(database.get_db),
@@ -112,7 +138,9 @@ async def get_current_active_user_or_none(
         return None
 
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(
+            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+        )
         username: Optional[str] = payload.get("sub")
     except jwt.InvalidTokenError:
         return None
@@ -120,7 +148,9 @@ async def get_current_active_user_or_none(
     if not username:
         return None
 
-    user = db.query(models.User).filter(models.User.username == username).first()
+    user = db.execute(
+        select(models.User).where(models.User.username == username)
+    ).scalar_one_or_none()
     if not user or not user.is_active:
         return None
     return user

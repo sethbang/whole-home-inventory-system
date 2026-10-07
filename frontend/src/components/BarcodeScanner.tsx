@@ -16,30 +16,37 @@ export default function BarcodeScanner({ onCapture, onBarcodeScan, onClose }: Ba
   const [isScanning, setIsScanning] = useState(true);
   const [lastScanned, setLastScanned] = useState<string | null>(null);
   const readerRef = useRef<BrowserMultiFormatReader | null>(null);
+  // Keep the stream in a ref so stopCamera has stable identity and the
+  // unmount cleanup isn't recreated every time `stream` state changes.
+  const streamRef = useRef<MediaStream | null>(null);
 
-  const startCamera = async () => {
+  const startCamera = useCallback(async () => {
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment' },
       });
+      streamRef.current = mediaStream;
       setStream(mediaStream);
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
       }
-    } catch (err) {
-      setError('Unable to access camera. Please make sure you have granted camera permissions.');
+    } catch {
+      setError(
+        'Unable to access camera. Please make sure you have granted camera permissions.',
+      );
     }
-  };
+  }, []);
 
-  const stopCamera = () => {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
+  const stopCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
       setStream(null);
     }
     if (readerRef.current) {
       readerRef.current.reset();
     }
-  };
+  }, []);
 
   const handleCapture = () => {
     if (videoRef.current && canvasRef.current) {
@@ -97,7 +104,7 @@ export default function BarcodeScanner({ onCapture, onBarcodeScan, onClose }: Ba
     return () => {
       stopCamera();
     };
-  }, []);
+  }, [startCamera, stopCamera]);
 
   useEffect(() => {
     if (stream && videoRef.current && isScanning) {
@@ -111,8 +118,8 @@ export default function BarcodeScanner({ onCapture, onBarcodeScan, onClose }: Ba
   }, [stream, isScanning, initBarcodeReader]);
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-lg w-full overflow-hidden">
+    <div className="fixed inset-0 bg-overlay bg-opacity-75 z-50 flex items-center justify-center p-4">
+      <div className="bg-surface-raised rounded-lg shadow-xl max-w-lg w-full overflow-hidden">
         <div className="p-4 flex justify-between items-center border-b">
           <h3 className="text-lg font-medium">Scan Barcode or Take Photo</h3>
           <button
@@ -120,13 +127,13 @@ export default function BarcodeScanner({ onCapture, onBarcodeScan, onClose }: Ba
               stopCamera();
               onClose();
             }}
-            className="text-gray-400 hover:text-gray-500"
+            className="text-subtle hover:text-subtle"
           >
             <XMarkIcon className="h-6 w-6" />
           </button>
         </div>
 
-        <div className="relative aspect-[4/3] bg-black">
+        <div className="relative aspect-[4/3] bg-overlay">
           {error ? (
             <div className="absolute inset-0 flex items-center justify-center text-white text-center p-4">
               {error}
@@ -144,7 +151,7 @@ export default function BarcodeScanner({ onCapture, onBarcodeScan, onClose }: Ba
               </div>
               {!isScanning && lastScanned && (
                 <div className="absolute bottom-4 left-0 right-0 mx-auto text-center">
-                  <div className="bg-green-500 text-white px-4 py-2 rounded-full inline-flex items-center">
+                  <div className="bg-success text-white px-4 py-2 rounded-full inline-flex items-center">
                     <QrCodeIcon className="h-5 w-5 mr-2" />
                     Code Scanned!
                   </div>
@@ -160,7 +167,7 @@ export default function BarcodeScanner({ onCapture, onBarcodeScan, onClose }: Ba
           <button
             onClick={handleCapture}
             disabled={!!error}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <CameraIcon className="h-5 w-5 mr-2" />
             Take Photo

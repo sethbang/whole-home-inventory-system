@@ -21,8 +21,33 @@
     <!-- PWA manifest and icons -->
     <link rel="manifest" href="/site.webmanifest" type="application/manifest+json" />
     <meta name="theme-color" content="#ffffff" />
+    <meta name="color-scheme" content="light dark" />
     <meta name="application-name" content="WHIS" />
-    
+
+    <!--
+      Day / Night / System-sync FOUC guard. Mirrors the resolution logic in
+      ThemeContext so the document already has the right ``.dark`` class
+      before React mounts and paints. Must stay synchronous and inline.
+    -->
+    <script>
+      (function () {
+        try {
+          var stored = window.localStorage.getItem('whis-theme');
+          var mode = stored === 'day' || stored === 'night' || stored === 'system'
+            ? stored
+            : 'system';
+          var prefersDark = false;
+          if (mode === 'system' && window.matchMedia) {
+            prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          }
+          var dark = mode === 'night' || (mode === 'system' && prefersDark);
+          if (dark) document.documentElement.classList.add('dark');
+        } catch (_) {
+          /* localStorage / matchMedia unavailable — fall back to day. */
+        }
+      })();
+    </script>
+
     <title>WHIS - Whole-Home Inventory System</title>
   </head>
   <body>

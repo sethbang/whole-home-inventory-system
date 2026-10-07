@@ -1,133 +1,131 @@
-import React, { lazy, Suspense, useState } from 'react';
-import CustomFields from '../components/CustomFields';
-
-// Lazy-loaded: @zxing/* bundles are ~400KB gzipped and only needed when the
-// user opens the scanner.
-const BarcodeScanner = lazy(() => import('../components/BarcodeScanner'));
-import { CameraIcon, QrCodeIcon } from '@heroicons/react/24/outline';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useDevMode } from '../contexts/DevModeContext';
-import { useFormik } from 'formik';
-import * as Yup from 'yup';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { items, images } from '../api/client';
+import { CameraIcon, QrCodeIcon } from '@heroicons/react/24/outline';
 
-const validationSchema = Yup.object({
-  name: Yup.string().required('Name is required'),
-  category: Yup.string().required('Category is required'),
-  location: Yup.string().required('Location is required'),
-  brand: Yup.string(),
-  model_number: Yup.string(),
-  serial_number: Yup.string(),
-  purchase_date: Yup.date().nullable(),
-  purchase_price: Yup.number().nullable().min(0, 'Price must be positive'),
-  current_value: Yup.number().nullable().min(0, 'Value must be positive'),
-  warranty_expiration: Yup.date().nullable(),
-  notes: Yup.string(),
-  custom_fields: Yup.object(),
-});
+import ItemFormFields from '../components/ItemFormFields';
+import { SectionErrorBoundary } from '../components/ErrorBoundary';
+import PriceEstimateCard from '../components/PriceEstimateCard';
+import VisionIdentifyButton from '../components/VisionIdentifyButton';
+import VisionSuggestionPanel from '../components/VisionSuggestionPanel';
+import { useDevMode } from '../contexts/useDevMode';
+import { items, images } from '../api/client';
+import { apiErrorMessage } from '../api/errors';
+import { queryKeys } from '../api/queryKeys';
+import type { VisionResult, VisionSuggestion } from '../api/types';
+import { useVisionPricingChain } from '../hooks/useVisionPricingChain';
+import {
+  type AddItemFormValues,
+  type AddItemSubmitValues,
+  addItemDefaults,
+  addItemSchema,
+} from './AddItem.schema';
+
+// Lazy-loaded: @zxing/* bundles are ~400 KB gzipped and only needed when
+// the user opens the scanner.
+const BarcodeScanner = lazy(() => import('../components/BarcodeScanner'));
 
 export default function AddItem() {
   const navigate = useNavigate();
   const { isDevMode } = useDevMode();
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [serverError, setServerError] = useState<string | null>(null);
   const [showScanner, setShowScanner] = useState(false);
   const [scanningStatus, setScanningStatus] = useState<string | null>(null);
+  const [visionResult, setVisionResult] = useState<VisionResult | null>(null);
+  // Track which form fields were populated by vision so we can render
+  // "AI" chips until the user edits them. The set is keyed by the
+  // RHF field name (not the vision suggestion key) — same string on
+  // both sides thanks to the 1:1 mapping in the accept handler.
+  const [aiFields, setAiFields] = useState<Set<string>>(() => new Set());
+  // Vision → pricing chain. After the user applies suggestions we
+  // fire a metadata-based pricing lookup so the "current value"
+  // input gets a suggested value too. The chain (mutation + job poll +
+  // stale-response guard) lives in this hook.
+  const { priceEnvelope, isPricing, estimateFromMetadata } =
+    useVisionPricingChain();
 
-  // Fetch categories and locations for autocomplete (to be implemented)
+  // Warm the autocomplete caches on mount — loader also preloads them but
+  // these hooks give React Query a live subscription.
   useQuery({
-    queryKey: ['categories'],
+    queryKey: queryKeys.items.categories(),
     queryFn: items.getCategories,
   });
-
   useQuery({
-    queryKey: ['locations'],
+    queryKey: queryKeys.items.locations(),
     queryFn: items.getLocations,
   });
 
-  interface FormValues {
-    name: string;
-    category: string;
-    location: string;
-    brand: string;
-    model_number: string;
-    serial_number: string;
-    barcode: string;
-    purchase_date: string;
-    purchase_price: string;
-    current_value: string;
-    warranty_expiration: string;
-    notes: string;
-    custom_fields: Record<string, unknown>;
-  }
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    control,
+    watch,
+    formState: { errors, isSubmitting },
+  } = useForm<AddItemFormValues, unknown, AddItemSubmitValues>({
+    resolver: zodResolver(addItemSchema),
+    defaultValues: addItemDefaults,
+  });
+
+  // Clear the "AI" chip on any field the user manually edits —
+  // keeps the badge honest. ``watch(callback)`` fires once per
+  // user-initiated change without re-rendering.
+  useEffect(() => {
+    const subscription = watch((_, { name, type }) => {
+      if (type !== 'change' || !name) return;
+      setAiFields((prev) => {
+        if (!prev.has(name)) return prev;
+        const next = new Set(prev);
+        next.delete(name);
+        return next;
+      });
+    });
+    return () => subscription.unsubscribe();
+  }, [watch]);
 
   const uploadImageMutation = useMutation({
-    mutationFn: async ({ itemId, file }: { itemId: string; file: File }) => {
-      return await images.upload(itemId, file);
-    },
-    onError: (error: any) => {
-      setError(error.response?.data?.detail || 'Failed to upload image');
-    },
+    mutationFn: async ({ itemId, file }: { itemId: string; file: File }) =>
+      images.upload(itemId, file),
   });
 
   const createItemMutation = useMutation({
-    mutationFn: async (params: { values: FormValues } & { isDev?: boolean }) => {
+    mutationFn: async (params: {
+      values: AddItemSubmitValues | Record<string, never>;
+      isDev: boolean;
+    }) => {
       const { values, isDev } = params;
-      const item = await items.create(
-        isDev ? {} : {
-          ...values,
-          purchase_price: values.purchase_price ? parseFloat(values.purchase_price) : undefined,
-          current_value: values.current_value ? parseFloat(values.current_value) : undefined,
-          purchase_date: values.purchase_date ? new Date(values.purchase_date).toISOString() : undefined,
-          warranty_expiration: values.warranty_expiration ? new Date(values.warranty_expiration).toISOString() : undefined,
-        },
-        isDev
-      );
+      const item = await items.create(values, isDev);
 
-      // Upload images after item is created
       if (selectedFiles.length > 0) {
         try {
           await Promise.all(
-            selectedFiles.map(file => uploadImageMutation.mutateAsync({ itemId: item.id, file }))
+            selectedFiles.map((file) =>
+              uploadImageMutation.mutateAsync({ itemId: item.id, file }),
+            ),
           );
-        } catch (error) {
-          console.error('Failed to upload some images:', error);
-          setError('Item was created but some images failed to upload. You can add them later.');
+        } catch {
+          setServerError(
+            'Item was created but some images failed to upload. You can add them later.',
+          );
         }
       }
-
       return item;
     },
     onSuccess: (item) => {
       navigate(`/items/${item.id}`);
     },
-    onError: (error: any) => {
-      setError(error.response?.data?.detail || 'Failed to create item');
+    onError: (err) => {
+      setServerError(apiErrorMessage(err, 'Failed to create item'));
     },
   });
 
-  const formik = useFormik({
-    initialValues: {
-      name: '',
-      category: '',
-      location: '',
-      brand: '',
-      model_number: '',
-      serial_number: '',
-      barcode: '',
-      purchase_date: '',
-      purchase_price: '',
-      current_value: '',
-      warranty_expiration: '',
-      notes: '',
-      custom_fields: {},
-    },
-    validationSchema,
-    onSubmit: async (values: FormValues) => {
-      createItemMutation.mutate({ values, isDev: false });
-    },
-  });
+  const onSubmit = (values: AddItemSubmitValues) => {
+    setServerError(null);
+    createItemMutation.mutate({ values, isDev: false });
+  };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
@@ -139,7 +137,7 @@ export default function AddItem() {
     <div>
       <div className="md:flex md:items-center md:justify-between">
         <div className="min-w-0 flex-1">
-          <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-3xl sm:tracking-tight">
+          <h2 className="text-2xl font-bold leading-7 text-fg sm:truncate sm:text-3xl sm:tracking-tight">
             Add New Item
           </h2>
         </div>
@@ -147,13 +145,10 @@ export default function AddItem() {
           {isDevMode && (
             <button
               type="button"
-              onClick={() => {
-                createItemMutation.mutate({
-                  values: {} as FormValues,
-                  isDev: true
-                });
-              }}
-              className="ml-3 inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+              onClick={() =>
+                createItemMutation.mutate({ values: {}, isDev: true })
+              }
+              className="ml-3 inline-flex items-center rounded-md bg-primary px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             >
               Quick Add (Dev)
             </button>
@@ -161,197 +156,24 @@ export default function AddItem() {
         </div>
       </div>
 
-      <form onSubmit={formik.handleSubmit} className="mt-8 space-y-8">
-        {error && (
-          <div className="rounded-md bg-red-50 p-4">
-            <div className="text-sm text-red-700">{error}</div>
+      <form onSubmit={handleSubmit(onSubmit)} className="mt-8 space-y-8" noValidate>
+        {serverError && (
+          <div role="alert" className="rounded-md bg-danger-subtle p-4">
+            <div className="text-sm text-danger">{serverError}</div>
           </div>
         )}
 
-        <div className="space-y-8 divide-y divide-gray-200">
+        <div className="space-y-8 divide-y divide-line">
           <div className="grid grid-cols-1 gap-y-6 sm:grid-cols-6 sm:gap-x-6">
-            <div className="sm:col-span-4">
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                Name
-              </label>
-              <input
-                type="text"
-                id="name"
-                {...formik.getFieldProps('name')}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
-              />
-              {formik.touched.name && formik.errors.name && (
-                <p className="mt-2 text-sm text-red-600">{formik.errors.name}</p>
-              )}
-            </div>
-
-            <div className="sm:col-span-3">
-              <label htmlFor="category" className="block text-sm font-medium text-gray-700">
-                Category
-              </label>
-              <input
-                type="text"
-                id="category"
-                {...formik.getFieldProps('category')}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
-                placeholder="Enter a category"
-              />
-              {formik.touched.category && formik.errors.category && (
-                <p className="mt-2 text-sm text-red-600">{formik.errors.category}</p>
-              )}
-            </div>
-
-            <div className="sm:col-span-3">
-              <label htmlFor="location" className="block text-sm font-medium text-gray-700">
-                Location
-              </label>
-              <input
-                type="text"
-                id="location"
-                {...formik.getFieldProps('location')}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
-                placeholder="Enter a location"
-              />
-              {formik.touched.location && formik.errors.location && (
-                <p className="mt-2 text-sm text-red-600">{formik.errors.location}</p>
-              )}
-            </div>
-
-            <div className="sm:col-span-3">
-              <label htmlFor="brand" className="block text-sm font-medium text-gray-700">
-                Brand
-              </label>
-              <input
-                type="text"
-                id="brand"
-                {...formik.getFieldProps('brand')}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
-              />
-            </div>
-
-            <div className="sm:col-span-3">
-              <label htmlFor="model_number" className="block text-sm font-medium text-gray-700">
-                Model Number
-              </label>
-              <input
-                type="text"
-                id="model_number"
-                {...formik.getFieldProps('model_number')}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
-              />
-            </div>
-
-            <div className="sm:col-span-3">
-              <label htmlFor="serial_number" className="block text-sm font-medium text-gray-700">
-                Serial Number
-              </label>
-              <input
-                type="text"
-                id="serial_number"
-                {...formik.getFieldProps('serial_number')}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
-              />
-            </div>
-
-            <div className="sm:col-span-3">
-              <label htmlFor="barcode" className="block text-sm font-medium text-gray-700">
-                Barcode
-              </label>
-              <input
-                type="text"
-                id="barcode"
-                {...formik.getFieldProps('barcode')}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
-              />
-            </div>
-
-            <div className="sm:col-span-3">
-              <label htmlFor="purchase_date" className="block text-sm font-medium text-gray-700">
-                Purchase Date
-              </label>
-              <input
-                type="date"
-                id="purchase_date"
-                {...formik.getFieldProps('purchase_date')}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
-              />
-            </div>
-
-            <div className="sm:col-span-3">
-              <label htmlFor="purchase_price" className="block text-sm font-medium text-gray-700">
-                Purchase Price
-              </label>
-              <div className="mt-1 relative rounded-md shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <span className="text-gray-500 sm:text-sm">$</span>
-                </div>
-                <input
-                  type="number"
-                  id="purchase_price"
-                  step="0.01"
-                  min="0"
-                  {...formik.getFieldProps('purchase_price')}
-                  className="mt-1 block w-full pl-7 rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
-                />
-              </div>
-            </div>
-
-            <div className="sm:col-span-3">
-              <label htmlFor="current_value" className="block text-sm font-medium text-gray-700">
-                Current Value
-              </label>
-              <div className="mt-1 relative rounded-md shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <span className="text-gray-500 sm:text-sm">$</span>
-                </div>
-                <input
-                  type="number"
-                  id="current_value"
-                  step="0.01"
-                  min="0"
-                  {...formik.getFieldProps('current_value')}
-                  className="mt-1 block w-full pl-7 rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
-                />
-              </div>
-            </div>
-
-            <div className="sm:col-span-3">
-              <label htmlFor="warranty_expiration" className="block text-sm font-medium text-gray-700">
-                Warranty Expiration
-              </label>
-              <input
-                type="date"
-                id="warranty_expiration"
-                {...formik.getFieldProps('warranty_expiration')}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
-              />
-            </div>
-
-            <div className="sm:col-span-6">
-              <label htmlFor="notes" className="block text-sm font-medium text-gray-700">
-                Notes
-              </label>
-              <textarea
-                id="notes"
-                rows={3}
-                {...formik.getFieldProps('notes')}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
-              />
-            </div>
-
-            <div className="sm:col-span-6">
-              <label className="block text-sm font-medium text-gray-700 mb-4">
-                Custom Fields
-              </label>
-              <CustomFields
-                fields={formik.values.custom_fields}
-                onChange={(fields) => formik.setFieldValue('custom_fields', fields)}
-              />
-            </div>
+            <ItemFormFields
+              register={register}
+              errors={errors}
+              control={control}
+            />
 
             <div className="sm:col-span-6">
               <div>
-                <label htmlFor="images" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="images" className="block text-sm font-medium text-muted">
                   Images
                 </label>
                 <div className="mt-1 flex items-center gap-4">
@@ -361,13 +183,13 @@ export default function AddItem() {
                     multiple
                     accept="image/*"
                     onChange={handleFileChange}
-                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"
+                    className="block w-full text-sm text-subtle file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary-subtle file:text-primary-hover hover:file:bg-primary-subtle-hover"
                   />
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
                       onClick={() => setShowScanner(true)}
-                      className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                      className="inline-flex items-center px-3 py-2 border border-line-strong shadow-sm text-sm font-medium rounded-md text-muted bg-surface-raised hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
                     >
                       <CameraIcon className="h-5 w-5 mr-2" />
                       Camera
@@ -375,23 +197,128 @@ export default function AddItem() {
                     <button
                       type="button"
                       onClick={() => setShowScanner(true)}
-                      className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                      className="inline-flex items-center px-3 py-2 border border-line-strong shadow-sm text-sm font-medium rounded-md text-muted bg-surface-raised hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
                     >
                       <QrCodeIcon className="h-5 w-5 mr-2" />
                       Scan Barcode
                     </button>
+                    <SectionErrorBoundary label="vision identify">
+                      <VisionIdentifyButton
+                        onResult={setVisionResult}
+                        maxFiles={4}
+                      />
+                    </SectionErrorBoundary>
                   </div>
                 </div>
               </div>
 
+              {visionResult && (
+                <SectionErrorBoundary
+                  label="vision suggestion panel"
+                  resetKey={visionResult.queried_at}
+                >
+                  <div className="mt-4">
+                    <VisionSuggestionPanel
+                    suggestion={visionResult.suggestion}
+                    provider={visionResult.provider}
+                    model={visionResult.model}
+                    onApply={(accepted: Partial<VisionSuggestion>) => {
+                      // Map vision fields onto form fields. Only keys
+                      // that line up exactly get applied; the rest
+                      // (suggested_tags, item_specifics) land in
+                      // custom_fields.user_defined in a later
+                      // iteration.
+                      const touched = new Set<string>(aiFields);
+                      const apply = (formField: string, value: unknown) => {
+                        if (value === null || value === undefined || value === '') return;
+                        setValue(formField as keyof AddItemFormValues, value as never);
+                        touched.add(formField);
+                      };
+                      apply('name', accepted.name);
+                      apply('brand', accepted.brand);
+                      apply('model_number', accepted.model_number);
+                      apply('category', accepted.category);
+                      apply('serial_number', accepted.serial_number);
+                      apply('notes', accepted.description);
+                      setAiFields(touched);
+                      setVisionResult(null);
+                      // Chain into pricing. If the accepted payload
+                      // doesn't have enough identity (brand +
+                      // model_number), skip — pricing needs them.
+                      if (accepted.brand && accepted.model_number) {
+                        estimateFromMetadata({
+                          brand: accepted.brand,
+                          model_number: accepted.model_number,
+                          name: accepted.name ?? undefined,
+                          condition: accepted.condition ?? undefined,
+                          year: accepted.year ?? undefined,
+                        });
+                      }
+                    }}
+                      onDismiss={() => setVisionResult(null)}
+                    />
+                  </div>
+                </SectionErrorBoundary>
+              )}
+
+              {aiFields.size > 0 && (
+                <div
+                  className="mt-3 flex flex-wrap items-center gap-2 rounded-md bg-primary-subtle px-3 py-2 text-xs text-primary"
+                  role="status"
+                  aria-live="polite"
+                >
+                  <span className="font-semibold">AI filled:</span>
+                  {Array.from(aiFields).map((field) => (
+                    <span
+                      key={field}
+                      className="rounded bg-primary px-1.5 py-0.5 text-white"
+                    >
+                      {field}
+                    </span>
+                  ))}
+                  <span className="text-[11px] text-primary">
+                    (chips clear as you edit each field)
+                  </span>
+                </div>
+              )}
+
+              {isPricing && !priceEnvelope && (
+                <p className="mt-3 text-xs text-muted">
+                  Looking up resale value from vision metadata…
+                </p>
+              )}
+
+              {priceEnvelope && (
+                <div className="mt-4">
+                  <PriceEstimateCard
+                    envelope={priceEnvelope}
+                    refreshing={isPricing}
+                    onApplyMedian={(median) => {
+                      setValue('current_value', String(median.toFixed(2)));
+                      setAiFields((prev) => {
+                        const next = new Set(prev);
+                        next.add('current_value');
+                        return next;
+                      });
+                    }}
+                  />
+                </div>
+              )}
+
               {scanningStatus && (
-                <div className="mt-2 rounded-md bg-blue-50 p-4">
-                  <div className="text-sm text-blue-700">{scanningStatus}</div>
+                <div className="mt-2 rounded-md bg-primary-subtle p-4">
+                  <div className="text-sm text-primary">{scanningStatus}</div>
                 </div>
               )}
 
               {showScanner && (
-                <Suspense fallback={<div className="mt-2 text-sm text-gray-500">Loading scanner…</div>}>
+                <Suspense
+                  fallback={
+                    <div className="mt-2 text-sm text-subtle">
+                      Loading scanner…
+                    </div>
+                  }
+                >
                   <BarcodeScanner
                     onCapture={(file: File) => {
                       setSelectedFiles((prev) => [...prev, file]);
@@ -402,22 +329,26 @@ export default function AddItem() {
                       try {
                         const item = await items.lookupBarcode(barcode);
                         if (item) {
-                          formik.setValues({
-                            ...formik.values,
-                            name: item.name,
-                            brand: item.brand || '',
-                            model_number: item.model_number || '',
-                            serial_number: item.serial_number || '',
-                            barcode: barcode,
-                          });
+                          setValue('name', item.name ?? '');
+                          setValue('brand', item.brand ?? '');
+                          setValue('model_number', item.model_number ?? '');
+                          setValue('serial_number', item.serial_number ?? '');
+                          setValue('barcode', barcode);
                           setScanningStatus('Item found! Form updated.');
                           setShowScanner(false);
                         } else {
-                          setScanningStatus('No item found for this barcode. Please fill in the details manually.');
+                          setValue('barcode', barcode);
+                          setScanningStatus(
+                            'No item found for this barcode. Please fill in the details manually.',
+                          );
                         }
-                      } catch (error) {
-                        setScanningStatus('Error looking up barcode. Please try again.');
-                        console.error('Barcode lookup error:', error);
+                      } catch (err) {
+                        setScanningStatus(
+                          apiErrorMessage(
+                            err,
+                            'Error looking up barcode. Please try again.',
+                          ),
+                        );
                       }
                     }}
                     onClose={() => {
@@ -436,16 +367,16 @@ export default function AddItem() {
             <button
               type="button"
               onClick={() => navigate('/')}
-              className="rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+              className="rounded-md border border-line-strong bg-surface-raised py-2 px-4 text-sm font-medium text-muted shadow-sm hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
             >
               Cancel
             </button>
             <button
               type="submit"
-              disabled={formik.isSubmitting}
-              className="ml-3 inline-flex justify-center rounded-md border border-transparent bg-primary-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+              disabled={isSubmitting}
+              className="ml-3 inline-flex justify-center rounded-md border border-transparent bg-primary py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-60"
             >
-              {formik.isSubmitting ? 'Saving...' : 'Save'}
+              {isSubmitting ? 'Saving...' : 'Save'}
             </button>
           </div>
         </div>

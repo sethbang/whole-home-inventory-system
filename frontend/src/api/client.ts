@@ -1,402 +1,61 @@
-import axios from 'axios';
-import type { EbayFieldsData } from '../components/EbayFields';
+/**
+ * Backward-compat barrel.
+ *
+ * Historically every frontend module imported its API helper from
+ * ``api/client.ts``. v2.3 splits those helpers into per-resource modules
+ * (``api/auth.ts``, ``api/items.ts``, etc.) but keeps this file as a
+ * re-export surface so the fifteen-plus existing import sites don't need
+ * a sweeping rename pass.
+ *
+ * New code should import from the per-resource modules directly. This
+ * barrel will be removed in a future release once downstream imports
+ * have migrated.
+ */
 
-// In development, use relative URLs that will be handled by Vite's proxy
-const API_URL = '';
+export { apiClient } from './http';
+export { ApiError, apiErrorMessage, isApiError } from './errors';
 
-export const apiClient = axios.create({
-  baseURL: API_URL,
-  withCredentials: true,
-  // Disable SSL certificate validation in development
-  ...(import.meta.env.DEV && {
-    httpsAgent: {
-      rejectUnauthorized: false
-    }
-  })
-});
+// Per-resource modules (all re-exported at the top level).
+export { auth } from './auth';
+export { items } from './items';
+export { images } from './images';
+export { backups } from './backups';
+export { analytics } from './analytics';
+export { ebay } from './ebay';
+export { facebook } from './facebook';
 
-// Add auth token to requests if available
-apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem('whis_token');
-  if (token && config.headers) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
-
-// Handle auth errors
-apiClient.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('whis_token');
-      window.location.href = '/login';
-    }
-    return Promise.reject(error);
-  }
-);
-
-export interface LoginCredentials {
-  username: string;
-  password: string;
-}
-
-export interface RegisterData {
-  email: string;
-  username: string;
-  password: string;
-}
-
-export interface User {
-  id: string;
-  email: string;
-  username: string;
-  is_active: boolean;
-  created_at: string;
-}
-
-export interface AuthResponse {
-  access_token: string;
-  token_type: string;
-}
-
-export const auth = {
-  login: async (credentials: LoginCredentials): Promise<AuthResponse> => {
-    try {
-      console.log('Attempting login with:', credentials.username);
-      
-      const params = new URLSearchParams();
-      params.append('grant_type', 'password');
-      params.append('username', credentials.username);
-      params.append('password', credentials.password);
-      
-      const response = await apiClient.post<AuthResponse>('/api/token', params, {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-      });
-      
-      console.log('Login response:', response.data);
-      return response.data;
-    } catch (error: any) {
-      console.error('Login error:', error.response?.data || error.message);
-      throw error;
-    }
-  },
-  register: async (data: RegisterData): Promise<User> => {
-    const response = await apiClient.post<User>('/api/register', data);
-    return response.data;
-  },
-  getCurrentUser: async (): Promise<User> => {
-    const response = await apiClient.get<User>('/api/users/me');
-    return response.data;
-  },
-};
-
-export interface Item {
-  id: string;
-  name: string;
-  category: string;
-  location: string;
-  brand?: string;
-  model_number?: string;
-  serial_number?: string;
-  purchase_date?: string;
-  purchase_price?: number;
-  current_value?: number;
-  warranty_expiration?: string;
-  notes?: string;
-  custom_fields?: Record<string, any>;
-  created_at: string;
-  updated_at: string;
-  images: ItemImage[];
-}
-
-export interface ItemImage {
-  id: string;
-  filename: string;
-  file_path: string;
-  created_at: string;
-}
-
-export interface SearchFilters {
-  query?: string;
-  category?: string;
-  location?: string;
-  min_value?: number;
-  max_value?: number;
-  sort_by?: string;
-  sort_desc?: boolean;
-  page?: number;
-  page_size?: number;
-}
-
-export interface ItemListResponse {
-  items: Item[];
-  total: number;
-  page: number;
-  page_size: number;
-}
-
-// Dev helper to generate dummy item data
-const generateDummyItem = (): Partial<Item> => {
-  const categories = ['Electronics', 'Furniture', 'Kitchen', 'Tools', 'Clothing'];
-  const locations = ['Living Room', 'Kitchen', 'Garage', 'Bedroom', 'Office'];
-  const brands = ['Samsung', 'Apple', 'Sony', 'LG', 'Dell'];
-  
-  const randomDate = () => {
-    const date = new Date();
-    date.setDate(date.getDate() - Math.floor(Math.random() * 365));
-    return date.toISOString();
-  };
-
-  return {
-    name: `Test Item ${Math.floor(Math.random() * 1000)}`,
-    category: categories[Math.floor(Math.random() * categories.length)],
-    location: locations[Math.floor(Math.random() * locations.length)],
-    brand: brands[Math.floor(Math.random() * brands.length)],
-    model_number: `MODEL-${Math.floor(Math.random() * 10000)}`,
-    serial_number: `SN-${Math.floor(Math.random() * 100000)}`,
-    purchase_date: randomDate(),
-    purchase_price: Math.floor(Math.random() * 1000),
-    current_value: Math.floor(Math.random() * 800),
-    warranty_expiration: randomDate(),
-    notes: 'This is a test item generated in dev mode',
-    custom_fields: {}
-  };
-};
-
-export const items = {
-  list: async (filters: SearchFilters = {}): Promise<ItemListResponse> => {
-    const response = await apiClient.get<ItemListResponse>('/api/items', { params: filters });
-    return response.data;
-  },
-  get: async (id: string): Promise<Item> => {
-    const response = await apiClient.get<Item>(`/api/items/${id}`);
-    return response.data;
-  },
-  create: async (data: Partial<Item>, isDev: boolean = false): Promise<Item> => {
-    let itemData = isDev ? generateDummyItem() : data;
-    const response = await apiClient.post<Item>('/api/items', itemData);
-    return response.data;
-  },
-  update: async (id: string, data: Partial<Item>): Promise<Item> => {
-    const response = await apiClient.put<Item>(`/api/items/${id}`, data);
-    return response.data;
-  },
-  delete: async (id: string): Promise<void> => {
-    await apiClient.delete(`/api/items/${id}`);
-  },
-  bulkDelete: async (itemIds: string[]): Promise<{ status: string; deleted_count: number }> => {
-    const response = await apiClient.post<{ status: string; deleted_count: number }>(
-      '/api/items/bulk-delete',
-      { item_ids: itemIds }
-    );
-    return response.data;
-  },
-  getCategories: async (): Promise<string[]> => {
-    const response = await apiClient.get<string[]>('/api/categories');
-    return response.data;
-  },
-  getLocations: async (): Promise<string[]> => {
-    const response = await apiClient.get<string[]>('/api/locations');
-    return response.data;
-  },
-  lookupBarcode: async (barcode: string): Promise<Item | null> => {
-    try {
-      const response = await apiClient.get<Item>(`/api/items/barcode/${barcode}`);
-      return response.data;
-    } catch (error) {
-      if ((error as any)?.response?.status === 404) {
-        return null;
-      }
-      throw error;
-    }
-  },
-};
-
-export const images = {
-  upload: async (itemId: string, file: File) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    const response = await apiClient.post(`/api/items/${itemId}/images`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-    return response.data;
-  },
-  list: async (itemId: string) => {
-    const response = await apiClient.get(`/api/items/${itemId}/images`);
-    return response.data;
-  },
-  delete: async (imageId: string) => {
-    await apiClient.delete(`/api/images/${imageId}`);
-  },
-};
-
-export interface EbayCategoryResponse {
-  categories: Array<{
-    id: string;
-    name: string;
-    subcategories?: Array<{
-      id: string;
-      name: string;
-    }>;
-  }>;
-  suggested_category?: {
-    id: string;
-    name: string;
-  };
-}
-
-export interface EbayExportResponse {
-  success: boolean;
-  file_url?: string;
-  message: string;
-  errors?: string[];
-  items_processed: number;
-}
-
-// eBay integration
-export const ebay = {
-  getCategories: async (itemId?: string): Promise<EbayCategoryResponse> => {
-    const response = await apiClient.get<EbayCategoryResponse>('/api/ebay/categories', {
-      params: itemId ? { item_id: itemId } : undefined
-    });
-    return response.data;
-  },
-  updateFields: async (itemId: string, fields: EbayFieldsData): Promise<EbayFieldsData> => {
-    const response = await apiClient.post<EbayFieldsData>(`/api/ebay/items/${itemId}/ebay-fields`, fields);
-    return response.data;
-  },
-  exportItems: async (itemIds: string[], defaultFields?: EbayFieldsData): Promise<EbayExportResponse> => {
-    const response = await apiClient.post<EbayExportResponse>('/api/ebay/export', {
-      item_ids: itemIds,
-      default_fields: defaultFields
-    });
-    return response.data;
-  },
-};
-
-// --- Backups ------------------------------------------------------------
-
-export interface Backup {
-  id: string;
-  owner_id: string;
-  filename: string;
-  file_path: string;
-  size_bytes: number;
-  item_count: number;
-  image_count: number;
-  created_at: string;
-  status: 'completed' | 'failed' | 'in_progress' | string;
-  error_message?: string;
-}
-
-export interface BackupList {
-  backups: Backup[];
-}
-
-export interface RestoreResult {
-  success: boolean;
-  message: string;
-  items_restored?: number;
-  images_restored?: number;
-  errors?: string[] | null;
-}
-
-export const backups = {
-  list: async (): Promise<BackupList> => {
-    const response = await apiClient.get<BackupList>('/api/backups');
-    return response.data;
-  },
-  create: async (): Promise<Backup> => {
-    const response = await apiClient.post<Backup>('/api/backups');
-    return response.data;
-  },
-  restore: async (backupId: string): Promise<RestoreResult> => {
-    const response = await apiClient.post<RestoreResult>(`/api/backups/${backupId}/restore`);
-    return response.data;
-  },
-  upload: async (file: File): Promise<Backup> => {
-    const formData = new FormData();
-    formData.append('file', file);
-    const response = await apiClient.post<Backup>('/api/backups/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-    return response.data;
-  },
-  delete: async (backupId: string): Promise<void> => {
-    await apiClient.delete(`/api/backups/${backupId}`);
-  },
-  download: (backupId: string): void => {
-    // Trigger a browser download via a new tab. The endpoint sets the
-    // Content-Disposition header server-side.
-    window.open(`/api/backups/${backupId}/download`, '_blank');
-  },
-};
-
-// --- Analytics ----------------------------------------------------------
-
-export interface ValueByCategory {
-  category: string;
-  item_count: number;
-  total_value: number;
-}
-
-export interface ValueByLocation {
-  location: string;
-  item_count: number;
-  total_value: number;
-}
-
-export interface ValueTrends {
-  total_purchase_value: number;
-  total_current_value: number;
-  value_change: number;
-  value_change_percentage: number;
-}
-
-export interface WarrantyItem {
-  id: string;
-  name: string;
-  expiration_date: string;
-}
-
-export interface WarrantyStatus {
-  expiring_soon: WarrantyItem[];
-  expired: WarrantyItem[];
-  active: WarrantyItem[];
-}
-
-export interface AgeBucket {
-  count: number;
-  total_value: number;
-  items: Array<{ id: string; name: string; purchase_date: string; current_value: number }>;
-}
-
-export type AgeAnalysis = Record<string, AgeBucket>;
-
-export const analytics = {
-  getValueByCategory: async (): Promise<ValueByCategory[]> => {
-    const response = await apiClient.get<ValueByCategory[]>('/api/analytics/value-by-category');
-    return response.data;
-  },
-  getValueByLocation: async (): Promise<ValueByLocation[]> => {
-    const response = await apiClient.get<ValueByLocation[]>('/api/analytics/value-by-location');
-    return response.data;
-  },
-  getValueTrends: async (): Promise<ValueTrends> => {
-    const response = await apiClient.get<ValueTrends>('/api/analytics/value-trends');
-    return response.data;
-  },
-  getWarrantyStatus: async (): Promise<WarrantyStatus> => {
-    const response = await apiClient.get<WarrantyStatus>('/api/analytics/warranty-status');
-    return response.data;
-  },
-  getAgeAnalysis: async (): Promise<AgeAnalysis> => {
-    const response = await apiClient.get<AgeAnalysis>('/api/analytics/age-analysis');
-    return response.data;
-  },
-};
+// Type re-exports so ``import type { Item } from '../api/client'`` keeps
+// working. New code should prefer importing from ``./types`` directly —
+// that module re-exports the generated OpenAPI types.
+export type {
+  AuthResponse,
+  LoginCredentials,
+  RegisterData,
+  User,
+  Item,
+  ItemImage,
+  ItemListResponse,
+  SearchFilters,
+  SearchFilter,
+  Backup,
+  BackupList,
+  RestoreResult,
+  AgeAnalysis,
+  AgeBucket,
+  ValueByCategory,
+  ValueByLocation,
+  ValueTrends,
+  WarrantyItem,
+  WarrantyStatus,
+  EbayCategory,
+  EbayCategoryResponse,
+  EbayExportRequest,
+  EbayExportResponse,
+  EbayFields,
+  FbAvailability,
+  FbCatalogExportRequest,
+  FbCategoriesResponse,
+  FbCondition,
+  FbCopyPasteBlock,
+  FbFieldsData,
+} from './types';

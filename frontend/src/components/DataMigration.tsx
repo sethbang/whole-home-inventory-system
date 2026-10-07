@@ -32,10 +32,11 @@ const DataMigration: React.FC = () => {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-    } catch (error: any) {
-      if (error?.response?.data) {
-        console.error('Export failed:', error.response.data);
-        setImportError(`Export failed: ${error.response.data.detail || 'Please try again.'}`);
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { detail?: string } } };
+      if (err.response?.data) {
+        console.error('Export failed:', err.response.data);
+        setImportError(`Export failed: ${err.response.data.detail || 'Please try again.'}`);
       } else {
         console.error('Export failed:', error);
         setImportError('Export failed. Please try again.');
@@ -82,24 +83,24 @@ const DataMigration: React.FC = () => {
   };
 
   return (
-    <div className="bg-white shadow rounded-lg p-6">
+    <div className="bg-surface-raised shadow rounded-lg p-6">
       <h2 className="text-xl font-semibold mb-4">Data Migration Tools</h2>
       
       <div className="space-y-6">
         {/* Export Section */}
         <div>
           <h3 className="text-lg font-medium mb-2">Export Items</h3>
-          <p className="text-gray-600 mb-3">Download your items in CSV or JSON format</p>
+          <p className="text-muted mb-3">Download your items in CSV or JSON format</p>
           <div className="flex space-x-4">
             <button
               onClick={() => handleExport('csv')}
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="bg-primary text-white px-4 py-2 rounded hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-primary"
             >
               Export as CSV
             </button>
             <button
               onClick={() => handleExport('json')}
-              className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="bg-success text-white px-4 py-2 rounded hover:bg-success/85 focus:outline-none focus:ring-2 focus:ring-success"
             >
               Export as JSON
             </button>
@@ -109,24 +110,24 @@ const DataMigration: React.FC = () => {
         {/* Import Section */}
         <div>
           <h3 className="text-lg font-medium mb-2">Import Items</h3>
-          <p className="text-gray-600 mb-3">Upload items from a CSV or JSON file</p>
+          <p className="text-muted mb-3">Upload items from a CSV or JSON file</p>
           <div className="flex flex-col space-y-4">
             <input
               type="file"
               accept=".csv,.json"
               onChange={handleImport}
-              className="block w-full text-sm text-gray-500
+              className="block w-full text-sm text-subtle
                 file:mr-4 file:py-2 file:px-4
                 file:rounded file:border-0
                 file:text-sm file:font-semibold
-                file:bg-blue-50 file:text-blue-700
-                hover:file:bg-blue-100"
+                file:bg-primary-subtle file:text-primary
+                hover:file:bg-primary-subtle"
             />
             {importStatus && (
-              <p className="text-green-600">{importStatus}</p>
+              <p className="text-success">{importStatus}</p>
             )}
             {importError && (
-              <p className="text-red-600 whitespace-pre-line">{importError}</p>
+              <p className="text-danger whitespace-pre-line">{importError}</p>
             )}
           </div>
         </div>

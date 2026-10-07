@@ -84,7 +84,7 @@ We are committed to providing a welcoming and inclusive experience for everyone.
    ```bash
    cd backend
    source venv/bin/activate
-   uvicorn app.main:app --reload
+   uvicorn app.main:app --reload --port 27182
    ```
 
 2. Start the frontend development server:
@@ -164,16 +164,27 @@ We are committed to providing a welcoming and inclusive experience for everyone.
 
 ### Backend Testing
 
-- Use pytest; `backend/tests/conftest.py` provides `client`, `user`, `auth_headers` fixtures against in-memory SQLite
+- Use pytest; `backend/tests/conftest.py` provides `client`, `user`, `auth_headers` fixtures against in-memory SQLite by default
 - Test edge cases and error conditions
-- Run locally with `pytest` before opening a PR; CI runs the same on Python 3.11 and 3.12
+- Run locally with `pytest` before opening a PR
+- CI runs a 4-leg matrix: Python 3.11 + 3.12, each on SQLite and on Postgres 16 (Postgres runs as a service container). LLM/pricing tests are mock-heavy and SQLite-only — Postgres legs run the subset that doesn't depend on provider mocks.
+- To run against Postgres locally: `TEST_DATABASE_URL=postgresql+psycopg://whis:whis@localhost:5432/whis pytest`
 - Coverage targets (80%) are aspirational — not currently enforced by CI
 
 ### Frontend Testing
 
-- Use React Testing Library + jest (preset `ts-jest`, jsdom)
-- Write unit tests for components and API client modules under `**/__tests__/**/*.test.[jt]s?(x)`
-- Run locally with `npm test` or `npm test -- --ci`
+- Use React Testing Library + **Vitest** (configured in `frontend/vitest.config.ts`, jsdom env, setup file at `src/setupTests.ts`)
+- Write unit tests for components and API client modules under `src/**/__tests__/**/*.test.{ts,tsx,js,jsx}`
+- Run locally with `npm test` (vitest run) or `npm run test:watch`
+- ESLint is **blocking** in CI (`npm run lint` must report 0 errors). Warnings are allowed but discouraged.
+- A `contract-check` CI leg regenerates `frontend/src/api/openapi.d.ts` from the live backend schema and fails if the committed file is out of sync — re-run `npm run codegen:api` after backend schema changes.
+
+### Security / supply chain
+
+CI also runs three blocking gates beyond the test matrix:
+- `pip-audit --strict` (Python deps; gated to the 3.12/SQLite leg)
+- `npm audit --omit=dev --audit-level=high` (frontend deps)
+- Trivy scan of the backend + Caddy images (HIGH/CRITICAL fail; ignore-unfixed)
 
 ### End-to-End Testing
 

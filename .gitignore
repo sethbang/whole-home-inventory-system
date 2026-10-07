@@ -24,6 +24,8 @@ yarn-error.log*
 *.db
 *.sqlite3
 backend/database/
+backend/uploads/
+backend/backups/
 backend/backend/database/
 backend/backend/uploads/
 backend/backend/backups/
@@ -41,6 +43,15 @@ dev-dist/
 # No longer excluding test data as it's now part of the repository
 images/local
 /ToDo.md
+
+# Local-only tooling and reference material
+.claude/
+OR_docs/
+VALIDATION_PLAN.md
+
+# Wrapper-managed runtime state (bin/whis writes these per-host)
+.env.generated
+.whis-mdns.pid
 
 # Certificates and Keys
 *.key
