@@ -17,14 +17,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (turbo-stream deserialization, `__manifest` DoS), and `form-data` →
   4.0.6 (CRLF injection in multipart field names). The production
   dependency audit (`npm audit --omit=dev`) is clean again.
+- **Patched Python dependency advisories** flagged by `pip-audit`:
+  `starlette` floor raised to 1.3.1 (PYSEC-2026-161/-248/-249/-2280/
+  -2281) and `cryptography` to 50.x (PYSEC-2026-3552/-3553/-3554,
+  GHSA-537c-gmf6-5ccf). Starlette 1.0 only removed APIs WHIS doesn't
+  use; no code changes were needed.
 
 ### Changed
 
 - **Completed the SQLAlchemy 2.x `select()` migration.** Every remaining
   legacy `db.query()` call site (auth, security, analytics, pricing,
   eBay, the ARQ job tasks, the backup / LLM-config services, and the dev
-  scripts) now uses `select()` / `db.execute(...)`. The codebase is now
-  ready for SQLAlchemy 3.x, where the `Query` API is removed.
+  scripts) now uses `select()` / `db.execute(...)`, and `Base` now
+  comes from `sqlalchemy.orm.declarative_base` rather than the legacy
+  `sqlalchemy.ext.declarative`. The codebase is now ready for
+  SQLAlchemy 3.x, where the `Query` API is removed.
 - **Replaced the deprecated `datetime.utcnow()`** with a new
   `app/utctime.py` helper (`utcnow()` — a naive UTC datetime,
   behaviour-identical to the old call). The backend test run dropped
