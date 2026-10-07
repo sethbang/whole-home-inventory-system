@@ -19,7 +19,7 @@ python-dotenv>=1.2.2,<2
 # image pipeline.
 pillow>=10.4,<13
 pydantic[email]>=2.10,<3
-pydantic-settings>=2.6,<3
+pydantic-settings>=2.15.0,<3
 pandas>=2.2,<3
 python-dateutil==2.9.0
 alembic==1.14.0
