@@ -56,7 +56,7 @@ redis>=5.0,<6
 
 # --- v3.1 additions -----------------------------------------------------------
 # httpx + tenacity underpin the LLM + pricing HTTP layers.
-httpx>=0.27,<1
+httpx>=0.28.1,<1
 tenacity>=9,<10
 
 # OpenAI Python SDK — used as the client for any OpenAI-compatible
