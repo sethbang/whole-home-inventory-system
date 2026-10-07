@@ -17,8 +17,8 @@ export default defineConfig(({ mode }) => {
       strictPort: true,
       ...(mode === 'development' && {
         https: {
-          key: fs.readFileSync(path.resolve(__dirname, 'certs/key.pem')),
-          cert: fs.readFileSync(path.resolve(__dirname, 'certs/cert.pem')),
+          key: fs.readFileSync(path.resolve(import.meta.dirname, 'certs/key.pem')),
+          cert: fs.readFileSync(path.resolve(import.meta.dirname, 'certs/cert.pem')),
         },
         proxy: {
           '/api': {

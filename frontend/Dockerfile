@@ -1,7 +1,7 @@
 # Dev-mode Dockerfile: Vite dev server with HMR. Used by docker-compose.yml.
 # Certs come from a mounted volume (the host runs
 # `node scripts/generate-certs.js` once before bringing compose up).
-FROM node:20-slim
+FROM node:24-slim
 
 # Install curl for HEALTHCHECK + openssl for the certs fallback path.
 RUN apt-get update \
@@ -10,7 +10,7 @@ RUN apt-get update \
 
 WORKDIR /app
 
-# node:20-slim already provisions a non-root `node` user (uid 1000).
+# node:24-slim already provisions a non-root `node` user (uid 1000).
 # Make sure the working dir is owned by it so npm install doesn't fight
 # permissions with bind-mounted host files.
 RUN chown -R node:node /app

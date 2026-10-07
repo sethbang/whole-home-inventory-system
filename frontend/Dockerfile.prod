@@ -5,7 +5,7 @@
 # `dockerfile: frontend/Dockerfile.prod` combo that wires it up.
 #
 # Stage 1 — build the SPA.
-FROM node:20-slim AS build
+FROM node:24-slim AS build
 
 WORKDIR /app
 

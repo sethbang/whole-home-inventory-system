@@ -43,7 +43,7 @@ We are committed to providing a welcoming and inclusive experience for everyone.
 ### Prerequisites
 
 - Python 3.11 or higher (CI tests 3.11 and 3.12)
-- Node.js 20 or higher
+- Node.js 22.12 or higher (24 LTS recommended)
 - npm
 - Git
 - A code editor (VS Code recommended)
