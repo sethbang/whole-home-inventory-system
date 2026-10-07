@@ -65,7 +65,7 @@ tenacity>=9,<10
 # pricing features return 503 via the VISION_ENABLED / PRICING_ENABLED
 # gates. Ships by default so switching on the features is just a
 # config change.
-openai>=1.57,<2
+openai>=3.24.0,<4
 
 # --- v3.2 additions -----------------------------------------------------------
 # Fernet encryption + HKDF for the operator-editable LLM API key
