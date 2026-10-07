@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Dependency refresh** (supersedes Dependabot PRs #2–#14).
+  - Frontend: Vite 6 → 8, `@vitejs/plugin-react` 4 → 6,
+    `vite-plugin-pwa` 0.21 → 2.0, Vitest + coverage 3 → 5, `globals`
+    15 → 17, `eslint-plugin-react-refresh` 0.4 → 0.5, plus minor/patch
+    bumps across React 19.3, TanStack Query, react-hook-form, zod,
+    zxing, and Tailwind. The lockfile was regenerated; `npm audit`
+    (dev included) now reports 0 vulnerabilities.
+  - Backend: `openai` SDK 1.x → 3.x (no code changes — WHIS doesn't use
+    the Responses API or pass a custom httpx client), uvicorn 0.54,
+    SQLAlchemy 2.1, alembic 1.20, and raised floors for httpx,
+    pydantic-settings, and slowapi.
+  - CI: `actions/checkout` v7, `actions/setup-node` v7,
+    `docker/setup-buildx-action` v4.
+- **Node.js 24** in CI and both frontend Docker images (was 20, which is
+  end-of-life). Vitest 5 requires Node ≥ 22.12, so that is now the
+  minimum for local development.
+- `vite.config.ts` uses `import.meta.dirname` instead of `__dirname`,
+  for Vite's upcoming native config loader.
+
+### Fixed
+
+- **Two timing-dependent frontend tests.** The Dashboard bulk-delete
+  test asserted the dialog had closed before the delete promise
+  resolved (it failed CI on `main` once), and the Browse room-filter
+  test assumed the location-counts query resolved alongside the items
+  query, which no longer holds with TanStack Query 5.104. Both now wait
+  for the UI state they check.
+
 ## [3.3.1] - 2026-10-06
 
 ### Security

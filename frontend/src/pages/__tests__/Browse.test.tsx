@@ -88,8 +88,12 @@ describe('Browse', () => {
       page_size: 24,
     });
 
-    // Click the desktop sidebar's "Garage" button.
-    const garageButtons = screen.getAllByRole('button', { name: /Garage\s*1/ });
+    // Click the desktop sidebar's "Garage" button. The room buttons come
+    // from the separate location-counts query, so wait for them to render
+    // rather than assuming it resolved alongside items.list.
+    const garageButtons = await screen.findAllByRole('button', {
+      name: /Garage\s*1/,
+    });
     fireEvent.click(garageButtons[0]);
 
     await waitFor(() => {

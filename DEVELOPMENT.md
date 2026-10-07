@@ -18,7 +18,7 @@ This guide provides detailed information for developers working on WHIS (Whole-H
 ### Prerequisites
 
 - Python 3.11 or 3.12 (CI matrix runs both)
-- Node.js 20+ (CI uses 20)
+- Node.js 22.12+ (CI and the Docker images use 24)
 - Git
 - VS Code (recommended)
 - Docker + Docker Compose for the full-stack workflow

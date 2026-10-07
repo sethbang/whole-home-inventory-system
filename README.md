@@ -72,7 +72,7 @@ WHIS is a self-hosted platform for managing household inventories. It centralize
 - **structlog**, **slowapi** (per-route rate limiting), **OpenTelemetry** (opt-in)
 
 ### Frontend
-- **React 19**, **TypeScript 5**, **Vite 6**
+- **React 19**, **TypeScript 5**, **Vite 8**
 - **Tailwind CSS v4** (`@tailwindcss/vite`, config in CSS via `@theme` block — no `tailwind.config.js`/`postcss.config.js`)
 - **React Router v7** (data router with loaders)
 - **TanStack Query 5**
@@ -88,7 +88,7 @@ WHIS is a self-hosted platform for managing household inventories. It centralize
 ## Prerequisites
 
 - Python 3.11 or higher
-- Node.js 20 or higher
+- Node.js 22.12 or higher (24 LTS recommended)
 - npm
 - Git
 - Optional: Docker + Docker Compose for the containerized stack
