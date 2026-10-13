@@ -44,7 +44,7 @@ opentelemetry-instrumentation-sqlalchemy>=0.49b0,<1
 # deployments — the 5MB overhead is acceptable to keep one image for both
 # dialects. Operators opt into Postgres by setting DATABASE_URL to
 # postgresql+psycopg://...
-psycopg[binary]>=3.2,<4
+psycopg[binary]>=3.3.6,<4
 
 # ARQ — Redis-backed async job queue. Ships by default; the enqueuer in
 # the service layer no-ops when REDIS_URL is unset, so SQLite-only
