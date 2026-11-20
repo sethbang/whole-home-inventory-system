@@ -1,7 +1,8 @@
 # Dependabot keeps backend (pip), frontend (npm), and CI (github-actions)
 # dependencies up to date. Minor and patch updates are grouped into one PR
 # per ecosystem per week to keep review noise low; major bumps arrive as
-# individual PRs so they can be vetted one at a time.
+# individual PRs so they can be vetted one at a time. Review requests come
+# from .github/CODEOWNERS (Dependabot's `reviewers` option was retired).
 
 version: 2
 
@@ -14,9 +15,7 @@ updates:
       day: monday
       time: "08:00"
       timezone: "America/New_York"
-    open-pull-requests-limit: 5
-    reviewers:
-      - "sethbangert"
+    open-pull-requests-limit: 10
     labels:
       - "dependencies"
       - "backend"
@@ -41,21 +40,25 @@ updates:
       day: monday
       time: "08:00"
       timezone: "America/New_York"
-    open-pull-requests-limit: 5
-    reviewers:
-      - "sethbangert"
+    open-pull-requests-limit: 10
     labels:
       - "dependencies"
       - "frontend"
     # Pin the React major to avoid unsolicited React 20 (or whatever comes
     # after). Same for React Router, which has historically shipped breaking
     # majors. Remove when the project is ready to move up.
+    #
+    # TypeScript majors are held until the toolchain catches up: as of
+    # 2026-11 openapi-typescript peers on `typescript ^5.x` and
+    # typescript-eslint on `<6.1.0`, so TS 7 fails `npm install` outright.
     ignore:
       - dependency-name: "react"
         update-types: ["version-update:semver-major"]
       - dependency-name: "react-dom"
         update-types: ["version-update:semver-major"]
       - dependency-name: "react-router-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "typescript"
         update-types: ["version-update:semver-major"]
     groups:
       frontend-minor-and-patch:
@@ -76,9 +79,13 @@ updates:
     schedule:
       interval: weekly
       day: monday
-    open-pull-requests-limit: 3
-    reviewers:
-      - "sethbangert"
+    open-pull-requests-limit: 5
     labels:
       - "dependencies"
       - "ci"
+    # Action bumps rarely break anything for this workflow; one weekly PR
+    # instead of one per action.
+    groups:
+      github-actions:
+        patterns:
+          - "*"

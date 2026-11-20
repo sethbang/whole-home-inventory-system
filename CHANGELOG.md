@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Pillow raised to 13.x** (`pillow>=13,<14`) to clear the
+  PYSEC-2026-43xx advisories against 12.x that were failing
+  `pip-audit --strict`. Operators rebuilding the backend image pick this
+  up automatically; no code or config changes were needed.
+- **Frontend transitive advisories patched** via `npm audit fix`:
+  `follow-redirects` → 1.16.3 (high) and `fast-uri` → 3.1.9 (moderate),
+  plus in-range bumps to `typescript-eslint`, `undici`, `seroval`,
+  `serialize-javascript` and `zod`.
+- **Backend dependency floors raised**: `starlette>=1.7.0`,
+  `psycopg[binary]>=3.3.6`, `openai>=3.28.0`, `python-dateutil` →
+  2.9.0.post0, `sqlalchemy` → 2.1.6, `alembic` → 1.20.1.
+
+### Changed
+
+- **CI**: `aquasecurity/trivy-action` pinned to the v0.36.0 commit SHA
+  instead of tracking `@master`; `actions/setup-python` → v7 and
+  `docker/build-push-action` → v7.
+- **Dependabot**: PR limits raised (pip/npm 10, actions 5), GitHub
+  Actions updates grouped into one weekly PR, TypeScript majors ignored
+  until `openapi-typescript` / `typescript-eslint` support TS 7, and the
+  retired `reviewers` key dropped in favour of CODEOWNERS.
+
 ## [3.3.1] - 2026-10-07
 
 ### Security
