@@ -37,6 +37,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Actions updates grouped into one weekly PR, TypeScript majors ignored
   until `openapi-typescript` / `typescript-eslint` support TS 7, and the
   retired `reviewers` key dropped in favour of CODEOWNERS.
+- **Lint toolchain → ESLint 10**: `eslint` 10, `@eslint/js` 10,
+  `eslint-plugin-react-hooks` 7 (adds the React Compiler rules),
+  `eslint-plugin-react-refresh` 0.5.8, `typescript-eslint` 8.73.
+  `react-hooks/set-state-in-effect` is held at `warn` for now.
+
+### Fixed
+
+- **Vision identify could fire `onResult` during render.** The async
+  job-completion handler in `VisionIdentifyButton` ran inside `useMemo`
+  (setState + callback during render); it is now a `useEffect`, matching
+  the other job-poll consumers. Flagged by react-hooks 7.
 
 ## [3.3.1] - 2026-10-07
 
