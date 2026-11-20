@@ -20,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Backend dependency floors raised**: `starlette>=1.7.0`,
   `psycopg[binary]>=3.3.6`, `openai>=3.28.0`, `python-dateutil` →
   2.9.0.post0, `sqlalchemy` → 2.1.6, `alembic` → 1.20.1.
+- **Backend image now applies Debian security upgrades** at build time
+  (`apt-get upgrade`), picking up `zlib1g` CVE-2026-85091 ahead of the
+  `python:3.11-slim` tag being rebuilt.
 
 ### Changed
 
