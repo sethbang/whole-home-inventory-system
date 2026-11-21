@@ -29,9 +29,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PATH="/opt/venv/bin:$PATH"
 
 # curl is needed by HEALTHCHECK; everything else is in the venv.
+# `apt-get upgrade` pulls Debian security fixes that land before the
+# python:*-slim tag is rebuilt (e.g. zlib1g CVE-2026-85091), so the Trivy
+# gate doesn't fail on base-image lag.
 # The base image's system setuptools has the same vendored-CVE problem as
 # the venv's (see builder stage), so upgrade it here too.
 RUN apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
     && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/* \
     && pip install --no-cache-dir --upgrade "setuptools>=84"

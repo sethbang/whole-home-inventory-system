@@ -9,7 +9,7 @@
  * the parent owns the persistent form state.
  */
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 
 import { apiErrorMessage } from '../api/errors';
@@ -61,7 +61,11 @@ export default function VisionIdentifyButton({
 
   const jobPoll = useJobPoll(pendingJobId);
 
-  useMemo(() => {
+  // React to the polled job settling. This must be an effect, not a memo:
+  // it calls setState + onResult, which are side effects and must not run
+  // during render (StrictMode / concurrent renders could fire onResult
+  // twice).
+  useEffect(() => {
     if (!pendingJobId || !jobPoll.data) return;
     const { status, result, error } = jobPoll.data;
     if (status === 'complete' && result) {

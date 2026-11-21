@@ -19,6 +19,12 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
+      // react-hooks v7 promotes this React Compiler rule to an error. Every
+      // current hit is a legitimate sync with an external system (a polled
+      // job settling, camera start, auth bootstrap), so keep it visible as
+      // a warning until those move to callbacks (e.g. a useJobPoll
+      // onSettled option) rather than effects.
+      'react-hooks/set-state-in-effect': 'warn',
       'react-refresh/only-export-components': [
         'warn',
         { allowConstantExport: true },

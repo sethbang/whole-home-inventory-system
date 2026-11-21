@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Pillow raised to 13.x** (`pillow>=13,<14`) to clear the
+  PYSEC-2026-43xx advisories against 12.x that were failing
+  `pip-audit --strict`. Operators rebuilding the backend image pick this
+  up automatically; no code or config changes were needed.
+- **Frontend transitive advisories patched** via `npm audit fix`:
+  `follow-redirects` → 1.16.3 (high) and `fast-uri` → 3.1.9 (moderate),
+  plus in-range bumps to `typescript-eslint`, `undici`, `seroval`,
+  `serialize-javascript` and `zod`.
+- **Backend dependency floors raised**: `starlette>=1.7.0`,
+  `psycopg[binary]>=3.3.6`, `openai>=3.28.0`, `python-dateutil` →
+  2.9.0.post0, `sqlalchemy` → 2.1.6, `alembic` → 1.20.1.
+- **Backend image now applies Debian security upgrades** at build time
+  (`apt-get upgrade`), picking up `zlib1g` CVE-2026-85091 ahead of the
+  `python:3.11-slim` tag being rebuilt.
+- **Caddy image: time-boxed Trivy ignore** for `golang.org/x/net`
+  CVE-2026-78661 (`.trivyignore.caddy`, expires 2026-11-30). No Caddy
+  release ships the fix yet, and the HTML-parsing path it affects isn't
+  reachable from WHIS's Caddyfile (no `templates` / `markdown`).
+
+### Changed
+
+- **CI**: `aquasecurity/trivy-action` pinned to the v0.36.0 commit SHA
+  instead of tracking `@master`; `actions/setup-python` → v7 and
+  `docker/build-push-action` → v7.
+- **Dependabot**: PR limits raised (pip/npm 10, actions 5), GitHub
+  Actions updates grouped into one weekly PR, TypeScript majors ignored
+  until `openapi-typescript` / `typescript-eslint` support TS 7, and the
+  retired `reviewers` key dropped in favour of CODEOWNERS.
+- **Lint toolchain → ESLint 10**: `eslint` 10, `@eslint/js` 10,
+  `eslint-plugin-react-hooks` 7 (adds the React Compiler rules),
+  `eslint-plugin-react-refresh` 0.5.8, `typescript-eslint` 8.73.
+  `react-hooks/set-state-in-effect` is held at `warn` for now.
+
+### Fixed
+
+- **Vision identify could fire `onResult` during render.** The async
+  job-completion handler in `VisionIdentifyButton` ran inside `useMemo`
+  (setState + callback during render); it is now a `useEffect`, matching
+  the other job-poll consumers. Flagged by react-hooks 7.
+
 ## [3.3.1] - 2026-10-07
 
 ### Security

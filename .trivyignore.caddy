@@ -1,0 +1,10 @@
+# Trivy ignores for the frontend (Caddy) image ONLY — wired into the
+# "Trivy scan — frontend image" step in .github/workflows/ci.yml.
+# Every entry MUST carry an exp: date so it fails loudly once stale.
+
+# golang.org/x/net/html DoS via crafted HTML (fixed in x/net 0.62.0).
+# Caddy bumped x/net on master 2026-11-06 (caddyserver/caddy#8368) but no
+# release ships it yet (v2.11.9 still has 0.60.0). Unreachable for WHIS:
+# our Caddyfile uses no `templates` / `markdown` handlers, the only paths
+# that parse HTML. Remove once caddy:2-alpine ships x/net >= 0.62.0.
+CVE-2026-78661 exp:2026-11-30
