@@ -185,6 +185,8 @@ jobs:
           severity: CRITICAL,HIGH
           exit-code: "1"
           ignore-unfixed: true
+          # Time-boxed, Caddy-only suppressions (each entry has exp:).
+          trivyignores: .trivyignore.caddy
 
   version-check:
     # Fail the build if the version stamp diverges across the FastAPI app,

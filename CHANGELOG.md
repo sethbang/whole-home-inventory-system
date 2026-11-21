@@ -23,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Backend image now applies Debian security upgrades** at build time
   (`apt-get upgrade`), picking up `zlib1g` CVE-2026-85091 ahead of the
   `python:3.11-slim` tag being rebuilt.
+- **Caddy image: time-boxed Trivy ignore** for `golang.org/x/net`
+  CVE-2026-78661 (`.trivyignore.caddy`, expires 2026-11-30). No Caddy
+  release ships the fix yet, and the HTML-parsing path it affects isn't
+  reachable from WHIS's Caddyfile (no `templates` / `markdown`).
 
 ### Changed
 
