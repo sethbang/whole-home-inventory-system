@@ -36,7 +36,7 @@ opentelemetry-api>=1.28,<2
 opentelemetry-sdk>=1.28,<2
 opentelemetry-exporter-otlp>=1.28,<2
 opentelemetry-instrumentation-fastapi>=0.49b0,<1
-opentelemetry-instrumentation-sqlalchemy>=0.49b0,<1
+opentelemetry-instrumentation-sqlalchemy>=0.66b2,<1
 
 # --- v3.0 additions -----------------------------------------------------------
 # psycopg (v3) is the Postgres driver. [binary] pulls the precompiled wheel
