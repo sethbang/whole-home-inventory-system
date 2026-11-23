@@ -1,4 +1,4 @@
-fastapi>=0.115.6,<1
+fastapi>=0.165.0,<1
 # Pin starlette explicitly — pulls newer than fastapi's transitive floor so
 # pip-audit sees a version with the CVE-2025-54121 + CVE-2025-62727 fixes.
 # 1.3.1+ resolves PYSEC-2026-161/-248/-249/-2280/-2281. Starlette 1.0 only
