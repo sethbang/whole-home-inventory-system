@@ -11,8 +11,7 @@ sqlalchemy==2.1.9
 python-multipart>=0.0.26,<1
 # 2.12.0+ resolves CVE-2026-32597.
 pyjwt[crypto]>=2.12.0,<3
-passlib[bcrypt]==1.7.4
-bcrypt>=3.2,<4
+bcrypt>=4.1,<6
 python-dotenv>=1.2.2,<2
 # Floor raised to 13.0 to clear the PYSEC-2026-43xx advisories against
 # 12.x (39 at last count). WHIS's image pipeline (Image.open,

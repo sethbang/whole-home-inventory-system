@@ -32,7 +32,7 @@ WHIS is a self-hosted single-tenant household inventory system. Its threat model
 
 3. **Authentication**
    - JWT-based authentication via **PyJWT** (HS256 by default — change `ALGORITHM` in settings if you need RS/ES)
-   - Password hashing with **bcrypt** via passlib (`bcrypt>=3.2,<4` pinned for passlib 1.7.4 compatibility)
+   - Password hashing with **bcrypt** (`bcrypt>=4.1,<6`, called directly; passwords are limited to 72 UTF-8 bytes at registration)
    - Token expiry controlled by `ACCESS_TOKEN_EXPIRE_MINUTES` (default 30)
    - `BYPASS_AUTH` env flag for local development — refuses to load without an explicit `SECRET_KEY` otherwise
 
@@ -172,7 +172,7 @@ A: No, WHIS stores all data locally on your host.
 A: Yes, but only via VPN (e.g., Tailscale) or a reverse proxy (Synology DSM, Caddy, Traefik). The application enforces per-route rate limits (login, registration, vision, pricing) but has no WAF or IP-level abuse protection of its own — put those at the proxy.
 
 **Q: How are passwords stored?**
-A: Passwords are hashed with **bcrypt** via passlib. Configure rounds by swapping the passlib `CryptContext` arguments in `backend/app/security.py`.
+A: Passwords are hashed with **bcrypt**. Configure rounds by passing `rounds=` to `bcrypt.gensalt()` in `get_password_hash` in `backend/app/security.py` (default 12).
 
 **Q: Are images stored securely?**
 A: Image uploads are validated by Pillow magic-byte inspection (not trusted `Content-Type`), enforced against a size cap and dimension cap, and stored with server-generated filenames. There is no malware scanning — if you accept uploads from untrusted parties, front the service with a scanning proxy.

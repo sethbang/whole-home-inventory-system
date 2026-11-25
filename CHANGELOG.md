@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Password hashing uses `bcrypt` directly; `passlib` removed**: passlib
+  1.7.4 is unmaintained and breaks against `bcrypt>=4.1`, which had pinned
+  us to `bcrypt<4`. `bcrypt` is now `>=4.1,<6`. Existing password hashes
+  (`$2b$` and `$2a$`) keep working with no migration, including passwords
+  longer than 72 bytes, which are still verified on their first 72 bytes
+  exactly as passlib did. **Registration now rejects passwords longer than
+  72 UTF-8 bytes** with a 422 instead of silently ignoring the excess.
+  Supersedes Dependabot #54.
+- **`python-dateutil` 4.0.0** (Dependabot #53). Only `relativedelta` is
+  used; no code changes.
+- **Dependabot ignores `redis` major bumps**: `arq` still requires
+  `redis<6`, so widening our cap (Dependabot #51) changed nothing and would
+  have allowed an unreviewed major jump once arq lifts its cap.
 - **Dependency updates (Dependabot #38-#49)**: backend floors raised for
   `fastapi`, `starlette`, `pydantic`, `psycopg`, `openai` and the
   OpenTelemetry exporter/SQLAlchemy instrumentation; majors `pandas` 3.x

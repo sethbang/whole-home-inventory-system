@@ -66,7 +66,7 @@ WHIS is a self-hosted platform for managing household inventories. It centralize
 - **SQLAlchemy 2.x**, **Pydantic v2**, **pydantic-settings**
 - **SQLite** by default; **Postgres 16** opt-in via `DATABASE_URL`
 - **Alembic** — sole source of truth for schema (the `Base.metadata.create_all()` path was removed in 2.0.0)
-- **PyJWT** + **passlib/bcrypt** for auth
+- **PyJWT** + **bcrypt** for auth
 - **ARQ** + **Redis** (v3.0) — optional background job queue
 - **OpenAI Python SDK** (v3.1) — talks to any OpenAI-compatible LLM (OpenRouter, Venice.ai, Ollama, LocalAI)
 - **structlog**, **slowapi** (per-route rate limiting), **OpenTelemetry** (opt-in)

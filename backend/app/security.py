@@ -3,10 +3,10 @@ import uuid
 from datetime import timedelta
 from typing import Optional
 
+import bcrypt
 import jwt
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
-from passlib.context import CryptContext
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -29,7 +29,13 @@ DEV_USER = models.User(
     created_at=utcnow(),
 )
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# bcrypt only reads the first 72 bytes of a password. passlib 1.7.4 (used
+# until v3.3.x) silently truncated longer input on both hash and verify, so
+# existing hashes for long passwords are hashes of the truncated bytes.
+# bcrypt>=5 raises instead of truncating, so we truncate explicitly to keep
+# those users able to log in. New passwords over the limit are rejected at
+# the schema layer (see schemas.UserCreate).
+BCRYPT_MAX_PASSWORD_BYTES = 72
 
 
 class OptionalOAuth2PasswordBearer(OAuth2PasswordBearer):
@@ -46,12 +52,22 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 oauth2_scheme_optional = OptionalOAuth2PasswordBearer(tokenUrl="token")
 
 
+def _password_bytes(password: str) -> bytes:
+    return password.encode("utf-8")[:BCRYPT_MAX_PASSWORD_BYTES]
+
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    try:
+        return bcrypt.checkpw(
+            _password_bytes(plain_password), hashed_password.encode("utf-8")
+        )
+    except ValueError:
+        # Empty or malformed stored hash: treat as a failed login, not a 500.
+        return False
 
 
 def get_password_hash(password: str) -> str:
-    return pwd_context.hash(password)
+    return bcrypt.hashpw(_password_bytes(password), bcrypt.gensalt()).decode("ascii")
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
