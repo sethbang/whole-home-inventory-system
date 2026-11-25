@@ -1,10 +1,10 @@
-fastapi>=0.115.6,<1
+fastapi>=0.165.0,<1
 # Pin starlette explicitly — pulls newer than fastapi's transitive floor so
 # pip-audit sees a version with the CVE-2025-54121 + CVE-2025-62727 fixes.
 # 1.3.1+ resolves PYSEC-2026-161/-248/-249/-2280/-2281. Starlette 1.0 only
 # removed APIs WHIS doesn't use (FastAPI provides its own
 # @app.middleware / @app.exception_handler).
-starlette>=1.7.0,<2
+starlette>=1.10.0,<2
 uvicorn[standard]==0.54.0
 sqlalchemy==2.1.9
 # 0.0.26+ resolves CVE-2024-53981, CVE-2026-24486, CVE-2026-40347.
@@ -18,9 +18,9 @@ python-dotenv>=1.2.2,<2
 # 12.x (39 at last count). WHIS's image pipeline (Image.open,
 # ImageOps.exif_transpose, ImageOps.fit) needed no changes for 13.0.
 pillow>=13,<14
-pydantic[email]>=2.10,<3
+pydantic[email]>=2.14.4,<3
 pydantic-settings>=2.15.0,<3
-pandas>=2.2,<3
+pandas>=3.1.1,<4
 python-dateutil==2.9.0.post0
 alembic==1.20.1
 
@@ -28,15 +28,15 @@ alembic==1.20.1
 # Rate limiting (slowapi, in-memory limiter; Redis backend lands in v3.0).
 slowapi>=0.1.10,<1
 # Structured logging. LOG_FORMAT=json|console selects renderer at startup.
-structlog>=24.4,<26
+structlog>=26.1.0,<27
 # OpenTelemetry skeleton — tracer provider always installed; exporter only
 # activates when OTEL_ENABLED=true. Gated so unconfigured deployments pay
 # nothing.
 opentelemetry-api>=1.28,<2
 opentelemetry-sdk>=1.28,<2
-opentelemetry-exporter-otlp>=1.28,<2
+opentelemetry-exporter-otlp>=1.45.2,<2
 opentelemetry-instrumentation-fastapi>=0.49b0,<1
-opentelemetry-instrumentation-sqlalchemy>=0.49b0,<1
+opentelemetry-instrumentation-sqlalchemy>=0.66b2,<1
 
 # --- v3.0 additions -----------------------------------------------------------
 # psycopg (v3) is the Postgres driver. [binary] pulls the precompiled wheel
@@ -44,7 +44,7 @@ opentelemetry-instrumentation-sqlalchemy>=0.49b0,<1
 # deployments — the 5MB overhead is acceptable to keep one image for both
 # dialects. Operators opt into Postgres by setting DATABASE_URL to
 # postgresql+psycopg://...
-psycopg[binary]>=3.3.6,<4
+psycopg[binary]>=3.3.9,<4
 
 # ARQ — Redis-backed async job queue. Ships by default; the enqueuer in
 # the service layer no-ops when REDIS_URL is unset, so SQLite-only
@@ -65,7 +65,7 @@ tenacity>=9,<10
 # pricing features return 503 via the VISION_ENABLED / PRICING_ENABLED
 # gates. Ships by default so switching on the features is just a
 # config change.
-openai>=3.28.0,<4
+openai>=3.57.0,<4
 
 # --- v3.2 additions -----------------------------------------------------------
 # Fernet encryption + HKDF for the operator-editable LLM API key

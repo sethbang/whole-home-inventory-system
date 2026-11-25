@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Dependency updates (Dependabot #38-#49)**: backend floors raised for
+  `fastapi`, `starlette`, `pydantic`, `psycopg`, `openai` and the
+  OpenTelemetry exporter/SQLAlchemy instrumentation; majors `pandas` 3.x
+  and `structlog` 26.x. Frontend: `@hookform/resolvers` 7.x,
+  `@testing-library/jest-dom` 8.x, plus react-query / react-router / vitest
+  patch releases.
+- **CI image scan no longer replays a stale apt layer**: the backend
+  `runtime` stage is always rebuilt (`no-cache-filters: runtime`) so its
+  `apt-get upgrade` picks up Debian security fixes (krb5 `deb13u2`).
+- **Dependabot pip `versioning-strategy: increase-if-necessary`**: range
+  requirements no longer produce one floor-bump PR per package.
+
 ### Security
 
 - **Pillow raised to 13.x** (`pillow>=13,<14`) to clear the
