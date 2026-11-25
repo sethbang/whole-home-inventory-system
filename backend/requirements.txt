@@ -52,7 +52,7 @@ psycopg[binary]>=3.3.9,<4
 # (async client); pinned explicitly so npm-audit-style CVE tracking can
 # see it.
 arq>=0.26,<1
-redis>=5.0,<6
+redis>=5.0,<9
 
 # --- v3.1 additions -----------------------------------------------------------
 # httpx + tenacity underpin the LLM + pricing HTTP layers.
