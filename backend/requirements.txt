@@ -34,7 +34,7 @@ structlog>=24.4,<26
 # nothing.
 opentelemetry-api>=1.28,<2
 opentelemetry-sdk>=1.28,<2
-opentelemetry-exporter-otlp>=1.28,<2
+opentelemetry-exporter-otlp>=1.45.2,<2
 opentelemetry-instrumentation-fastapi>=0.49b0,<1
 opentelemetry-instrumentation-sqlalchemy>=0.49b0,<1
 
