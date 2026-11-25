@@ -159,6 +159,11 @@ jobs:
           tags: whis-backend:ci
           cache-from: type=gha,scope=backend
           cache-to: type=gha,scope=backend,mode=max
+          # Always rebuild the runtime stage so its `apt-get upgrade` layer
+          # picks up new Debian security fixes; a cached layer replays stale
+          # packages and Trivy fails on CVEs that are already fixed. The
+          # expensive pip `builder` stage stays cached.
+          no-cache-filters: runtime
 
       - name: Build frontend (Caddy) image
         uses: docker/build-push-action@v7

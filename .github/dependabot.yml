@@ -16,6 +16,15 @@ updates:
       time: "08:00"
       timezone: "America/New_York"
     open-pull-requests-limit: 10
+    # requirements.txt uses ranges (`>=X,<Y`) with no lockfile, so there is
+    # no resolved version for Dependabot to classify as minor/patch/major.
+    # Those updates never matched the `update-types` group below and arrived
+    # as one PR per package (e.g. #38-#49), each only raising a floor that CI
+    # and the Docker build already exceed, since pip installs the newest
+    # in-range release. `increase-if-necessary` limits range updates to
+    # releases outside the range (real major bumps, still one PR each);
+    # `==` pins keep flowing through the group as before.
+    versioning-strategy: increase-if-necessary
     labels:
       - "dependencies"
       - "backend"
