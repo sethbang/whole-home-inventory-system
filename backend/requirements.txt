@@ -28,7 +28,7 @@ alembic==1.20.1
 # Rate limiting (slowapi, in-memory limiter; Redis backend lands in v3.0).
 slowapi>=0.1.10,<1
 # Structured logging. LOG_FORMAT=json|console selects renderer at startup.
-structlog>=24.4,<26
+structlog>=26.1.0,<27
 # OpenTelemetry skeleton — tracer provider always installed; exporter only
 # activates when OTEL_ENABLED=true. Gated so unconfigured deployments pay
 # nothing.
