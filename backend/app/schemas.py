@@ -2,7 +2,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import UUID4, BaseModel, ConfigDict, EmailStr, Field
+from pydantic import UUID4, BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from .ebay.schemas import EbayFields
 from .facebook.schemas import FbFields
@@ -85,6 +85,15 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     password: str
+
+    @field_validator("password")
+    @classmethod
+    def _password_fits_bcrypt(cls, value: str) -> str:
+        # bcrypt ignores everything past 72 bytes; reject rather than
+        # silently truncate. Counted in UTF-8 bytes, not characters.
+        if len(value.encode("utf-8")) > 72:
+            raise ValueError("Password must be at most 72 bytes (UTF-8).")
+        return value
 
 
 class User(UserBase):

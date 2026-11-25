@@ -362,7 +362,7 @@ See [SECURITY.md](SECURITY.md) for the full posture. Summary of what the applica
 
 - HTTPS-only (no HTTP listener; refuses to start without certs in the shared volume)
 - JWT auth via PyJWT (HS256 by default; switch via `ALGORITHM`)
-- bcrypt password hashing via passlib
+- bcrypt password hashing (the `bcrypt` package, called directly)
 - Pillow magic-byte upload validation + size + dimension caps
 - slowapi per-route rate limiting (auth, vision, pricing all rate-limited)
 - Structured logging with stack-trace redaction unless `DEBUG=true`

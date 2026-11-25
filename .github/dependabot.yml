@@ -28,6 +28,11 @@ updates:
     labels:
       - "dependencies"
       - "backend"
+    # redis is ARQ's runtime dependency and arq pins it (redis<6 as of arq
+    # 0.28). Raise our cap only when arq does, as a deliberate change.
+    ignore:
+      - dependency-name: "redis"
+        update-types: ["version-update:semver-major"]
     groups:
       backend-minor-and-patch:
         applies-to: version-updates
