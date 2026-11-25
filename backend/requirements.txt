@@ -20,7 +20,7 @@ python-dotenv>=1.2.2,<2
 pillow>=13,<14
 pydantic[email]>=2.14.4,<3
 pydantic-settings>=2.15.0,<3
-pandas>=2.2,<3
+pandas>=3.1.1,<4
 python-dateutil==2.9.0.post0
 alembic==1.20.1
 
